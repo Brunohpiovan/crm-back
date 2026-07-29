@@ -1,0 +1,4 @@
+ALTER TABLE etapa ADD COLUMN criado_em DATETIME;
+ALTER TABLE etapa ADD COLUMN atualizado_em DATETIME;
+
+

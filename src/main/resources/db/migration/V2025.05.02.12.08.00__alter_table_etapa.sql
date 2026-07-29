@@ -1,0 +1,2 @@
+ALTER TABLE etapa
+MODIFY valor_total DECIMAL(38,2) DEFAULT 0;

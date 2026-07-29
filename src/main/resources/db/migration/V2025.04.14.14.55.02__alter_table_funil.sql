@@ -1,0 +1,4 @@
+ALTER TABLE funil ADD COLUMN criado_em DATETIME;
+ALTER TABLE funil ADD COLUMN atualizado_em DATETIME;
+
+

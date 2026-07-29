@@ -1,0 +1,4 @@
+ALTER TABLE usuario
+ADD COLUMN bloqueado BOOLEAN NOT NULL DEFAULT false;
+
+

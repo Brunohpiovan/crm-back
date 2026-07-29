@@ -1,0 +1,2 @@
+ALTER TABLE participante 
+ADD COLUMN tipo_participante VARCHAR(20) NOT NULL DEFAULT 'PARTICIPANTE';

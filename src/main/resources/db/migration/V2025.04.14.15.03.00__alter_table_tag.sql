@@ -1,0 +1,4 @@
+ALTER TABLE tag ADD COLUMN criado_em DATETIME;
+ALTER TABLE tag ADD COLUMN atualizado_em DATETIME;
+
+

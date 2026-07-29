@@ -1,0 +1,14 @@
+package br.edu.faculdadevincit.crm_vincit.repository;
+
+import br.edu.faculdadevincit.crm_vincit.model.Acesso;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface AcessoRepository extends JpaRepository<Acesso, Long> {
+    List<Acesso> findByUsuarioId(Long usuarioId);
+    void deleteByUsuarioId(Long userId);
+
+}

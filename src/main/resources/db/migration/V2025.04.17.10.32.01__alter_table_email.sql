@@ -1,0 +1,2 @@
+ALTER TABLE email ADD COLUMN criado_em DATETIME;
+

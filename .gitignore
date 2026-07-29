@@ -1,0 +1,53 @@
+### Maven ###
+HELP.md
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### Credenciais e configurações locais ###
+.env
+.env.*
+!.env.example
+
+src/main/resources/application-dev.properties
+src/main/resources/application-local.properties
+
+### Chaves privadas e certificados ###
+src/main/resources/keys/
+*.pem
+*.key
+*.p12
+*.jks
+
+### Spring Tool Suite ###
+.apt_generated/
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### Visual Studio Code ###
+.vscode/
+
+### Sistema operacional ###
+.DS_Store
+Thumbs.db
