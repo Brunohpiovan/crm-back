@@ -61,9 +61,9 @@ public class OportunidadeService {
 
     long maxSizeBytes = 100 * 1024 * 1024;
 
-    public Oportunidade findByClienteAndCriadorNull(Long clienteId) {
+    public OportunidadeDTO findByClienteAndCriadorNull(Long clienteId) {
         Oportunidade oportunidade = oportunidadeRepository.findByClienteIdAndCriadorIsNull(clienteId).orElse(null);
-        return oportunidade;
+        return oportunidade != null ? new OportunidadeDTO(oportunidade) : null;
     }
 
 
@@ -161,7 +161,7 @@ public class OportunidadeService {
             String signedUrl = cloudFrontService.generateSignedUrl(dto.getUrl_anexo(), Duration.ofMinutes(60));
             dto.setUrl_anexo(signedUrl);
         }
-        messagingTemplate.convertAndSend("/topic/newoportunidade", newOportunidade);
+        messagingTemplate.convertAndSend("/topic/newoportunidade", dto);
         return dto;
     }
 

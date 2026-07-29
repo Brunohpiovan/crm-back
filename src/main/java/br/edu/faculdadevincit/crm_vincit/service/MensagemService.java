@@ -125,7 +125,7 @@ public class MensagemService{
     }
 
 
-    public List<Mensagem> getMessagesForProtocol(Long protocoloId) {
+    public List<MensagemResponseDTO> getMessagesForProtocol(Long protocoloId) {
         Protocolo protocolo = protocoloRepository.findById(protocoloId).orElseThrow(()-> new RuntimeException("Protocolo nao encontrado"));
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String authenticatedUsername = authentication.getName();
@@ -136,15 +136,21 @@ public class MensagemService{
         }
 
         List<Mensagem> mensagens = mensagemRepository.findByProtocolo(protocolo);
-        mensagens.forEach(mensagem -> {
-            String conteudo = mensagem.getConteudo();
-            if (conteudo != null && conteudo.contains(cloudFrontService.getBaseUrl())) {
-                String urlAssinada = cloudFrontService.generateSignedUrl(conteudo, Duration.ofMinutes(30));
-                mensagem.setConteudo(urlAssinada);
-            }
-        });
 
-        return mensagens;
+        return mensagens.stream()
+                .map(mensagem -> {
+                    MensagemResponseDTO dto = new MensagemResponseDTO(mensagem);
+
+                    String conteudo = dto.getConteudo();
+                    if (conteudo != null && conteudo.contains(cloudFrontService.getBaseUrl())) {
+                        dto.setConteudo(
+                                cloudFrontService.generateSignedUrl(conteudo, Duration.ofMinutes(30))
+                        );
+                    }
+
+                    return dto;
+                })
+                .collect(Collectors.toList());
 
     }
 

@@ -32,7 +32,7 @@ public class OportunidadeController {
 
     @GetMapping(value = "/cliente/{id}")
     public ResponseEntity<?> findByClienteAndCriadorNull(@PathVariable Long id) {
-        Oportunidade oportunidade = oportunidadeService.findByClienteAndCriadorNull(id);
+        OportunidadeDTO oportunidade = oportunidadeService.findByClienteAndCriadorNull(id);
         return ResponseEntity.ok(oportunidade);
     }
 

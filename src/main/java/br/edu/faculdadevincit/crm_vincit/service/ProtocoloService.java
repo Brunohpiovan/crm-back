@@ -24,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class ProtocoloService {
@@ -43,7 +44,7 @@ public class ProtocoloService {
     @Autowired
     private MensagemRepository mensagemRepository;
 
-    public Protocolo createProtocolo(ProtocoloDto protocoloDto) {
+    public ProtocoloMoveDTO createProtocolo(ProtocoloDto protocoloDto) {
         Usuario admin = usuarioRepository.findById(protocoloDto.getId_admin()).orElseThrow(() ->
                 new UsernameNotFoundException("Usuário não encontrado"));
         Optional<Protocolo> protocoloOptional = protocoloRepository.findByParticipanteIdAndStatusAberto(protocoloDto.getId_participante(),StatusProtocolo.ABERTO);
@@ -64,10 +65,11 @@ public class ProtocoloService {
         }
 
         mensagemRepository.saveAll(mensagensSemProtocolo);
-        messagingTemplate.convertAndSend("/topic/protocolo/aberto/" + protocolo.getParticipante().getId(), protocolo);
+        ProtocoloMoveDTO dto = new ProtocoloMoveDTO(protocolo);
+        messagingTemplate.convertAndSend("/topic/protocolo/aberto/" + protocolo.getParticipante().getId(), dto);
         ProtocoloNotificacaoDTO notificacaoDTO = new ProtocoloNotificacaoDTO(participante.getId(), admin.getId());
         messagingTemplate.convertAndSend("/topic/protocolo/novo", notificacaoDTO);
-        return protocolo;
+        return dto;
     }
 
     public Participante createParticipante(Long id){
@@ -136,7 +138,7 @@ public class ProtocoloService {
     }
 
 
-    public List<Protocolo> getProtocols(Long id_usuario) {
+    public List<ProtocoloMoveDTO> getProtocols(Long id_usuario) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String authenticatedUsername = authentication.getName();
         Usuario usuario = usuarioRepository.findById(id_usuario).orElseThrow(() ->
@@ -147,13 +149,13 @@ public class ProtocoloService {
         String login = usuario.getLogin();
         Optional<List<Protocolo>> optionalProtocolos  = protocoloRepository.findByAdminLoginOrParticipanteLogin(login);
         if (optionalProtocolos.isPresent() && !optionalProtocolos.get().isEmpty()) {
-            return optionalProtocolos.get();
+            return optionalProtocolos.get().stream().map(ProtocoloMoveDTO::new).collect(Collectors.toList());
         } else {
             return null;
         }
     }
 
-    public Protocolo findById(Long id) {
+    public ProtocoloMoveDTO findById(Long id) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String authenticatedUsername = authentication.getName();
         Optional<Protocolo> protocolo = protocoloRepository.findById(id);
@@ -162,7 +164,7 @@ public class ProtocoloService {
             if (!p.getAdmin().getLogin().equals(authenticatedUsername) && !p.getParticipante().getLogin().equals(authenticatedUsername)) {
                 throw new RuntimeException("Usuário não autorizado a acessar este protocolo.");
             }
-            return protocolo.get();
+            return new ProtocoloMoveDTO(p);
         } else {
             throw new RuntimeException("No content");
         }

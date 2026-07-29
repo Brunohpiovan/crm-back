@@ -39,7 +39,7 @@ public class OportunidadeDTO {
         this.id = oportunidade.getId();
         this.titulo = oportunidade.getTitulo();
         this.etapa = oportunidade.getEtapa().getId();
-        this.criador = new CriadorOportunidadeDto(oportunidade.getCriador());
+        this.criador = oportunidade.getCriador() != null ? new CriadorOportunidadeDto(oportunidade.getCriador()) : null;
         this.cliente = new ParticipanteDTO(oportunidade.getCliente());
         this.valor = oportunidade.getValor();
         this.data_criacao = oportunidade.getData_criacao();

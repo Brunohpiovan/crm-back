@@ -146,8 +146,10 @@ public class UsuarioService {
 
 
 
-    public List<Usuario> findByAdmin() {
-        return usuarioRepository.findByCargo(UserRole.ADMINISTRADOR);
+    public List<UsuarioAllDTO> findByAdmin() {
+        return usuarioRepository.findByCargo(UserRole.ADMINISTRADOR).stream()
+                .map(UsuarioAllDTO::new)
+                .collect(Collectors.toList());
     }
 
     public UsuarioResponseDto findById(Long id) {

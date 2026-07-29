@@ -2,6 +2,7 @@ package br.edu.faculdadevincit.crm_vincit.controller;
 
 import br.edu.faculdadevincit.crm_vincit.model.Mensagem;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.MensagemDto;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.MensagemResponseDTO;
 import br.edu.faculdadevincit.crm_vincit.service.ChatService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -25,7 +26,7 @@ public class ChatController {
         List<Mensagem> savedMessage = service.sendMessage(mensagem);
         String protocoloId = String.valueOf(mensagem.getId_protocolo());
         savedMessage.forEach(mensagemNew -> {
-            messagingTemplate.convertAndSend("/topic/messages/" + protocoloId, mensagemNew);
+            messagingTemplate.convertAndSend("/topic/messages/" + protocoloId, new MensagemResponseDTO(mensagemNew));
         });
     }
 

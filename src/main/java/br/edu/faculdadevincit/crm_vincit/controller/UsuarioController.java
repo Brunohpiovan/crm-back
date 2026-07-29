@@ -1,6 +1,5 @@
 package br.edu.faculdadevincit.crm_vincit.controller;
 
-import br.edu.faculdadevincit.crm_vincit.model.Usuario;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.*;
 import br.edu.faculdadevincit.crm_vincit.service.UsuarioService;
 import br.edu.faculdadevincit.crm_vincit.service.exceptions.DataIntegrityViolationException;
@@ -42,7 +41,7 @@ public class UsuarioController {
     }
 
     @GetMapping("/admin")
-    public List<Usuario> findCargo() {
+    public List<UsuarioAllDTO> findCargo() {
         return usuarioService.findByAdmin();
     }
 

@@ -16,8 +16,8 @@ public class MensagemController {
     private MensagemService mensagemService;
 
     @GetMapping("/messages/{protocoloId}")
-    public List<Mensagem> getMessages(@PathVariable Long protocoloId) {
-        List<Mensagem> messages = mensagemService.getMessagesForProtocol(protocoloId);
+    public List<MensagemResponseDTO> getMessages(@PathVariable Long protocoloId) {
+        List<MensagemResponseDTO> messages = mensagemService.getMessagesForProtocol(protocoloId);
         return messages;
     }
 

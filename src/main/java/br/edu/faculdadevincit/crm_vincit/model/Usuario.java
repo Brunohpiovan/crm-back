@@ -53,6 +53,7 @@ public class Usuario implements UserDetails {
     @NotBlank(message = "Informe uma senha")
     @Column(name = "senha",nullable = false)
     @Size(min = 8, max = 255, message = "O nome deve ter entre 6 e 254 caracteres")
+    @JsonIgnore
     private String senha;
 
     @NotBlank(message = "Informe um rg")
@@ -171,6 +172,7 @@ public class Usuario implements UserDetails {
     }
 
     @Override
+    @JsonIgnore
     public String getPassword() {
         return senha;
     }

@@ -1,6 +1,5 @@
 package br.edu.faculdadevincit.crm_vincit.controller;
 
-import br.edu.faculdadevincit.crm_vincit.model.Protocolo;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.ProtocoloDto;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.ProtocoloMoveDTO;
 import br.edu.faculdadevincit.crm_vincit.service.ProtocoloService;
@@ -20,7 +19,7 @@ public class ProtocoloController {
 
     @PostMapping
     public ResponseEntity<?> createProtocol(@RequestBody ProtocoloDto protocoloDto) {
-        Protocolo protocolo = protocoloService.createProtocolo(protocoloDto);
+        ProtocoloMoveDTO protocolo = protocoloService.createProtocolo(protocoloDto);
         return ResponseEntity.ok(protocolo);
     }
 
