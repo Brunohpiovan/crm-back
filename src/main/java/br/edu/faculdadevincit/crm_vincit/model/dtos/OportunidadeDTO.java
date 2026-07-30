@@ -38,9 +38,9 @@ public class OportunidadeDTO {
     public OportunidadeDTO(Oportunidade oportunidade) {
         this.id = oportunidade.getId();
         this.titulo = oportunidade.getTitulo();
-        this.etapa = oportunidade.getEtapa().getId();
+        this.etapa = oportunidade.getEtapa() != null ? oportunidade.getEtapa().getId() : null;
         this.criador = oportunidade.getCriador() != null ? new CriadorOportunidadeDto(oportunidade.getCriador()) : null;
-        this.cliente = new ParticipanteDTO(oportunidade.getCliente());
+        this.cliente = oportunidade.getCliente() != null ? new ParticipanteDTO(oportunidade.getCliente()) : null;
         this.valor = oportunidade.getValor();
         this.data_criacao = oportunidade.getData_criacao();
         this.url_anexo = oportunidade.getUrl_anexo();

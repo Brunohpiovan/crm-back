@@ -34,4 +34,12 @@ public class EtapaDto {
         }
         this.valor_total = etapa.getValor_total();
     }
+
+    public EtapaDto(Etapa etapa, List<OportunidadeDTO> oportunidades) {
+        this.id = etapa.getId();
+        this.nome = etapa.getNome();
+        this.funil = new FunilDtoCard(etapa.getFunil());
+        this.oportunidades = oportunidades != null ? oportunidades : new ArrayList<>();
+        this.valor_total = etapa.getValor_total();
+    }
 }

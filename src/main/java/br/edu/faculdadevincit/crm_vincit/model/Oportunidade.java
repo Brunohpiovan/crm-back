@@ -27,15 +27,15 @@ public class Oportunidade {
     @Size(max = 150, message = "O titulo deve ter no maximo 150 caracteres")
     private String titulo;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "card_id")
     private Etapa etapa;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "criador_id")
     private Usuario criador;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cliente_id")
     private Participante cliente;
 
@@ -78,5 +78,8 @@ public class Oportunidade {
     )
     private List<Tag> tags;
 
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 
 }

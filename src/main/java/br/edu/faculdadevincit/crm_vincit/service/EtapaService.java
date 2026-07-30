@@ -2,16 +2,22 @@ package br.edu.faculdadevincit.crm_vincit.service;
 
 import br.edu.faculdadevincit.crm_vincit.model.Etapa;
 import br.edu.faculdadevincit.crm_vincit.model.Funil;
+import br.edu.faculdadevincit.crm_vincit.model.Oportunidade;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.CriadorOportunidadeDto;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaDto;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaFunilDTO;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaUpdate2DTO;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaUpdateDTO;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.OportunidadeDTO;
+import br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade;
 import br.edu.faculdadevincit.crm_vincit.repository.EtapaRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.FunilRepository;
+import br.edu.faculdadevincit.crm_vincit.repository.OportunidadeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -29,6 +35,9 @@ public class EtapaService {
     private FunilRepository funilRepository;
 
     @Autowired
+    private OportunidadeRepository oportunidadeRepository;
+
+    @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
     @Autowired
@@ -36,25 +45,12 @@ public class EtapaService {
 
     public List<EtapaDto> findAll() {
         List<Etapa> etapas = etapaRepository.findAll();
+        Map<Long, List<OportunidadeDTO>> oportunidadesPorEtapa =
+                carregarOportunidadesPorEtapa(etapas.stream().map(Etapa::getId).collect(Collectors.toList()));
 
-        List<EtapaDto> etapaDtos = etapas.stream()
-                .map(etapa -> {
-                    EtapaDto dto = new EtapaDto(etapa);
-
-                    if (dto.getOportunidades() != null) {
-                        dto.getOportunidades().forEach(oportunidadeDTO -> {
-                            if (oportunidadeDTO.getUrl_anexo() != null && oportunidadeDTO.getUrl_anexo().contains(cloudFrontService.getBaseUrl())) {
-                                String signedUrl = cloudFrontService.generateSignedUrl(oportunidadeDTO.getUrl_anexo(), Duration.ofMinutes(60));
-                                oportunidadeDTO.setUrl_anexo(signedUrl);
-                            }
-                        });
-                    }
-
-                    return dto;
-                })
+        return etapas.stream()
+                .map(etapa -> new EtapaDto(etapa, oportunidadesPorEtapa.getOrDefault(etapa.getId(), List.of())))
                 .collect(Collectors.toList());
-
-        return etapaDtos;
     }
 
 
@@ -62,18 +58,57 @@ public class EtapaService {
         Etapa etapa = etapaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Etapa com id " + id + " não encontrado"));
 
-        EtapaDto dto = new EtapaDto(etapa);
+        List<OportunidadeDTO> oportunidades =
+                carregarOportunidadesPorEtapa(List.of(id)).getOrDefault(id, List.of());
 
-        if (dto.getOportunidades() != null) {
-            dto.getOportunidades().forEach(oportunidadeDTO -> {
-                if (oportunidadeDTO.getUrl_anexo() != null && oportunidadeDTO.getUrl_anexo().contains(cloudFrontService.getBaseUrl())) {
-                    String signedUrl = cloudFrontService.generateSignedUrl(oportunidadeDTO.getUrl_anexo(), Duration.ofMinutes(60));
-                    oportunidadeDTO.setUrl_anexo(signedUrl);
-                }
-            });
+        return new EtapaDto(etapa, oportunidades);
+    }
+
+    /**
+     * Carrega, em uma única consulta, os cards de todas as etapas informadas (evita N+1 por etapa)
+     * e assina as URLs do CloudFront.
+     */
+    Map<Long, List<OportunidadeDTO>> carregarOportunidadesPorEtapa(List<Long> etapaIds) {
+        if (etapaIds == null || etapaIds.isEmpty()) {
+            return Map.of();
         }
+        List<Oportunidade> oportunidades = oportunidadeRepository.findCardsByEtapaIdIn(etapaIds);
+        Map<Long, List<OportunidadeDTO>> resultado = new HashMap<>();
+        for (Oportunidade oportunidade : oportunidades) {
+            OportunidadeDTO dto = new OportunidadeDTO(oportunidade);
+            assinarUrls(dto);
+            resultado.computeIfAbsent(oportunidade.getEtapa().getId(), k -> new ArrayList<>()).add(dto);
+        }
+        return resultado;
+    }
 
-        return dto;
+    Map<Long, List<OportunidadeDTO>> carregarOportunidadesPorEtapa(List<Long> etapaIds,
+                                                                     List<SituacaoOportunidade> situacoes,
+                                                                     List<Long> tagIds) {
+        if (etapaIds == null || etapaIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Oportunidade> oportunidades = (tagIds != null && !tagIds.isEmpty())
+                ? oportunidadeRepository.findCardsByEtapaIdInAndSituacaoInAndTagIdsIn(etapaIds, situacoes, tagIds)
+                : oportunidadeRepository.findCardsByEtapaIdInAndSituacaoIn(etapaIds, situacoes);
+        Map<Long, List<OportunidadeDTO>> resultado = new HashMap<>();
+        for (Oportunidade oportunidade : oportunidades) {
+            OportunidadeDTO dto = new OportunidadeDTO(oportunidade);
+            assinarUrls(dto);
+            resultado.computeIfAbsent(oportunidade.getEtapa().getId(), k -> new ArrayList<>()).add(dto);
+        }
+        return resultado;
+    }
+
+    void assinarUrls(OportunidadeDTO dto) {
+        if (dto.getUrl_anexo() != null && dto.getUrl_anexo().contains(cloudFrontService.getBaseUrl())) {
+            dto.setUrl_anexo(cloudFrontService.generateSignedUrl(dto.getUrl_anexo(), Duration.ofMinutes(60)));
+        }
+        CriadorOportunidadeDto criador = dto.getCriador();
+        if (criador != null && criador.getUrlPicture() != null
+                && criador.getUrlPicture().contains(cloudFrontService.getBaseUrl())) {
+            criador.setUrlPicture(cloudFrontService.generateSignedUrl(criador.getUrlPicture(), Duration.ofMinutes(60)));
+        }
     }
 
 
@@ -89,18 +124,18 @@ public class EtapaService {
         Etapa savedEtapa = etapaRepository.save(etapa);
         messagingTemplate.convertAndSend("/topic/newetapa", savedEtapa);
         savedEtapa.setCriadoEm(LocalDateTime.now());
-        return new EtapaDto(savedEtapa);
+        return new EtapaDto(savedEtapa, List.of());
     }
 
     public EtapaDto updateAddValor(Long id, BigDecimal valor){
         Etapa etapaBanco = etapaRepository.findById(id).orElseThrow(()-> new RuntimeException("Etapa com id "+id+" nao encontrada"));
         etapaBanco.setValor_total(etapaBanco.getValor_total().add(valor));
         Etapa savedEtapa = etapaRepository.save(etapaBanco);
-        EtapaDto dto = new EtapaDto(savedEtapa);
+        EtapaDto dto = new EtapaDto(savedEtapa, List.of());
         Map<String, Object> payload = new HashMap<>();
         payload.put("etapaId", etapaBanco.getId());
         payload.put("valor", valor);
-        messagingTemplate.convertAndSend("/topic/addvalue", payload);
+        afterCommit(() -> messagingTemplate.convertAndSend("/topic/addvalue", payload));
         return dto;
     }
 
@@ -108,11 +143,11 @@ public class EtapaService {
         Etapa etapaBanco = etapaRepository.findById(id).orElseThrow(()-> new RuntimeException("Etapa com id "+id+" nao encontrada"));
         etapaBanco.setValor_total(etapaBanco.getValor_total().subtract(valor));
         Etapa savedEtapa = etapaRepository.save(etapaBanco);
-        EtapaDto dto = new EtapaDto(savedEtapa);
+        EtapaDto dto = new EtapaDto(savedEtapa, List.of());
         Map<String, Object> payload = new HashMap<>();
         payload.put("etapaId", etapaBanco.getId());
         payload.put("valor", valor);
-        messagingTemplate.convertAndSend("/topic/subvalue", payload);
+        afterCommit(() -> messagingTemplate.convertAndSend("/topic/subvalue", payload));
         return dto;
     }
 
@@ -147,6 +182,19 @@ public class EtapaService {
         }
         etapaBanco.setAtualizadoEm(LocalDateTime.now());
         return etapaBanco;
+    }
+
+    private void afterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
+        }
     }
 
 }
