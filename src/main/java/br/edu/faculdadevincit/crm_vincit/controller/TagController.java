@@ -1,16 +1,14 @@
 package br.edu.faculdadevincit.crm_vincit.controller;
 
 
-import br.edu.faculdadevincit.crm_vincit.model.Tag;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.TagDTO;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.TagOportunidadeDTO;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.TagRequestDTO;
 import br.edu.faculdadevincit.crm_vincit.service.TagService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -23,22 +21,22 @@ public class TagController {
     private TagService tagService;
 
     @GetMapping
-    public List<?> findAll() {
+    public List<TagDTO> findAll() {
         return tagService.findAll();
     }
 
     @GetMapping("/ativas")
-    public List<?> findAllAtivas() {
+    public List<TagOportunidadeDTO> findAllAtivas() {
         return tagService.findAllAtivas();
     }
 
     @GetMapping(value = "/{id}")
-    public ResponseEntity<?> findById(@PathVariable Long id){
+    public ResponseEntity<TagDTO> findById(@PathVariable Long id){
         return ResponseEntity.ok(tagService.findById(id));
     }
 
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody Tag tag) {
+    public ResponseEntity<?> create(@Valid @RequestBody TagRequestDTO tag) {
         tagService.create(tag);
         return ResponseEntity.ok().build();
     }

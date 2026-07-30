@@ -1,7 +1,6 @@
 package br.edu.faculdadevincit.crm_vincit.model.dtos;
 
 import br.edu.faculdadevincit.crm_vincit.model.Tag;
-import br.edu.faculdadevincit.crm_vincit.model.TemplateEmail;
 import br.edu.faculdadevincit.crm_vincit.model.enums.Cor;
 import br.edu.faculdadevincit.crm_vincit.model.enums.Pertence;
 import br.edu.faculdadevincit.crm_vincit.model.enums.Situacao;

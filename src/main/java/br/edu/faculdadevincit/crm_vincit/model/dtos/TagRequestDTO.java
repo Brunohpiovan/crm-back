@@ -3,6 +3,8 @@ package br.edu.faculdadevincit.crm_vincit.model.dtos;
 import br.edu.faculdadevincit.crm_vincit.model.enums.Cor;
 import br.edu.faculdadevincit.crm_vincit.model.enums.Pertence;
 import br.edu.faculdadevincit.crm_vincit.model.enums.Situacao;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -11,13 +13,17 @@ import lombok.Setter;
 @Setter
 public class TagRequestDTO {
 
+    @NotBlank(message = "O nome e obrigatorio")
     @Size(max = 150, message = "O nome deve ter no maximo 150 caracteres")
     private String nome;
 
+    @NotNull(message = "A cor e obrigatoria")
     private Cor cor;
 
+    @NotNull(message = "O pertencimento e obrigatorio")
     private Pertence pertence;
 
+    @NotNull(message = "A situacao e obrigatoria")
     private Situacao situacao;
 
 }

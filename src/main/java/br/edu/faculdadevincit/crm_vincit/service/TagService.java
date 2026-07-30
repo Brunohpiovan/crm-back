@@ -41,12 +41,13 @@ public class TagService {
         return new TagDTO(tagRepository.findById(id).orElseThrow(()->new RuntimeException("Tag nao encontrada")));
     }
 
-    public void create(Tag tag){
+    public void create(TagRequestDTO tag){
         if (tagRepository.existsByNome(tag.getNome())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Já existe uma tag com este nome.");
         }
-        tag.setCriadoEm(LocalDateTime.now());
-        tagRepository.save(tag);
+        Tag newTag = preencheTag(new Tag(), tag);
+        newTag.setCriadoEm(LocalDateTime.now());
+        tagRepository.save(newTag);
     }
 
     public void delete(Long id){

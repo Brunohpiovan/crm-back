@@ -29,10 +29,13 @@ public class Tag {
     @Column(unique = true)
     private String nome;
 
+    @Enumerated(EnumType.STRING)
     private Cor cor;
 
+    @Enumerated(EnumType.STRING)
     private Pertence pertence;
 
+    @Enumerated(EnumType.STRING)
     private Situacao situacao;
 
     @Column(name = "criado_em")
