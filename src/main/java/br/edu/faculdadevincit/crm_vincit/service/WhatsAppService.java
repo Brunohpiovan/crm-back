@@ -7,8 +7,10 @@ import br.edu.faculdadevincit.crm_vincit.model.enums.TipoParticipante;
 import br.edu.faculdadevincit.crm_vincit.repository.OportunidadeRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.ParticipanteRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.ProtocoloRepository;
+import br.edu.faculdadevincit.crm_vincit.service.exceptions.AccessDeniedException;
 import com.twilio.Twilio;
 import com.twilio.rest.api.v2010.account.Message;
+import com.twilio.security.RequestValidator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -107,7 +109,10 @@ public class WhatsAppService {
         }
     }
 
-    public void receiveRequest(Map<String, String> params){
+    public void receiveRequest(Map<String, String> params, String requestUrl, String twilioSignature){
+        if (!isValidTwilioRequest(requestUrl, params, twilioSignature)) {
+            throw new AccessDeniedException("Assinatura Twilio inválida.");
+        }
         String from = params.get("From");
         String body = params.get("Body");
         String profileName = params.get("ProfileName");
@@ -182,6 +187,14 @@ public class WhatsAppService {
             e.printStackTrace();
         }
     }
+    private boolean isValidTwilioRequest(String requestUrl, Map<String, String> params, String twilioSignature) {
+        if (twilioSignature == null || twilioSignature.isBlank()) {
+            return false;
+        }
+        RequestValidator requestValidator = new RequestValidator(authToken);
+        return requestValidator.validate(requestUrl, params, twilioSignature);
+    }
+
     private byte[] downloadMediaFromTwilio(String mediaUrl) throws IOException {
         RestTemplate restTemplate = new RestTemplate();
 

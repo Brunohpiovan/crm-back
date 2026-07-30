@@ -2,6 +2,7 @@ package br.edu.faculdadevincit.crm_vincit.controller;
 import br.edu.faculdadevincit.crm_vincit.model.MensagemRequest;
 import br.edu.faculdadevincit.crm_vincit.service.WhatsAppService;
 import com.twilio.rest.api.v2010.account.Message;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,8 +21,10 @@ public class WhatsAppController {
     }
 
     @PostMapping("/webhook")
-    public void receiveWhatsAppMessage(@RequestParam Map<String, String> params) {
-        whatsAppService.receiveRequest(params);
+    public void receiveWhatsAppMessage(@RequestParam Map<String, String> params,
+                                        @RequestHeader(value = "X-Twilio-Signature", required = false) String twilioSignature,
+                                        HttpServletRequest request) {
+        whatsAppService.receiveRequest(params, request.getRequestURL().toString(), twilioSignature);
     }
 }
 

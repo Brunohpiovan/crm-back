@@ -61,9 +61,19 @@ public class UsuarioService {
     @Autowired
     private CloudFrontService cloudFrontService;
 
-    public UsuarioResponseNoAuthDto findByIdNoAuth(Long id) {
+    public UsuarioResponseNoAuthDto findByIdParaEdicao(Long id) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String authenticatedUsername = authentication.getName();
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+
         Usuario usuario = usuarioRepository.findById(id).orElseThrow(() ->
                 new UsernameNotFoundException("Usuário não encontrado"));
+
+        if (!isAdmin && !usuario.getLogin().equals(authenticatedUsername)) {
+            throw new AccessDeniedException("Você não tem permissão para acessar este usuário.");
+        }
+
         if (usuario.getUrlPicture().contains(cloudFrontService.getBaseUrl())) {
             String signedUrl = cloudFrontService.generateSignedUrl(usuario.getUrlPicture(), Duration.ofMinutes(60));
             usuario.setUrlPicture(signedUrl);
@@ -201,6 +211,22 @@ public class UsuarioService {
     }
 
     public LoginResponseDTO update(Long id, UsuarioDTO dto, MultipartFile foto) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String authenticatedUsername = authentication.getName();
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+
+        Usuario usuarioDoBanco = usuarioRepository.findById(id).orElseThrow(() ->
+                new UserNotFoundException("Usuario nao encontrado"));
+
+        if (!usuarioDoBanco.getLogin().equals(authenticatedUsername)) {
+            throw new AccessDeniedException("Você não tem permissão para alterar este usuário.");
+        }
+
+        if (!isAdmin) {
+            dto.setCargo(null);
+        }
+
         Object result = updateUser (id, dto, foto, true);
         return (LoginResponseDTO) result;
     }

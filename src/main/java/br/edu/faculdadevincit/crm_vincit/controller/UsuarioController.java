@@ -45,9 +45,9 @@ public class UsuarioController {
         return usuarioService.findByAdmin();
     }
 
-    @GetMapping(value = "/noAuth/{id}")
-    public ResponseEntity<?> findByIdNoAuth(@PathVariable Long id) {
-        UsuarioResponseNoAuthDto resposta = usuarioService.findByIdNoAuth(id);
+    @GetMapping(value = "/{id}/edicao")
+    public ResponseEntity<?> findByIdParaEdicao(@PathVariable Long id) {
+        UsuarioResponseNoAuthDto resposta = usuarioService.findByIdParaEdicao(id);
         return ResponseEntity.ok(resposta);
     }
 
