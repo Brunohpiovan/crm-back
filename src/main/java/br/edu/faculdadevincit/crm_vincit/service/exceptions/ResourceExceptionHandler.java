@@ -4,16 +4,18 @@ import br.edu.faculdadevincit.crm_vincit.model.dtos.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.HashMap;
 import java.util.Map;
 
-@ControllerAdvice
+@Slf4j
+@RestControllerAdvice
 public class ResourceExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -21,6 +23,40 @@ public class ResourceExceptionHandler {
         StandardError error = new StandardError(System.currentTimeMillis(), HttpStatus.BAD_REQUEST.value(),"Violacao de dados", ex.getMessage(), request.getRequestURI() );
 
         return  ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<StandardError> jpaDataIntegrityViolationException(org.springframework.dao.DataIntegrityViolationException ex, HttpServletRequest request){
+        log.warn("Violacao de integridade de dados na camada de persistencia", ex);
+        StandardError error = new StandardError(System.currentTimeMillis(), HttpStatus.BAD_REQUEST.value(),
+                "Violacao de dados", "Nao foi possivel concluir a operacao devido a uma restricao de integridade dos dados.", request.getRequestURI());
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<StandardError> resourceNotFoundException(ResourceNotFoundException ex, HttpServletRequest request){
+        StandardError error = new StandardError(System.currentTimeMillis(), HttpStatus.NOT_FOUND.value(),
+                "Recurso nao encontrado", ex.getMessage(), request.getRequestURI());
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<StandardError> conflictException(ConflictException ex, HttpServletRequest request){
+        StandardError error = new StandardError(System.currentTimeMillis(), HttpStatus.CONFLICT.value(),
+                "Conflito", ex.getMessage(), request.getRequestURI());
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    @ExceptionHandler(IntegrationException.class)
+    public ResponseEntity<StandardError> integrationException(IntegrationException ex, HttpServletRequest request){
+        log.error("Falha ao integrar com servico externo", ex);
+        StandardError error = new StandardError(System.currentTimeMillis(), HttpStatus.BAD_GATEWAY.value(),
+                "Erro de integracao", "Nao foi possivel concluir a operacao devido a uma falha em um servico externo.", request.getRequestURI());
+
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(error);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -45,7 +81,8 @@ public class ResourceExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleGenericException(Exception ex) {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erro inesperado: " + ex.getMessage());
+        log.error("Erro inesperado nao tratado", ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erro interno no servidor. Tente novamente mais tarde.");
     }
 
     @ExceptionHandler(RuntimeException.class)
