@@ -2,14 +2,13 @@ package br.edu.faculdadevincit.crm_vincit.controller;
 
 import br.edu.faculdadevincit.crm_vincit.model.dtos.*;
 import br.edu.faculdadevincit.crm_vincit.service.UsuarioService;
-import br.edu.faculdadevincit.crm_vincit.service.exceptions.DataIntegrityViolationException;
-import br.edu.faculdadevincit.crm_vincit.service.exceptions.UserNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -21,8 +20,10 @@ public class UsuarioController {
     private UsuarioService usuarioService;
 
     @GetMapping
-    public List<UsuarioAllDTO> findAll() {
-        return usuarioService.findAll();
+    public Page<UsuarioAllDTO> findAll(
+            @RequestParam(required = false) String search,
+            @PageableDefault(size = 10, sort = "nome") Pageable pageable) {
+        return usuarioService.findAll(search, pageable);
     }
 
     @GetMapping("/contacts/{userId}")
@@ -58,7 +59,7 @@ public class UsuarioController {
     }
 
     @PostMapping
-    public ResponseEntity<?> post(@RequestPart("usuario") UsuarioDTO usuarioRequest,
+    public ResponseEntity<?> post(@RequestPart("usuario") UsuarioCreateDTO usuarioRequest,
                                         @RequestPart(value = "foto", required = false) MultipartFile foto) {
         UsuarioAllDTO dto = usuarioService.save(usuarioRequest,foto);
         return ResponseEntity.ok(dto);
@@ -67,7 +68,7 @@ public class UsuarioController {
 
     @PutMapping(value = "/{id}")
     public ResponseEntity<?> update(@PathVariable Long id,
-                                    @RequestPart("usuario") UsuarioDTO usuarioRequest,
+                                    @RequestPart("usuario") UsuarioSelfUpdateDTO usuarioRequest,
                                     @RequestPart(value = "foto", required = false) MultipartFile foto) {
         LoginResponseDTO responseDTO = usuarioService.update(id, usuarioRequest, foto);
         return ResponseEntity.ok(responseDTO);
@@ -76,7 +77,7 @@ public class UsuarioController {
 
     @PutMapping(value = "/all/{id}")
     public ResponseEntity<?> updateAll(@PathVariable Long id,
-                                    @RequestPart("usuario") UsuarioDTO usuarioRequest,
+                                    @RequestPart("usuario") UsuarioAdminUpdateDTO usuarioRequest,
                                     @RequestPart(value = "foto", required = false) MultipartFile foto) {
         UsuarioAllDTO responseDTO = usuarioService.updateAll(id, usuarioRequest, foto);
         return ResponseEntity.ok(responseDTO);

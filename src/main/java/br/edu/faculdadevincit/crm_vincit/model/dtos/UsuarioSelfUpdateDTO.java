@@ -1,29 +1,30 @@
 package br.edu.faculdadevincit.crm_vincit.model.dtos;
 
 import br.edu.faculdadevincit.crm_vincit.model.enums.Uf;
-import br.edu.faculdadevincit.crm_vincit.model.enums.UserRole;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.annotation.Nullable;
-import jakarta.persistence.*;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
-
+/**
+ * Payload de atualização do próprio cadastro (PUT /usuario/{id}).
+ * Não possui cargo nem bloqueado: essas propriedades administrativas só
+ * podem ser alteradas através de UsuarioAdminUpdateDTO (PUT /usuario/all/{id}).
+ */
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class UsuarioDTO {
-
-    private Long id;
+public class UsuarioSelfUpdateDTO implements UsuarioDadosPessoaisDTO {
 
     @Nullable
     private String urlPicture;
@@ -37,7 +38,6 @@ public class UsuarioDTO {
     @Size(max = 150, message = "O login deve ter no maximo 255 caracteres")
     private String login;
 
-    @NotNull(message = "o campo SENHA é requerido")
     @Size(min = 8, max = 255, message = "A Senha deve ter entre 6 e 100 caracteres")
     private String senha;
 
@@ -83,18 +83,9 @@ public class UsuarioDTO {
     @Size(max = 100, message = "O campo cidade deve ter no maximo 100 caracteres")
     private String cidade;
 
-    @NotBlank(message = "Informe um cep")
+    @NotNull(message = "Informe um cep")
     @Size(max = 10, message = "O cep deve ter no maximo 10 caracteres")
     private String cep;
 
-    @NotNull(message = "O campo CARGO é requerido.")
-    private UserRole cargo;
-
-    private Boolean bloqueado;
-
     private String observacoes;
-
-    private LocalDateTime criadoEm;
-    private LocalDateTime atualizadoEm;
-
 }
