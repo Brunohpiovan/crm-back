@@ -288,7 +288,8 @@ public class OportunidadeService {
             oportunidade.setEtapa(newEtapa);
             reorganizarIndicesOportunidades(newEtapa, oportunidade, novoIndice);
         }
-        OportunidadeDTO dto = new OportunidadeDTO(oportunidade);
+        Oportunidade oportunidadeSalva = oportunidadeRepository.save(oportunidade);
+        OportunidadeDTO dto = new OportunidadeDTO(oportunidadeSalva);
         if (dto.getUrl_anexo() != null && dto.getUrl_anexo().contains(cloudFrontService.getBaseUrl())) {
             String signedUrl = cloudFrontService.generateSignedUrl(dto.getUrl_anexo(), Duration.ofMinutes(60));
             dto.setUrl_anexo(signedUrl);
@@ -301,7 +302,6 @@ public class OportunidadeService {
             criador.setUrlPicture(signedPictureUrl);
         }
         messagingTemplate.convertAndSend("/topic/movimentoOportunidade",dto);
-        oportunidadeRepository.save(oportunidade);
     }
 
 

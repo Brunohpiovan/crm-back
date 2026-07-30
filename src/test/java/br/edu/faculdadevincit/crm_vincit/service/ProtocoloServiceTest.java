@@ -24,6 +24,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
@@ -98,20 +99,21 @@ class ProtocoloServiceTest {
     }
 
     /**
-     * Documenta um bug conhecido (auditoria, item 6): closeProtocolo compara
-     * "FECHADO".equals(protocolo.getStatus()) — String contra enum, nunca true — então fechar um
-     * protocolo já fechado hoje NÃO lança exceção. Este teste trava o comportamento atual; deve ser
-     * atualizado quando esse bug for corrigido em etapa de correção dedicada (fora do escopo desta
-     * etapa, que é só criar a rede de testes).
+     * Bug da auditoria (item 6) corrigido: closeProtocolo agora compara
+     * StatusProtocolo.FECHADO.equals(protocolo.getStatus()) — enum contra enum — então fechar um
+     * protocolo já fechado lança exceção e não reabre/reenvia notificação.
      */
     @Test
-    void fecharProtocoloJaFechado_comportamentoAtualNaoLancaExcecao() {
+    void fecharProtocoloJaFechado_lancaExcecaoENaoPersisteNemNotifica() {
         Protocolo protocolo = protocolo(StatusProtocolo.FECHADO);
         when(protocoloRepository.findById(10L)).thenReturn(Optional.of(protocolo));
 
-        protocoloService.closeProtocolo(10L);
+        assertThatThrownBy(() -> protocoloService.closeProtocolo(10L))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("Protocolo ja encerrado");
 
         assertThat(protocolo.getStatus()).isEqualTo(StatusProtocolo.FECHADO);
-        verify(protocoloRepository, times(1)).save(protocolo);
+        verify(protocoloRepository, times(0)).save(protocolo);
+        verify(messagingTemplate, times(0)).convertAndSend(anyString(), any(Object.class));
     }
 }

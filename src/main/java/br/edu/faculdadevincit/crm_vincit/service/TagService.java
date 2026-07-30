@@ -4,6 +4,7 @@ package br.edu.faculdadevincit.crm_vincit.service;
 import br.edu.faculdadevincit.crm_vincit.model.Tag;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.TagDTO;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.TagOportunidadeDTO;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.TagRequestDTO;
 import br.edu.faculdadevincit.crm_vincit.model.enums.Situacao;
 import br.edu.faculdadevincit.crm_vincit.repository.TagRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,7 +54,7 @@ public class TagService {
         tagRepository.delete(tag);
     }
 
-    public void update(Long id, Tag tag) {
+    public void update(Long id, TagRequestDTO tag) {
         Tag tagBanco = tagRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tag não encontrada"));
 
@@ -68,7 +69,7 @@ public class TagService {
         tagRepository.save(newTag);
     }
 
-    private Tag preencheTag(Tag tagBanco,Tag newTag){
+    private Tag preencheTag(Tag tagBanco, TagRequestDTO newTag){
         tagBanco.setNome(newTag.getNome());
         tagBanco.setCor(newTag.getCor());
         tagBanco.setSituacao(newTag.getSituacao());

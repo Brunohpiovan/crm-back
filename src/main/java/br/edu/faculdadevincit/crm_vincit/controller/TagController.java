@@ -3,6 +3,7 @@ package br.edu.faculdadevincit.crm_vincit.controller;
 
 import br.edu.faculdadevincit.crm_vincit.model.Tag;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.TagDTO;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.TagRequestDTO;
 import br.edu.faculdadevincit.crm_vincit.service.TagService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,7 +50,7 @@ public class TagController {
     }
 
     @PutMapping(value = "/{id}")
-    public ResponseEntity<?> update(@PathVariable Long id, @RequestBody @Valid Tag tag) {
+    public ResponseEntity<?> update(@PathVariable Long id, @RequestBody @Valid TagRequestDTO tag) {
         tagService.update(id, tag);
         return ResponseEntity.ok().build();
     }

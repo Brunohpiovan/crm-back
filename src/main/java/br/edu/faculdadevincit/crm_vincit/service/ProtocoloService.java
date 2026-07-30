@@ -105,7 +105,7 @@ public class ProtocoloService {
         Usuario admin = (Usuario) usuarioRepository.findByLogin(emailAdmin)
                 .orElseThrow(() -> new RuntimeException("Admin não encontrado"));
         Protocolo protocolo = protocoloRepository.findById(protocolId).orElseThrow(()-> new RuntimeException("Protocolo nao encontrado"));
-        if ("FECHADO".equals(protocolo.getStatus())) {
+        if (StatusProtocolo.FECHADO.equals(protocolo.getStatus())) {
             throw new RuntimeException("Protocolo ja encerrado");
         }
         protocolo.setStatus(StatusProtocolo.FECHADO);
