@@ -23,8 +23,8 @@ public class MensagemResponseDTO {
     public MensagemResponseDTO(Mensagem mensagem){
         this.id = mensagem.getId();
         this.sender = new SenderDTO(mensagem.getSender());
-        this.conteudo = mensagem.getConteudo();;
+        this.conteudo = mensagem.getConteudo();
         this.data_envio = mensagem.getData_envio();
-        this.protocolo = new ProtocoloMessageDTO(mensagem.getProtocolo());
+        this.protocolo = mensagem.getProtocolo() != null ? new ProtocoloMessageDTO(mensagem.getProtocolo()) : null;
     }
 }

@@ -1,6 +1,5 @@
 package br.edu.faculdadevincit.crm_vincit.controller;
 
-import br.edu.faculdadevincit.crm_vincit.model.Mensagem;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.MensagemResponseDTO;
 import br.edu.faculdadevincit.crm_vincit.service.MensagemService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,9 +28,8 @@ public class MensagemController {
     }
 
     @GetMapping("/messages/public/{userId}")
-    public List<Mensagem> getMessagesPublic(@PathVariable Long userId) {
-        List<Mensagem> messages = mensagemService.getMessagesPublic(userId);
-        return messages;
+    public List<MensagemResponseDTO> getMessagesPublic(@PathVariable Long userId) {
+        return mensagemService.getMessagesPublic(userId);
     }
 
     @GetMapping("messages/public/sender-ids")

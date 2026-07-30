@@ -1,6 +1,7 @@
 package br.edu.faculdadevincit.crm_vincit.service;
 
 import br.edu.faculdadevincit.crm_vincit.model.*;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.MensagemResponseDTO;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioContatoDto;
 import br.edu.faculdadevincit.crm_vincit.model.enums.StatusProtocolo;
 import br.edu.faculdadevincit.crm_vincit.model.enums.TipoParticipante;
@@ -212,17 +213,15 @@ public class WhatsAppService {
 
 
     private void handleMessage(Optional<Protocolo> optionalProtocolo, Participante participante, String body,String media) {
-        List<Mensagem> savedMessage;
-        Mensagem commun;
         if (optionalProtocolo.isPresent()) {
             Protocolo protocolo = optionalProtocolo.get();
-            savedMessage = mensagemService.sendMessage(protocolo, participante, body,media);
+            List<Mensagem> savedMessage = mensagemService.sendMessage(protocolo, participante, body,media);
             savedMessage.forEach(mensagemNew -> {
-                messagingTemplate.convertAndSend("/topic/messages/" + protocolo.getId(), mensagemNew);
+                messagingTemplate.convertAndSend("/topic/messages/" + protocolo.getId(), new MensagemResponseDTO(mensagemNew));
             });
         } else {
-            commun = mensagemService.sendMessagePublico(participante, body);
-            messagingTemplate.convertAndSend("/topic/messages/public", commun);
+            Mensagem commun = mensagemService.sendMessagePublico(participante, body);
+            messagingTemplate.convertAndSend("/topic/messages/public", new MensagemResponseDTO(commun));
         }
     }
 

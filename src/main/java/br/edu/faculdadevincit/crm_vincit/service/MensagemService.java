@@ -154,8 +154,11 @@ public class MensagemService{
 
     }
 
-    public List<Mensagem> getMessagesPublic(Long userId) {
-        return mensagemRepository.findMessagesWithoutProtocol(userId);
+    public List<MensagemResponseDTO> getMessagesPublic(Long userId) {
+        return mensagemRepository.findBySenderIdAndProtocoloIsNull(userId)
+                .stream()
+                .map(MensagemResponseDTO::new)
+                .collect(Collectors.toList());
     }
 
     public List<Long> getSenderIdsWithoutProtocol() {
@@ -164,7 +167,7 @@ public class MensagemService{
 
 
     public void deleteMessagesWithoutProtocol(Long userId) {
-        List<Mensagem> messagesToDelete = mensagemRepository.findMessagesWithoutProtocol(userId);
+        List<Mensagem> messagesToDelete = mensagemRepository.findBySenderIdAndProtocoloIsNull(userId);
         mensagemRepository.deleteAll(messagesToDelete);
     }
 }
