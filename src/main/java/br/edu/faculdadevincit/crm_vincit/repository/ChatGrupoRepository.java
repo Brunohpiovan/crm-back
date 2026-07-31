@@ -1,6 +1,7 @@
 package br.edu.faculdadevincit.crm_vincit.repository;
 
 import br.edu.faculdadevincit.crm_vincit.model.ChatGrupo;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,6 +12,10 @@ import java.util.Optional;
 
 @Repository
 public interface ChatGrupoRepository extends JpaRepository<ChatGrupo, Long> {
+
+    @Override
+    @EntityGraph(attributePaths = {"usuarios"})
+    Optional<ChatGrupo> findById(Long id);
 
     @Query("""
         SELECT g

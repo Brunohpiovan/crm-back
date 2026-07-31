@@ -1,7 +1,9 @@
 package br.edu.faculdadevincit.crm_vincit.service;
 
 import br.edu.faculdadevincit.crm_vincit.model.Participante;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.ParticipanteCreateRequest;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.ParticipanteDTO;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.ParticipanteUpdateRequest;
 import br.edu.faculdadevincit.crm_vincit.model.enums.StatusProtocolo;
 import br.edu.faculdadevincit.crm_vincit.model.enums.TipoParticipante;
 import br.edu.faculdadevincit.crm_vincit.repository.ParticipanteRepository;
@@ -10,7 +12,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.util.List;
 
 @Service
@@ -19,24 +20,11 @@ public class ParticipanteService {
     @Autowired
     private ParticipanteRepository participanteRepository;
 
-    @Autowired
-    private CloudFrontService cloudFrontService;
-
     public List<ParticipanteDTO> findAllFilter(Long id){
         List<Participante> participantes = participanteRepository.findAllWithoutOpenProtocoloFromOtherAdmins(id);
 
         return participantes.stream()
-                .map(participante -> {
-                    ParticipanteDTO dto = new ParticipanteDTO(participante);
-
-                    String urlPicture = dto.getUrlPicture();
-                    if (urlPicture != null && urlPicture.contains(cloudFrontService.getBaseUrl())) {
-                        String urlAssinada = cloudFrontService.generateSignedUrl(urlPicture, Duration.ofMinutes(30));
-                        dto.setUrlPicture(urlAssinada);
-                    }
-
-                    return dto;
-                })
+                .map(ParticipanteDTO::new)
                 .toList();
     }
 
@@ -44,21 +32,34 @@ public class ParticipanteService {
     public List<ParticipanteDTO> findAll() {
         return participanteRepository.findAll()
                 .stream()
-                .map(participante -> {
-                    ParticipanteDTO dto = new ParticipanteDTO(participante);
-
-                    String urlPicture = dto.getUrlPicture();
-                    if (urlPicture != null && urlPicture.contains(cloudFrontService.getBaseUrl())) {
-                        String urlAssinada = cloudFrontService.generateSignedUrl(urlPicture, Duration.ofMinutes(30));
-                        dto.setUrlPicture(urlAssinada);
-                    }
-
-                    return dto;
-                })
+                .map(ParticipanteDTO::new)
                 .toList();
     }
 
 
+    public void create(ParticipanteCreateRequest request){
+        Participante participante = new Participante();
+        participante.setNome(request.nome());
+        participante.setLogin(request.login());
+        participante.setRg(request.rg());
+        participante.setCpf(request.cpf());
+        participante.setDataNascimento(request.dataNascimento());
+        participante.setCelular(request.celular());
+        participante.setEndereco(request.endereco());
+        participante.setNumeroResidencial(request.numeroResidencial());
+        participante.setComplemento(request.complemento());
+        participante.setBairro(request.bairro());
+        participante.setUf(request.uf());
+        participante.setCidade(request.cidade());
+        participante.setObservacoes(request.observacoes());
+        participante.setTipoParticipante(request.tipoParticipante());
+        create(participante);
+    }
+
+    /**
+     * Usado internamente (ex.: espelhamento de Usuario/Oportunidade.cliente como Participante),
+     * fora do fluxo de POST /participante — que usa {@link #create(ParticipanteCreateRequest)}.
+     */
     public void create(Participante participante){
         participante.setUrlPicture("assets/img/avatar/padrao.jpeg");
         participante.setId(null);
@@ -70,18 +71,34 @@ public class ParticipanteService {
         Participante participante = participanteRepository.findById(id)
                 .orElseThrow(() -> new UsernameNotFoundException("Participante não encontrado"));
 
-        ParticipanteDTO dto = new ParticipanteDTO(participante);
-
-        String urlPicture = dto.getUrlPicture();
-        if (urlPicture != null && urlPicture.contains(cloudFrontService.getBaseUrl())) {
-            String urlAssinada = cloudFrontService.generateSignedUrl(urlPicture, Duration.ofMinutes(30));
-            dto.setUrlPicture(urlAssinada);
-        }
-
-        return dto;
+        return new ParticipanteDTO(participante);
     }
 
 
+    public Participante update(ParticipanteUpdateRequest request, Long id){
+        Participante participante = new Participante();
+        participante.setUrlPicture(request.urlPicture());
+        participante.setNome(request.nome());
+        participante.setLogin(request.login());
+        participante.setRg(request.rg());
+        participante.setCpf(request.cpf());
+        participante.setDataNascimento(request.dataNascimento());
+        participante.setCelular(request.celular());
+        participante.setEndereco(request.endereco());
+        participante.setNumeroResidencial(request.numeroResidencial());
+        participante.setComplemento(request.complemento());
+        participante.setBairro(request.bairro());
+        participante.setUf(request.uf());
+        participante.setCidade(request.cidade());
+        participante.setObservacoes(request.observacoes());
+        participante.setTipoParticipante(request.tipoParticipante());
+        return update(participante, id);
+    }
+
+    /**
+     * Usado internamente (ex.: sincronização de Participante ao atualizar um Usuario),
+     * fora do fluxo de PUT /participante/{id} — que usa {@link #update(ParticipanteUpdateRequest, Long)}.
+     */
     public Participante update(Participante participante,Long id){
         Participante optionalParticipante = participanteRepository.findById(id).orElseThrow(() ->
                 new UsernameNotFoundException("Participante não encontrado"));

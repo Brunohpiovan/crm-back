@@ -16,7 +16,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,9 +32,6 @@ public class MensagemService{
 
     @Autowired
     private UsuarioRepository usuarioRepository;
-
-    @Autowired
-    private CloudFrontService cloudFrontService;
 
 
     public List<Mensagem> sendMessage(Protocolo protocolo, Participante sender, String conteudo, String media) {
@@ -58,14 +54,6 @@ public class MensagemService{
             message.setData_envio(LocalDateTime.now());
             lista.add(mensagemRepository.save(message));
         }
-
-        lista.forEach(m -> {
-            String msgConteudo = m.getConteudo();
-            if (msgConteudo != null && msgConteudo.contains(cloudFrontService.getBaseUrl())) {
-                String urlAssinada = cloudFrontService.generateSignedUrl(msgConteudo,Duration.ofMinutes(60));
-                m.setConteudo(urlAssinada);
-            }
-        });
 
         return lista;
     }
@@ -108,24 +96,13 @@ public class MensagemService{
                 )
                 .getContent()
                 .stream()
-                .map(mensagem -> {
-                    MensagemResponseDTO dto = new MensagemResponseDTO(mensagem);
-
-                    String conteudo = dto.getConteudo();
-                    if (conteudo != null && conteudo.contains(cloudFrontService.getBaseUrl())) {
-                        dto.setConteudo(
-                                cloudFrontService.generateSignedUrl(conteudo, Duration.ofMinutes(30))
-                        );
-                    }
-
-                    return dto;
-                })
+                .map(MensagemResponseDTO::new)
                 .collect(Collectors.toList());
 
     }
 
 
-    public List<Mensagem> getMessagesForProtocol(Long protocoloId) {
+    public List<MensagemResponseDTO> getMessagesForProtocol(Long protocoloId) {
         Protocolo protocolo = protocoloRepository.findById(protocoloId).orElseThrow(()-> new RuntimeException("Protocolo nao encontrado"));
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String authenticatedUsername = authentication.getName();
@@ -136,20 +113,18 @@ public class MensagemService{
         }
 
         List<Mensagem> mensagens = mensagemRepository.findByProtocolo(protocolo);
-        mensagens.forEach(mensagem -> {
-            String conteudo = mensagem.getConteudo();
-            if (conteudo != null && conteudo.contains(cloudFrontService.getBaseUrl())) {
-                String urlAssinada = cloudFrontService.generateSignedUrl(conteudo, Duration.ofMinutes(30));
-                mensagem.setConteudo(urlAssinada);
-            }
-        });
 
-        return mensagens;
+        return mensagens.stream()
+                .map(MensagemResponseDTO::new)
+                .collect(Collectors.toList());
 
     }
 
-    public List<Mensagem> getMessagesPublic(Long userId) {
-        return mensagemRepository.findMessagesWithoutProtocol(userId);
+    public List<MensagemResponseDTO> getMessagesPublic(Long userId) {
+        return mensagemRepository.findBySenderIdAndProtocoloIsNull(userId)
+                .stream()
+                .map(MensagemResponseDTO::new)
+                .collect(Collectors.toList());
     }
 
     public List<Long> getSenderIdsWithoutProtocol() {
@@ -158,7 +133,7 @@ public class MensagemService{
 
 
     public void deleteMessagesWithoutProtocol(Long userId) {
-        List<Mensagem> messagesToDelete = mensagemRepository.findMessagesWithoutProtocol(userId);
+        List<Mensagem> messagesToDelete = mensagemRepository.findBySenderIdAndProtocoloIsNull(userId);
         mensagemRepository.deleteAll(messagesToDelete);
     }
 }

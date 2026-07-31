@@ -9,7 +9,6 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.checkerframework.common.aliasing.qual.Unique;
 
 import java.time.LocalDateTime;
 
@@ -29,10 +28,13 @@ public class Tag {
     @Column(unique = true)
     private String nome;
 
+    @Enumerated(EnumType.STRING)
     private Cor cor;
 
+    @Enumerated(EnumType.STRING)
     private Pertence pertence;
 
+    @Enumerated(EnumType.STRING)
     private Situacao situacao;
 
     @Column(name = "criado_em")

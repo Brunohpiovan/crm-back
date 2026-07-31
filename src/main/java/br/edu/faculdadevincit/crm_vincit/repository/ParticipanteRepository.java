@@ -22,7 +22,7 @@ public interface ParticipanteRepository extends JpaRepository<Participante, Long
     SELECT p FROM Participante p
     WHERE p.id NOT IN (
         SELECT pr.participante.id FROM Protocolo pr
-        WHERE pr.status = 0
+        WHERE pr.status = br.edu.faculdadevincit.crm_vincit.model.enums.StatusProtocolo.ABERTO
         AND pr.admin.id <> :adminId
     )
 """)

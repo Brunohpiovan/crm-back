@@ -67,6 +67,11 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
 			<version>1.18.36</version>
@@ -76,6 +81,11 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-websocket</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>2.7.0</version>
 		</dependency>
 <dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -117,23 +127,6 @@
 			<version>2.20.0</version>
 		</dependency>
 		<dependency>
-			<groupId>com.github.javafaker</groupId>
-			<artifactId>javafaker</artifactId>
-			<version>1.0.2</version>
-		</dependency>
-		<dependency>
-			<groupId>net.bramp.ffmpeg</groupId>
-			<artifactId>ffmpeg</artifactId>
-			<version>0.6.2</version>
-		</dependency>
-
-		<dependency>
-			<groupId>commons-fileupload</groupId>
-			<artifactId>commons-fileupload</artifactId>
-			<version>1.4</version>
-		</dependency>
-
-		<dependency>
 			<groupId>com.twilio.sdk</groupId>
 			<artifactId>twilio</artifactId>
 			<version>9.0.0</version>
@@ -145,16 +138,15 @@
 			<version>1.21</version>
 		</dependency>
 
+		<!--
+			Escopo compile (não test): MediaController e AudioConvertor usam
+			org.springframework.mock.web.MockMultipartFile em código de produção
+			(não só em testes), então precisa estar disponível fora do classpath de teste.
+		-->
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-test</artifactId>
-			<scope>compile</scope> <!-- ATENÇÃO: remova se for só em testes -->
-		</dependency>
-
-		<dependency>
-			<groupId>net.bramp.ffmpeg</groupId>
-			<artifactId>ffmpeg</artifactId>
-			<version>0.8.0</version>
+			<scope>compile</scope>
 		</dependency>
 
 		<dependency>
@@ -168,25 +160,6 @@
 			<artifactId>javacv-platform</artifactId>
 			<version>1.5.8</version>
 		</dependency>
-
-		<dependency>
-			<groupId>org.bouncycastle</groupId>
-			<artifactId>bcprov-jdk15on</artifactId>
-			<version>1.70</version>
-		</dependency>
-
-		<dependency>
-			<groupId>software.amazon.awssdk</groupId>
-			<artifactId>cloudfront</artifactId>
-			<version>2.20.50</version>
-		</dependency>
-		<dependency>
-			<groupId>com.amazonaws</groupId>
-			<artifactId>aws-java-sdk-cloudfront</artifactId>
-			<version>1.12.545</version> <!-- Use a versão mais atual disponível -->
-		</dependency>
-
-
 
 
 	</dependencies>

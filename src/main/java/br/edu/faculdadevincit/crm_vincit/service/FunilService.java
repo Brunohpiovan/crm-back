@@ -1,24 +1,22 @@
 package br.edu.faculdadevincit.crm_vincit.service;
 
+import br.edu.faculdadevincit.crm_vincit.model.Etapa;
 import br.edu.faculdadevincit.crm_vincit.model.Funil;
-import br.edu.faculdadevincit.crm_vincit.model.Oportunidade;
 import br.edu.faculdadevincit.crm_vincit.model.Usuario;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.*;
 import br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade;
 import br.edu.faculdadevincit.crm_vincit.model.enums.UserRole;
 import br.edu.faculdadevincit.crm_vincit.repository.FunilRepository;
-import br.edu.faculdadevincit.crm_vincit.repository.OportunidadeRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,10 +29,7 @@ public class FunilService {
     private UsuarioRepository usuarioRepository;
 
     @Autowired
-    private CloudFrontService cloudFrontService;
-
-    @Autowired
-    private OportunidadeRepository oportunidadeRepository;
+    private EtapaService etapaService;
 
     public List<FunilAllDTO> findAll() {
         Usuario usuario = getUsuarioAutenticado();
@@ -57,25 +52,14 @@ public class FunilService {
 
 
     public List<UsuarioContatoDto> findFuncionariosFunil(Long funilId) {
-        Funil funil = funilRepository.findById(funilId)
-                .orElseThrow(() -> new RuntimeException("Funil não encontrado"));
+        if (!funilRepository.existsById(funilId)) {
+            throw new RuntimeException("Funil não encontrado");
+        }
 
-        List<Usuario> todosUsuarios = usuarioRepository.findByNotCargo(UserRole.ADMINISTRADOR);
-        List<Usuario> usuariosNaoNoFunil = todosUsuarios.stream()
-                .filter(usuario -> !funil.getFuncionarios().contains(usuario))
-                .toList();
+        List<UsuarioContatoDto> usuariosNaoNoFunil =
+                usuarioRepository.findDisponiveisParaFunil(funilId, UserRole.ADMINISTRADOR);
 
-        List<UsuarioContatoDto> usuariosNaoNoFunilDto = usuariosNaoNoFunil.stream()
-                .map(usuario -> {
-                    String urlPicture = usuario.getUrlPicture();
-                    if (urlPicture != null && urlPicture.contains(cloudFrontService.getBaseUrl())) {
-                        urlPicture = cloudFrontService.generateSignedUrl(urlPicture, Duration.ofMinutes(60));
-                    }
-                    return new UsuarioContatoDto(usuario.getId(), usuario.getNome(), urlPicture);
-                })
-                .collect(Collectors.toList());
-
-        return usuariosNaoNoFunilDto;
+        return usuariosNaoNoFunil;
     }
 
 
@@ -95,42 +79,17 @@ public class FunilService {
 
 
     public FunilDto findById(Long id) {
-        Funil funil = funilRepository.findById(id)
+        Funil funil = funilRepository.findByIdWithEtapas(id)
                 .orElseThrow(() -> new RuntimeException("Funil com id " + id + " não encontrado"));
-        FunilDto dto = new FunilDto(funil);
 
-        if (dto.getEtapas() != null) {
-            dto.getEtapas().forEach(etapaDto -> {
-                if (etapaDto.getOportunidades() != null) {
-                    etapaDto.getOportunidades().forEach(oportunidadeDTO -> {
-                        // Assina url_anexo se necessário
-                        if (oportunidadeDTO.getUrl_anexo() != null &&
-                                oportunidadeDTO.getUrl_anexo().contains(cloudFrontService.getBaseUrl())) {
+        List<Long> etapaIds = funil.getEtapas().stream().map(Etapa::getId).toList();
+        Map<Long, List<OportunidadeDTO>> oportunidadesPorEtapa = etapaService.carregarOportunidadesPorEtapa(etapaIds);
 
-                            String signedUrl = cloudFrontService.generateSignedUrl(
-                                    oportunidadeDTO.getUrl_anexo(),
-                                    Duration.ofMinutes(60)
-                            );
-                            oportunidadeDTO.setUrl_anexo(signedUrl);
-                        }
-                        
-                        CriadorOportunidadeDto criador = oportunidadeDTO.getCriador();
-                        if (criador != null &&
-                                criador.getUrlPicture() != null &&
-                                criador.getUrlPicture().contains(cloudFrontService.getBaseUrl())) {
+        List<EtapaDto> etapaDtos = funil.getEtapas().stream()
+                .map(etapa -> new EtapaDto(etapa, oportunidadesPorEtapa.getOrDefault(etapa.getId(), List.of())))
+                .collect(Collectors.toList());
 
-                            String signedPictureUrl = cloudFrontService.generateSignedUrl(
-                                    criador.getUrlPicture(),
-                                    Duration.ofMinutes(60)
-                            );
-                            criador.setUrlPicture(signedPictureUrl);
-                        }
-                    });
-                }
-            });
-        }
-
-        return dto;
+        return new FunilDto(funil.getId(), funil.getNome(), etapaDtos);
     }
 
     public FunilDto findByIdAndSituacao(Long id, List<SituacaoOportunidade> situacoes, List<TagOportunidadeDTO> tags) {
@@ -140,58 +99,24 @@ public class FunilService {
         List<Long> tagIds = tags != null
                 ? tags.stream().map(TagOportunidadeDTO::getId).toList()
                 : List.of();
+        List<Long> etapaIds = funil.getEtapas().stream().map(Etapa::getId).toList();
 
-        funil.getEtapas().forEach(etapa -> {
-            List<Oportunidade> filtradas;
+        Map<Long, List<OportunidadeDTO>> oportunidadesPorEtapa =
+                etapaService.carregarOportunidadesPorEtapa(etapaIds, situacoes, tagIds);
 
-            if (!tagIds.isEmpty()) {
-                filtradas = oportunidadeRepository
-                        .findByEtapaIdAndSituacaoInAndTagIdsIn(etapa.getId(), situacoes, tagIds);
-            } else {
-                filtradas = oportunidadeRepository
-                        .findByEtapaIdAndSituacaoIn(etapa.getId(), situacoes);
-            }
+        List<EtapaDto> etapaDtos = funil.getEtapas().stream()
+                .map(etapa -> new EtapaDto(etapa, oportunidadesPorEtapa.getOrDefault(etapa.getId(), List.of())))
+                .collect(Collectors.toList());
 
-            etapa.setOportunidades(filtradas);
-        });
-
-        FunilDto dto = new FunilDto(funil);
-
-        if (dto.getEtapas() != null) {
-            dto.getEtapas().forEach(etapaDto -> {
-                if (etapaDto.getOportunidades() != null) {
-                    etapaDto.getOportunidades().forEach(oportunidadeDTO -> {
-                        if (oportunidadeDTO.getUrl_anexo() != null &&
-                                oportunidadeDTO.getUrl_anexo().contains(cloudFrontService.getBaseUrl())) {
-                            String signedUrl = cloudFrontService.generateSignedUrl(
-                                    oportunidadeDTO.getUrl_anexo(),
-                                    Duration.ofMinutes(60)
-                            );
-                            oportunidadeDTO.setUrl_anexo(signedUrl);
-                        }
-
-                        CriadorOportunidadeDto criador = oportunidadeDTO.getCriador();
-                        if (criador != null &&
-                                criador.getUrlPicture() != null &&
-                                criador.getUrlPicture().contains(cloudFrontService.getBaseUrl())) {
-                            String signedPictureUrl = cloudFrontService.generateSignedUrl(
-                                    criador.getUrlPicture(),
-                                    Duration.ofMinutes(60)
-                            );
-                            criador.setUrlPicture(signedPictureUrl);
-                        }
-                    });
-                }
-            });
-        }
-
-        return dto;
+        return new FunilDto(funil.getId(), funil.getNome(), etapaDtos);
     }
 
 
-    public FunilDto create(Funil funil) {
+    public FunilDto create(FunilCreateRequest funilCreateRequest) {
+        Funil funil = new Funil();
+        funil.setNome(funilCreateRequest.nome());
+        funil.setCriadoEm(LocalDateTime.now());
         Funil savedFunil = funilRepository.save(funil);
-        savedFunil.setCriadoEm(LocalDateTime.now());
         return new FunilDto(savedFunil);
     }
 

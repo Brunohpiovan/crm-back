@@ -2,19 +2,24 @@ package br.edu.faculdadevincit.crm_vincit.service;
 
 import br.edu.faculdadevincit.crm_vincit.model.Etapa;
 import br.edu.faculdadevincit.crm_vincit.model.Funil;
+import br.edu.faculdadevincit.crm_vincit.model.Oportunidade;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaCreateRequest;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaDto;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaFunilDTO;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaUpdate2DTO;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaUpdateDTO;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.OportunidadeDTO;
+import br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade;
 import br.edu.faculdadevincit.crm_vincit.repository.EtapaRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.FunilRepository;
+import br.edu.faculdadevincit.crm_vincit.repository.OportunidadeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -29,32 +34,19 @@ public class EtapaService {
     private FunilRepository funilRepository;
 
     @Autowired
-    private SimpMessagingTemplate messagingTemplate;
+    private OportunidadeRepository oportunidadeRepository;
 
     @Autowired
-    private CloudFrontService cloudFrontService;
+    private SimpMessagingTemplate messagingTemplate;
 
     public List<EtapaDto> findAll() {
         List<Etapa> etapas = etapaRepository.findAll();
+        Map<Long, List<OportunidadeDTO>> oportunidadesPorEtapa =
+                carregarOportunidadesPorEtapa(etapas.stream().map(Etapa::getId).collect(Collectors.toList()));
 
-        List<EtapaDto> etapaDtos = etapas.stream()
-                .map(etapa -> {
-                    EtapaDto dto = new EtapaDto(etapa);
-
-                    if (dto.getOportunidades() != null) {
-                        dto.getOportunidades().forEach(oportunidadeDTO -> {
-                            if (oportunidadeDTO.getUrl_anexo() != null && oportunidadeDTO.getUrl_anexo().contains(cloudFrontService.getBaseUrl())) {
-                                String signedUrl = cloudFrontService.generateSignedUrl(oportunidadeDTO.getUrl_anexo(), Duration.ofMinutes(60));
-                                oportunidadeDTO.setUrl_anexo(signedUrl);
-                            }
-                        });
-                    }
-
-                    return dto;
-                })
+        return etapas.stream()
+                .map(etapa -> new EtapaDto(etapa, oportunidadesPorEtapa.getOrDefault(etapa.getId(), List.of())))
                 .collect(Collectors.toList());
-
-        return etapaDtos;
     }
 
 
@@ -62,45 +54,73 @@ public class EtapaService {
         Etapa etapa = etapaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Etapa com id " + id + " não encontrado"));
 
-        EtapaDto dto = new EtapaDto(etapa);
+        List<OportunidadeDTO> oportunidades =
+                carregarOportunidadesPorEtapa(List.of(id)).getOrDefault(id, List.of());
 
-        if (dto.getOportunidades() != null) {
-            dto.getOportunidades().forEach(oportunidadeDTO -> {
-                if (oportunidadeDTO.getUrl_anexo() != null && oportunidadeDTO.getUrl_anexo().contains(cloudFrontService.getBaseUrl())) {
-                    String signedUrl = cloudFrontService.generateSignedUrl(oportunidadeDTO.getUrl_anexo(), Duration.ofMinutes(60));
-                    oportunidadeDTO.setUrl_anexo(signedUrl);
-                }
-            });
+        return new EtapaDto(etapa, oportunidades);
+    }
+
+    /**
+     * Carrega, em uma única consulta, os cards de todas as etapas informadas (evita N+1 por etapa).
+     */
+    Map<Long, List<OportunidadeDTO>> carregarOportunidadesPorEtapa(List<Long> etapaIds) {
+        if (etapaIds == null || etapaIds.isEmpty()) {
+            return Map.of();
         }
+        List<Oportunidade> oportunidades = oportunidadeRepository.findCardsByEtapaIdIn(etapaIds);
+        Map<Long, List<OportunidadeDTO>> resultado = new HashMap<>();
+        for (Oportunidade oportunidade : oportunidades) {
+            OportunidadeDTO dto = new OportunidadeDTO(oportunidade);
+            resultado.computeIfAbsent(oportunidade.getEtapa().getId(), k -> new ArrayList<>()).add(dto);
+        }
+        return resultado;
+    }
 
-        return dto;
+    Map<Long, List<OportunidadeDTO>> carregarOportunidadesPorEtapa(List<Long> etapaIds,
+                                                                     List<SituacaoOportunidade> situacoes,
+                                                                     List<Long> tagIds) {
+        if (etapaIds == null || etapaIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Oportunidade> oportunidades = (tagIds != null && !tagIds.isEmpty())
+                ? oportunidadeRepository.findCardsByEtapaIdInAndSituacaoInAndTagIdsIn(etapaIds, situacoes, tagIds)
+                : oportunidadeRepository.findCardsByEtapaIdInAndSituacaoIn(etapaIds, situacoes);
+        Map<Long, List<OportunidadeDTO>> resultado = new HashMap<>();
+        for (Oportunidade oportunidade : oportunidades) {
+            OportunidadeDTO dto = new OportunidadeDTO(oportunidade);
+            resultado.computeIfAbsent(oportunidade.getEtapa().getId(), k -> new ArrayList<>()).add(dto);
+        }
+        return resultado;
     }
 
 
-    public EtapaDto create(Etapa etapa) {
-        boolean exists = etapaRepository.existsByNomeAndFunilId(etapa.getNome(), etapa.getFunil().getId());
+    public EtapaDto create(EtapaCreateRequest etapaCreateRequest) {
+        Long funilId = etapaCreateRequest.funil().getId();
+        boolean exists = etapaRepository.existsByNomeAndFunilId(etapaCreateRequest.nome(), funilId);
         if (exists) {
             throw new RuntimeException("Já existe um etapa com o mesmo nome neste funil.");
         }
-        Funil funil = funilRepository.findById(etapa.getFunil().getId())
+        Funil funil = funilRepository.findById(funilId)
                 .orElseThrow(() -> new RuntimeException("Funil não encontrado"));
+        Etapa etapa = new Etapa();
+        etapa.setNome(etapaCreateRequest.nome());
         etapa.setFunil(funil);
         etapa.setValor_total(BigDecimal.ZERO);
+        etapa.setCriadoEm(LocalDateTime.now());
         Etapa savedEtapa = etapaRepository.save(etapa);
         messagingTemplate.convertAndSend("/topic/newetapa", savedEtapa);
-        savedEtapa.setCriadoEm(LocalDateTime.now());
-        return new EtapaDto(savedEtapa);
+        return new EtapaDto(savedEtapa, List.of());
     }
 
     public EtapaDto updateAddValor(Long id, BigDecimal valor){
         Etapa etapaBanco = etapaRepository.findById(id).orElseThrow(()-> new RuntimeException("Etapa com id "+id+" nao encontrada"));
         etapaBanco.setValor_total(etapaBanco.getValor_total().add(valor));
         Etapa savedEtapa = etapaRepository.save(etapaBanco);
-        EtapaDto dto = new EtapaDto(savedEtapa);
+        EtapaDto dto = new EtapaDto(savedEtapa, List.of());
         Map<String, Object> payload = new HashMap<>();
         payload.put("etapaId", etapaBanco.getId());
         payload.put("valor", valor);
-        messagingTemplate.convertAndSend("/topic/addvalue", payload);
+        afterCommit(() -> messagingTemplate.convertAndSend("/topic/addvalue", payload));
         return dto;
     }
 
@@ -108,11 +128,11 @@ public class EtapaService {
         Etapa etapaBanco = etapaRepository.findById(id).orElseThrow(()-> new RuntimeException("Etapa com id "+id+" nao encontrada"));
         etapaBanco.setValor_total(etapaBanco.getValor_total().subtract(valor));
         Etapa savedEtapa = etapaRepository.save(etapaBanco);
-        EtapaDto dto = new EtapaDto(savedEtapa);
+        EtapaDto dto = new EtapaDto(savedEtapa, List.of());
         Map<String, Object> payload = new HashMap<>();
         payload.put("etapaId", etapaBanco.getId());
         payload.put("valor", valor);
-        messagingTemplate.convertAndSend("/topic/subvalue", payload);
+        afterCommit(() -> messagingTemplate.convertAndSend("/topic/subvalue", payload));
         return dto;
     }
 
@@ -147,6 +167,19 @@ public class EtapaService {
         }
         etapaBanco.setAtualizadoEm(LocalDateTime.now());
         return etapaBanco;
+    }
+
+    private void afterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
+        }
     }
 
 }

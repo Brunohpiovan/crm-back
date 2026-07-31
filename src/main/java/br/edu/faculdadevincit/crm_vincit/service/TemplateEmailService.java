@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,9 +28,6 @@ public class TemplateEmailService {
     @Value("${aws.s3.bucket-name}")
     private String bucketName;
 
-    @Autowired
-    private CloudFrontService cloudFrontService;
-
     public List<TemplateAllDTO> findAll() {
         return templateEmailRepository.findAllOrdered()
                 .stream()
@@ -43,18 +39,7 @@ public class TemplateEmailService {
         TemplateEmail template = templateEmailRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Template não encontrada"));
 
-        TemplateEmailIdDTO dto = new TemplateEmailIdDTO(template);
-
-        List<String> anexos = dto.getUrlAnexo();
-
-        if (anexos != null && !anexos.isEmpty()) {
-            List<String> urlsAssinadas = anexos.stream()
-                    .map(url -> cloudFrontService.generateSignedUrl(url, Duration.ofMinutes(60)))
-                    .collect(Collectors.toList());
-            dto.setUrlAnexo(urlsAssinadas);
-        }
-
-        return dto;
+        return new TemplateEmailIdDTO(template);
     }
 
 

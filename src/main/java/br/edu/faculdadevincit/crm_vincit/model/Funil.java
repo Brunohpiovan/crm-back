@@ -1,6 +1,7 @@
 package br.edu.faculdadevincit.crm_vincit.model;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -8,9 +9,11 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+@Schema(description = "Entidade Funil (pipeline de vendas). Etapas e funcionários são geridos por endpoints próprios; para criar um funil, use FunilCreateRequest.")
 @Getter
 @Setter
 @Entity
@@ -23,9 +26,10 @@ public class Funil {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String nome;
+    @Schema(description = "Etapas pertencentes a este funil (gerenciadas via /etapa, não são criadas diretamente aqui)")
     @OneToMany(mappedBy = "funil", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<Etapa> etapas;
-    @ManyToMany
+    private Set<Etapa> etapas = new HashSet<>();
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "funil_funcionarios",
             joinColumns = @JoinColumn(name = "funil_id"),

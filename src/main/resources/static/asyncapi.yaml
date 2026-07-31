@@ -1,0 +1,706 @@
+asyncapi: 2.6.0
+id: 'urn:br.edu.faculdadevincit:crm-vincit-ws'
+info:
+  title: CRM Vincit - Comunicação em tempo real (WebSocket / STOMP)
+  version: '1.0.0'
+  description: |
+    Documentação dos canais de tempo real do CRM Vincit, expostos via **STOMP sobre SockJS**
+    (biblioteca `@stomp/stompjs` + `sockjs-client` são as recomendadas no Angular).
+
+    Este documento complementa a documentação OpenAPI/Swagger da API REST (`/swagger-ui.html`),
+    que **não** cobre esse canal — o padrão OpenAPI não descreve comunicação assíncrona baseada
+    em tópicos publish/subscribe.
+
+    ## Como conectar (Angular)
+    1. Abrir uma conexão SockJS para `{baseUrl}/ws` (ex.: `http://localhost:8080/ws`).
+    2. Envolver a conexão em um cliente STOMP.
+    3. No frame `CONNECT`, enviar o header `Authorization: Bearer {token}` com o mesmo token
+       JWT obtido em `POST /auth/login` (o backend não valida esse header no handshake HTTP do
+       SockJS hoje — a rota `/ws/**` é pública no Spring Security — mas o envio do token é a
+       convenção esperada para futuras validações e para os headers de rastreio nas mensagens
+       enviadas pelo cliente).
+    4. Após conectado, `SUBSCRIBE` nos tópicos (`destination`) relevantes para a tela atual
+       (ex.: ao abrir uma conversa, inscrever-se em `/topic/messages/{protocoloId}`).
+    5. Para enviar mensagens de chat, `SEND` para os destinos `/app/...` (prefixo de aplicação
+       configurado no backend); o servidor processa e republica o resultado nos tópicos
+       `/topic/...` correspondentes, que devem estar inscritos (`SUBSCRIBE`) para o remetente
+       ver a própria mensagem confirmada e para os demais participantes verem a nova mensagem.
+
+    ## Observações importantes
+    - Todos os canais `/topic/**` são broadcast (SimpleBroker do Spring, `/topic` prefix) — não
+      há fila privada por usuário; a "privacidade" é obtida ao usar o **id do usuário/participante
+      no próprio path do tópico** (ex.: `/topic/newGroup/{userId}`), então o frontend deve
+      inscrever-se apenas no tópico do usuário logado.
+    - Alguns canais publicam a **entidade JPA diretamente** (não um DTO), por herança de código
+      legado (ex.: `/topic/newetapa`, `/topic/newoportunidadectt`) — o formato pode conter mais
+      campos do que os documentados aqui e está sujeito a mudanças sem aviso prévio; prefira,
+      quando possível, tratar esses eventos apenas como "algo mudou, refaça o GET" no frontend.
+    - Os eventos de oportunidade/etapa/protocolo são publicados **após o commit da transação**
+      no banco (via `TransactionSynchronization`), então é seguro reagir a eles fazendo uma
+      nova consulta REST caso precise do estado mais atualizado.
+
+servers:
+  default:
+    url: '{host}/ws'
+    protocol: stomp
+    description: >
+      Endpoint STOMP sobre SockJS. Em produção, a origem permitida é definida por
+      `app.frontend.url` (CORS) no backend.
+    variables:
+      host:
+        default: localhost:8080
+        description: Host e porta do backend (sem protocolo).
+
+defaultContentType: application/json
+
+channels:
+  /app/send:
+    description: >
+      **Cliente → Servidor.** Envia uma nova mensagem de chat com um contato/participante
+      (atendimento via WhatsApp ou chat direto). O servidor persiste a mensagem e, em seguida,
+      republica o resultado para todos os inscritos em `/topic/messages/{protocoloId}`
+      (um por mensagem processada, pode ser mais de uma se a mensagem gerar desdobramentos).
+    subscribe:
+      operationId: enviarMensagemChat
+      summary: Cliente envia (STOMP SEND) uma mensagem de chat.
+      message:
+        $ref: '#/components/messages/MensagemDto'
+
+  /app/sendInterno:
+    description: >
+      **Cliente → Servidor.** Envia uma nova mensagem de chat interno (entre usuários do CRM,
+      1-para-1 ou em grupo). O servidor persiste e republica em
+      `/topic/messages-interna/{grupoId}`.
+    subscribe:
+      operationId: enviarMensagemInterna
+      summary: Cliente envia (STOMP SEND) uma mensagem de chat interno.
+      message:
+        $ref: '#/components/messages/MensagemInternoDto'
+
+  /topic/messages/{protocoloId}:
+    parameters:
+      protocoloId:
+        description: Id do protocolo de atendimento ao qual as mensagens pertencem.
+        schema:
+          type: integer
+          format: int64
+    description: >
+      **Servidor → Cliente.** Novas mensagens de chat (contato/atendimento) vinculadas a um
+      protocolo específico. Inscrever-se ao abrir a tela de conversa de um protocolo.
+    publish:
+      operationId: novaMensagemChat
+      summary: Nova mensagem de chat publicada pelo servidor.
+      message:
+        $ref: '#/components/messages/MensagemResponseDTO'
+
+  /topic/messages/public:
+    description: >
+      **Servidor → Cliente.** Novas mensagens de contatos que ainda não possuem um protocolo de
+      atendimento aberto (ex.: primeira mensagem recebida via WhatsApp antes de um atendente
+      assumir o atendimento).
+    publish:
+      operationId: novaMensagemPublica
+      message:
+        $ref: '#/components/messages/MensagemResponseDTO'
+
+  /topic/messages-interna/{grupoId}:
+    parameters:
+      grupoId:
+        description: Id do chat/grupo interno.
+        schema:
+          type: integer
+          format: int64
+    description: '**Servidor → Cliente.** Novas mensagens de um chat interno (1-para-1 ou em grupo).'
+    publish:
+      operationId: novaMensagemInterna
+      message:
+        $ref: '#/components/messages/MensagemInternaResponseDTO'
+
+  /topic/usuarios:
+    description: >
+      **Servidor → Cliente.** Novo contato/participante criado no sistema (ex.: ao receber a
+      primeira mensagem de um número de WhatsApp desconhecido, ou ao criar cliente junto de uma
+      nova oportunidade). Útil para atualizar listas de contatos em tempo real.
+    publish:
+      operationId: novoUsuarioContato
+      message:
+        $ref: '#/components/messages/UsuarioContatoDto'
+
+  /topic/newoportunidadectt:
+    description: >
+      **Servidor → Cliente.** Nova oportunidade criada automaticamente a partir de um contato
+      recebido via WhatsApp (fluxo de captação automática). Publica a entidade `Oportunidade`
+      praticamente crua (ver nota geral sobre entidades JPA no topo deste documento) — trate o
+      payload como aproximadamente equivalente a `OportunidadeDTO`.
+    publish:
+      operationId: novaOportunidadeContato
+      message:
+        $ref: '#/components/messages/OportunidadeDTO'
+
+  /topic/protocolo/aberto/{destinatarioId}:
+    parameters:
+      destinatarioId:
+        description: >
+          Id do participante (quando o protocolo é aberto pela primeira vez) OU id do usuário
+          administrador/atendente (quando o protocolo é encaminhado/transferido para ele via
+          `PUT /protocolos/encaminhar`) — o mesmo canal é reutilizado nos dois fluxos, com
+          payloads diferentes (ver `oneOf` na mensagem).
+        schema:
+          type: integer
+          format: int64
+    description: >
+      **Servidor → Cliente.** Notifica que um protocolo de atendimento foi aberto/atribuído.
+      Inscrever-se em `/topic/protocolo/aberto/{meuId}` (usando o id do usuário logado) para
+      saber quando um novo atendimento cai para ele.
+    publish:
+      operationId: protocoloAberto
+      message:
+        oneOf:
+          - $ref: '#/components/messages/ProtocoloMoveDTO'
+          - $ref: '#/components/messages/ProtocoloNotificacao2DTO'
+
+  /topic/protocolo/novo:
+    description: '**Servidor → Cliente.** Broadcast geral avisando que um novo protocolo foi aberto (para painéis/filas de atendimento).'
+    publish:
+      operationId: protocoloNovo
+      message:
+        $ref: '#/components/messages/ProtocoloNotificacaoDTO'
+
+  /topic/protocolo/{protocoloId}:
+    parameters:
+      protocoloId:
+        description: Id do protocolo de atendimento.
+        schema:
+          type: integer
+          format: int64
+    description: >
+      **Servidor → Cliente.** Mudança de status de um protocolo específico (hoje, emitido ao
+      encerrar o atendimento). Payload é a string do enum `StatusProtocolo` (`ABERTO` ou
+      `FECHADO`), não um objeto.
+    publish:
+      operationId: statusProtocoloAlterado
+      message:
+        $ref: '#/components/messages/StatusProtocolo'
+
+  /topic/contatoRet:
+    description: '**Servidor → Cliente.** Broadcast do participante cujo protocolo acabou de ser encerrado (retorno ao estado "sem atendimento ativo").'
+    publish:
+      operationId: contatoRetornado
+      message:
+        $ref: '#/components/messages/ParticipanteDTO'
+
+  /topic/newoportunidade:
+    description: '**Servidor → Cliente.** Nova oportunidade criada manualmente (`POST /oportunidade`), ou oportunidade que mudou de etapa via edição (`PUT /oportunidade/{id}`).'
+    publish:
+      operationId: novaOportunidade
+      message:
+        $ref: '#/components/messages/OportunidadeDTO'
+
+  /topic/updateOportunidade:
+    description: '**Servidor → Cliente.** Oportunidade atualizada (`PUT /oportunidade/{id}`) sem mudança de etapa.'
+    publish:
+      operationId: oportunidadeAtualizada
+      message:
+        $ref: '#/components/messages/OportunidadeDTO'
+
+  /topic/movimentoOportunidade:
+    description: '**Servidor → Cliente.** Oportunidade movida entre etapas via drag-and-drop no Kanban (`PUT /oportunidade/move`).'
+    publish:
+      operationId: oportunidadeMovida
+      message:
+        $ref: '#/components/messages/OportunidadeDTO'
+
+  /topic/attoportunidades:
+    description: >
+      **Servidor → Cliente.** Reindexação em lote das oportunidades de uma etapa (ex.: após
+      reordenar cards dentro da mesma coluna do Kanban). Payload é uma lista de `OportunidadeDTO`.
+    publish:
+      operationId: oportunidadesReindexadas
+      message:
+        $ref: '#/components/messages/OportunidadeDTOList'
+
+  /topic/deletedoportunidade:
+    description: '**Servidor → Cliente.** Oportunidade excluída (`DELETE /oportunidade/{id}`). Payload é apenas o id (número).'
+    publish:
+      operationId: oportunidadeExcluida
+      message:
+        $ref: '#/components/messages/IdLong'
+
+  /topic/newGroup/{userId}:
+    parameters:
+      userId:
+        description: Id do usuário do CRM destinatário da notificação.
+        schema:
+          type: integer
+          format: int64
+    description: >
+      **Servidor → Cliente.** Um novo chat interno 1-para-1 foi criado envolvendo este usuário
+      (disparado ao enviar a primeira mensagem interna para alguém sem chat existente). Inscrever-se
+      em `/topic/newGroup/{meuId}`.
+    publish:
+      operationId: novoGrupoInterno
+      message:
+        $ref: '#/components/messages/UsuarioAllContactsDTO'
+
+  /topic/newetapa:
+    description: >
+      **Servidor → Cliente.** Nova etapa de funil criada (`POST /etapa`). Publica a entidade
+      `Etapa` crua (ver nota geral sobre entidades JPA no topo deste documento).
+    publish:
+      operationId: novaEtapa
+      message:
+        $ref: '#/components/messages/EtapaEntity'
+
+  /topic/addvalue:
+    description: '**Servidor → Cliente.** Valor total de uma etapa aumentou (ex.: nova oportunidade entrou na etapa).'
+    publish:
+      operationId: etapaValorAdicionado
+      message:
+        $ref: '#/components/messages/EtapaValorPayload'
+
+  /topic/subvalue:
+    description: '**Servidor → Cliente.** Valor total de uma etapa diminuiu (ex.: oportunidade saiu da etapa ou foi excluída).'
+    publish:
+      operationId: etapaValorSubtraido
+      message:
+        $ref: '#/components/messages/EtapaValorPayload'
+
+  /topic/updateEtapa:
+    description: '**Servidor → Cliente.** Etapa atualizada (`PUT /etapa/{id}`) — payload reduzido, apenas id e novo nome.'
+    publish:
+      operationId: etapaAtualizada
+      message:
+        $ref: '#/components/messages/EtapaUpdate2DTO'
+
+  /topic/deleteetapa:
+    description: '**Servidor → Cliente.** Etapa excluída (`DELETE /etapa/{id}`). Payload é apenas o id (número).'
+    publish:
+      operationId: etapaExcluida
+      message:
+        $ref: '#/components/messages/IdLong'
+
+  /topic/newPublicGroup/{userId}:
+    parameters:
+      userId:
+        description: Id do usuário do CRM membro do grupo.
+        schema:
+          type: integer
+          format: int64
+    description: '**Servidor → Cliente.** Novo grupo de chat criado (`POST /grupos`), publicado para cada membro do grupo.'
+    publish:
+      operationId: novoGrupoPublico
+      message:
+        $ref: '#/components/messages/ChatGrupoResponseDTO'
+
+  /topic/attPublicGroup/{userId}:
+    parameters:
+      userId:
+        description: Id do usuário do CRM membro do grupo.
+        schema:
+          type: integer
+          format: int64
+    description: '**Servidor → Cliente.** Grupo de chat atualizado (`PUT /grupos/{id}`), publicado para cada membro atual do grupo.'
+    publish:
+      operationId: grupoPublicoAtualizado
+      message:
+        $ref: '#/components/messages/ChatGrupoResponseDTO'
+
+  /topic/delPublicGroup/{userId}:
+    parameters:
+      userId:
+        description: Id do usuário do CRM removido do grupo.
+        schema:
+          type: integer
+          format: int64
+    description: '**Servidor → Cliente.** Usuário removido de um grupo de chat (durante uma edição de grupo). Payload é apenas o id do grupo (número).'
+    publish:
+      operationId: usuarioRemovidoDoGrupo
+      message:
+        $ref: '#/components/messages/IdLong'
+
+components:
+  messages:
+    MensagemDto:
+      name: MensagemDto
+      title: Envio de mensagem de chat (contato)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/MensagemDto'
+    MensagemInternoDto:
+      name: MensagemInternoDto
+      title: Envio de mensagem de chat interno
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/MensagemInternoDto'
+    MensagemResponseDTO:
+      name: MensagemResponseDTO
+      title: Mensagem de chat (contato) persistida
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/MensagemResponseDTO'
+    MensagemInternaResponseDTO:
+      name: MensagemInternaResponseDTO
+      title: Mensagem de chat interno persistida
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/MensagemInternaResponseDTO'
+    UsuarioContatoDto:
+      name: UsuarioContatoDto
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UsuarioContatoDto'
+    UsuarioAllContactsDTO:
+      name: UsuarioAllContactsDTO
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UsuarioAllContactsDTO'
+    OportunidadeDTO:
+      name: OportunidadeDTO
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OportunidadeDTO'
+    OportunidadeDTOList:
+      name: OportunidadeDTOList
+      contentType: application/json
+      payload:
+        type: array
+        items:
+          $ref: '#/components/schemas/OportunidadeDTO'
+    ProtocoloMoveDTO:
+      name: ProtocoloMoveDTO
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ProtocoloMoveDTO'
+    ProtocoloNotificacaoDTO:
+      name: ProtocoloNotificacaoDTO
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ProtocoloNotificacaoDTO'
+    ProtocoloNotificacao2DTO:
+      name: ProtocoloNotificacao2DTO
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ProtocoloNotificacao2DTO'
+    ParticipanteDTO:
+      name: ParticipanteDTO
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ParticipanteDTO'
+    StatusProtocolo:
+      name: StatusProtocolo
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/StatusProtocolo'
+    EtapaEntity:
+      name: EtapaEntity
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/EtapaEntity'
+    EtapaValorPayload:
+      name: EtapaValorPayload
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/EtapaValorPayload'
+    EtapaUpdate2DTO:
+      name: EtapaUpdate2DTO
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/EtapaUpdate2DTO'
+    ChatGrupoResponseDTO:
+      name: ChatGrupoResponseDTO
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ChatGrupoResponseDTO'
+    IdLong:
+      name: IdLong
+      title: Id numérico simples
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/IdLong'
+
+  schemas:
+    MensagemDto:
+      type: object
+      properties:
+        id_protocolo:
+          type: integer
+          format: int64
+          description: Id do protocolo de atendimento (pode ser omitido se ainda não houver protocolo aberto).
+        id_sender:
+          type: integer
+          format: int64
+          description: Id do participante remetente.
+        conteudo:
+          type: string
+        media:
+          type: string
+          description: URL/identificador de mídia anexada (opcional).
+        data_envio:
+          type: string
+          format: date-time
+
+    MensagemInternoDto:
+      type: object
+      properties:
+        id_group:
+          type: integer
+          format: int64
+          description: Id do grupo de chat interno (omitir para o backend criar/reaproveitar um chat 1-para-1 entre id_sender e id_reciver).
+        id_sender:
+          type: integer
+          format: int64
+          description: Id do usuário remetente.
+        id_reciver:
+          type: integer
+          format: int64
+          description: Id do usuário destinatário (apenas para chat 1-para-1, quando id_group é omitido).
+        conteudo:
+          type: string
+        data_envio:
+          type: string
+          format: date-time
+
+    MensagemResponseDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        sender:
+          $ref: '#/components/schemas/SenderDTO'
+        conteudo:
+          type: string
+        data_envio:
+          type: string
+          format: date-time
+        protocolo:
+          type: object
+          nullable: true
+          description: Status resumido do protocolo vinculado (null se a mensagem ainda não tem protocolo).
+          properties:
+            status:
+              $ref: '#/components/schemas/StatusProtocolo'
+
+    SenderDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        nome:
+          type: string
+        urlPicture:
+          type: string
+          description: URL da foto de perfil (S3), pode ser um caminho relativo padrão.
+
+    MensagemInternaResponseDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        sender:
+          $ref: '#/components/schemas/UsuarioAllContactsDTO'
+        grupoId:
+          type: integer
+          format: int64
+        conteudo:
+          type: string
+        dataEnvio:
+          type: string
+          format: date-time
+
+    UsuarioAllContactsDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        nome:
+          type: string
+        urlPicture:
+          type: string
+
+    UsuarioContatoDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        nome:
+          type: string
+        urlPicture:
+          type: string
+
+    ParticipanteDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        urlPicture:
+          type: string
+        nome:
+          type: string
+        login:
+          type: string
+        celular:
+          type: string
+        tipoParticipante:
+          type: string
+          enum: [PARTICIPANTE, CLIENTE]
+          description: Ver enum TipoParticipante do backend para valores exatos.
+
+    OportunidadeDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        titulo:
+          type: string
+        etapa:
+          type: integer
+          format: int64
+          description: Id da etapa atual da oportunidade.
+        criador:
+          type: object
+          description: Usuário que criou a oportunidade (CriadorOportunidadeDto).
+        cliente:
+          $ref: '#/components/schemas/ParticipanteDTO'
+        valor:
+          type: number
+          format: double
+        data_criacao:
+          type: string
+          format: date-time
+        interesse:
+          type: string
+        url_anexo:
+          type: string
+          nullable: true
+          description: URL pública do anexo no S3 (quando enviado na criação/edição da oportunidade).
+        origem:
+          type: string
+          description: Enum Origem do backend.
+        descricao:
+          type: string
+        observacoes:
+          type: string
+        situacao:
+          type: string
+          description: Enum SituacaoOportunidade do backend.
+        tags:
+          type: array
+          items:
+            type: object
+            description: TagOportunidadeDTO.
+        indice:
+          type: integer
+          description: Posição/ordem do card dentro da coluna (etapa) no Kanban.
+
+    ProtocoloMoveDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        admin:
+          type: object
+          description: Usuário administrador/atendente responsável (UsuarioAdminDTO).
+        adminAnterior:
+          type: string
+          nullable: true
+          description: Nome do administrador anterior, quando o protocolo é transferido.
+        participante:
+          type: object
+          description: Dados resumidos do participante (ParticipanteProtocoloDTO).
+        status:
+          $ref: '#/components/schemas/StatusProtocolo'
+        dataCriacao:
+          type: string
+          format: date-time
+        dataEncerramento:
+          type: string
+          format: date-time
+          nullable: true
+
+    ProtocoloNotificacaoDTO:
+      type: object
+      properties:
+        participanteId:
+          type: integer
+          format: int64
+        adminId:
+          type: integer
+          format: int64
+
+    ProtocoloNotificacao2DTO:
+      type: object
+      properties:
+        protocolo:
+          $ref: '#/components/schemas/ProtocoloMoveDTO'
+        participante:
+          $ref: '#/components/schemas/ParticipanteDTO'
+
+    StatusProtocolo:
+      type: string
+      enum: [ABERTO, FECHADO]
+
+    EtapaEntity:
+      type: object
+      description: >
+        Entidade JPA `Etapa` publicada diretamente (não um DTO) — estrutura sujeita a variação.
+        Campos mínimos esperados abaixo.
+      properties:
+        id:
+          type: integer
+          format: int64
+        nome:
+          type: string
+        valor_total:
+          type: number
+          format: double
+
+    EtapaValorPayload:
+      type: object
+      properties:
+        etapaId:
+          type: integer
+          format: int64
+        valor:
+          type: number
+          format: double
+          description: Valor (delta) somado/subtraído do total da etapa — não é o novo total.
+
+    EtapaUpdate2DTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        nome:
+          type: string
+
+    ChatGrupoResponseDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        nome:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+          description: URL pública da foto do grupo no S3.
+        imagemFundoUrl:
+          type: string
+          nullable: true
+          description: URL pública da imagem de fundo do grupo no S3.
+        privado:
+          type: boolean
+
+    IdLong:
+      type: integer
+      format: int64

@@ -4,20 +4,27 @@ import br.edu.faculdadevincit.crm_vincit.model.Etapa;
 import br.edu.faculdadevincit.crm_vincit.model.Oportunidade;
 import br.edu.faculdadevincit.crm_vincit.model.Participante;
 import br.edu.faculdadevincit.crm_vincit.model.Tag;
-import br.edu.faculdadevincit.crm_vincit.model.dtos.CriadorOportunidadeDto;
+import br.edu.faculdadevincit.crm_vincit.model.Usuario;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.OportunidadeClienteRequest;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.OportunidadeCreateRequest;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.OportunidadeDTO;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.OportunidadeUpdateRequest;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioContatoDto;
 import br.edu.faculdadevincit.crm_vincit.model.enums.Origem;
+import br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade;
 import br.edu.faculdadevincit.crm_vincit.model.enums.TipoParticipante;
 import br.edu.faculdadevincit.crm_vincit.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -25,11 +32,12 @@ import java.util.stream.Collectors;
 @Service
 public class OportunidadeService {
 
-    @Autowired
-    private OportunidadeRepository oportunidadeRepository;
+    private static final long MAX_SIZE_BYTES = 100L * 1024 * 1024;
+    private static final Set<String> ALLOWED_CONTENT_TYPES =
+            Set.of("image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif");
 
     @Autowired
-    private FunilRepository funilRepository;
+    private OportunidadeRepository oportunidadeRepository;
 
     @Autowired
     private UsuarioRepository usuarioRepository;
@@ -53,330 +61,334 @@ public class OportunidadeService {
     private S3Service s3Service;
 
     @Autowired
-    private CloudFrontService cloudFrontService;
-
-    @Autowired
     private TagRepository tagRepository;
 
-
-    long maxSizeBytes = 100 * 1024 * 1024;
-
-    public Oportunidade findByClienteAndCriadorNull(Long clienteId) {
-        Oportunidade oportunidade = oportunidadeRepository.findByClienteIdAndCriadorIsNull(clienteId).orElse(null);
-        return oportunidade;
+    public OportunidadeDTO findByClienteAndCriadorNull(Long clienteId) {
+        return oportunidadeRepository.findByClienteIdAndCriadorIsNull(clienteId)
+                .map(this::toDto)
+                .orElse(null);
     }
 
-
-    public List<OportunidadeDTO> findAll() {
-        List<Oportunidade> oportunidades = oportunidadeRepository.findAll();
-
-        return oportunidades.stream()
-                .map(oportunidade -> {
-                    OportunidadeDTO dto = new OportunidadeDTO(oportunidade);
-
-                    if (dto.getUrl_anexo() != null && dto.getUrl_anexo().contains(cloudFrontService.getBaseUrl())) {
-                        String signedUrl = cloudFrontService.generateSignedUrl(dto.getUrl_anexo(), Duration.ofMinutes(60));
-                        dto.setUrl_anexo(signedUrl);
-                    }
-
-                    return dto;
-                })
-                .collect(Collectors.toList());
+    public Page<OportunidadeDTO> findAll(Pageable pageable) {
+        return oportunidadeRepository.findAllWithDetails(pageable).map(this::toDto);
     }
-
 
     public OportunidadeDTO findById(Long id) {
-        Oportunidade oportunidade = oportunidadeRepository.findById(id)
+        Oportunidade oportunidade = oportunidadeRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Oportunidade com id " + id + " nao encontrada"));
-
-        OportunidadeDTO dto = new OportunidadeDTO(oportunidade);
-
-        if (dto.getUrl_anexo() != null && dto.getUrl_anexo().contains(cloudFrontService.getBaseUrl())) {
-            String signedUrl = cloudFrontService.generateSignedUrl(dto.getUrl_anexo(), Duration.ofMinutes(60));
-            dto.setUrl_anexo(signedUrl);
-        }
-
-        return dto;
+        return toDto(oportunidade);
     }
 
+    /**
+     * O upload ao S3 roda antes de abrir a transação (e o delete de anexo antigo, em {@link #update},
+     * depois de fechá-la) para que a conexão/transação JPA nunca fique presa esperando uma chamada de rede.
+     */
+    public OportunidadeDTO create(OportunidadeCreateRequest request, MultipartFile file) {
+        String urlAnexo = null;
+        if (file != null && !file.isEmpty()) {
+            validarArquivo(file);
+            urlAnexo = uploadArquivo(file);
+        }
+        return criarComAnexoResolvido(request, urlAnexo);
+    }
 
-    public OportunidadeDTO create(Oportunidade oportunidade, MultipartFile file) {
-        Etapa etapa = etapaRepository.findById(oportunidade.getEtapa().getId())
+    @Transactional
+    OportunidadeDTO criarComAnexoResolvido(OportunidadeCreateRequest request, String urlAnexo) {
+        Etapa etapa = etapaRepository.findById(request.etapaId())
                 .orElseThrow(() -> new RuntimeException("Etapa não encontrado"));
-        funilRepository.findById(etapa.getFunil().getId())
-                .orElseThrow(() -> new RuntimeException("Funil não encontrado"));
-        usuarioRepository.findById(oportunidade.getCriador().getId())
+        Usuario criador = usuarioRepository.findById(request.criadorId())
                 .orElseThrow(() -> new RuntimeException("Dono não encontrado"));
-        List<Tag> tags = new ArrayList<>();
 
-        if (oportunidade.getTags() != null && !oportunidade.getTags().isEmpty()) {
-            for (Tag tag : oportunidade.getTags()) {
-                Tag foundTag = tagRepository.findById(tag.getId())
-                        .orElseThrow(() -> new RuntimeException("Tag com ID " + tag.getId() + " não encontrada"));
-                tags.add(foundTag);
-            }
-        }
+        List<Tag> tags = resolveTags(request.tagIds());
+        Participante cliente = resolveCliente(request.cliente());
 
+        Oportunidade oportunidade = new Oportunidade();
+        oportunidade.setTitulo(request.titulo());
+        oportunidade.setEtapa(etapa);
+        oportunidade.setCriador(criador);
+        oportunidade.setCliente(cliente);
+        oportunidade.setValor(request.valor());
+        oportunidade.setData_criacao(request.dataCriacao() != null ? request.dataCriacao() : LocalDateTime.now());
+        oportunidade.setOrigem(request.origem());
+        oportunidade.setInteresse(request.interesse());
+        oportunidade.setDescricao(request.descricao());
+        oportunidade.setObservacoes(request.observacoes());
+        oportunidade.setSituacao(request.situacao() != null ? request.situacao() : SituacaoOportunidade.ABERTO);
         oportunidade.setTags(tags);
-
-        Optional<Participante> cliente = participanteRepository.findByCelular(oportunidade.getCliente().getCelular());
-        if (cliente.isPresent()) {
-            cliente.get().setTipoParticipante(TipoParticipante.PARTICIPANTE);
-            if(cliente.get().getLogin() != null){
-                oportunidade.setCliente(cliente.get());
-            }else{
-                Participante updateClient = participanteService.preencheParticipante(oportunidade.getCliente(),cliente.get());
-                oportunidade.setCliente(updateClient);
-            }
-
-        } else {
-            Participante newCliente = createParticipante(oportunidade.getCliente());
-            oportunidade.setCliente(newCliente);
-        }
-        if (oportunidade.getData_criacao() == null) {
-            oportunidade.setData_criacao(LocalDateTime.now());
-        }
         oportunidade.setIndice(0);
         oportunidade.setDataEntradaEtapa(LocalDateTime.now());
+        oportunidade.setUrl_anexo(urlAnexo);
 
-        List<Oportunidade> oportunidadesNoEtapa = oportunidadeRepository.findByEtapaId(etapa.getId());
-        for (Oportunidade op : oportunidadesNoEtapa) {
-            if (op.getIndice() >= 0) {
-                op.setIndice(op.getIndice() + 1);
-                oportunidadeRepository.save(op);
-            }
-        }
+        List<Oportunidade> oportunidadesNaEtapa = oportunidadeRepository.findCardsByEtapaId(etapa.getId());
+        oportunidadesNaEtapa.forEach(op -> op.setIndice(op.getIndice() + 1));
+        oportunidadeRepository.saveAll(oportunidadesNaEtapa);
 
-        if(file != null){
-            if (file.getSize() > maxSizeBytes) {
-                throw new RuntimeException("O arquivo selecionado excede o limite de 100 MB.");
-            }
-            String key = "imgetapa/" + file.getOriginalFilename();
-            oportunidade.setUrl_anexo(s3Service.uploadFile(file,key));
-        }
-        etapaService.updateAddValor(etapa.getId(),oportunidade.getValor());
-        Oportunidade newOportunidade = oportunidadeRepository.save(oportunidade);
-        OportunidadeDTO dto = new OportunidadeDTO(newOportunidade);
-        if (dto.getUrl_anexo() != null && dto.getUrl_anexo().contains(cloudFrontService.getBaseUrl())) {
-            String signedUrl = cloudFrontService.generateSignedUrl(dto.getUrl_anexo(), Duration.ofMinutes(60));
-            dto.setUrl_anexo(signedUrl);
-        }
-        messagingTemplate.convertAndSend("/topic/newoportunidade", newOportunidade);
+        etapaService.updateAddValor(etapa.getId(), oportunidade.getValor());
+        Oportunidade salva = oportunidadeRepository.save(oportunidade);
+
+        OportunidadeDTO dto = toDto(salva);
+        afterCommit(() -> messagingTemplate.convertAndSend("/topic/newoportunidade", dto));
         return dto;
     }
 
-    public Participante createParticipante(Participante participante){
-        Participante newparticipante = new Participante();
-        newparticipante.setNome(participante.getNome());
-        newparticipante.setLogin(participante.getLogin());
-        newparticipante.setRg(null);
-        newparticipante.setCpf(null);
-        newparticipante.setUrlPicture("assets/img/avatar/padrao.jpeg");
-        newparticipante.setDataNascimento(null);
-        newparticipante.setCelular(participante.getCelular());
-        newparticipante.setEndereco(null);
-        newparticipante.setNumeroResidencial(null);
-        newparticipante.setComplemento(null);
-        newparticipante.setBairro(null);
-        newparticipante.setUf(null);
-        newparticipante.setCidade(null);
-        newparticipante.setObservacoes(null);
-        newparticipante.setTipoParticipante(TipoParticipante.PARTICIPANTE);
-        participanteRepository.save(newparticipante);
-        UsuarioContatoDto contatoDto = new UsuarioContatoDto(newparticipante.getId(), newparticipante.getNome(), newparticipante.getUrlPicture());
-        messagingTemplate.convertAndSend("/topic/usuarios", contatoDto);
-        return newparticipante;
+    private Participante resolveCliente(OportunidadeClienteRequest clienteRequest) {
+        Optional<Participante> existenteOpt = participanteRepository.findByCelular(clienteRequest.celular());
+        if (existenteOpt.isPresent()) {
+            Participante existente = existenteOpt.get();
+            existente.setTipoParticipante(TipoParticipante.PARTICIPANTE);
+            if (existente.getLogin() != null) {
+                return existente;
+            }
+            Participante dadosRequest = new Participante();
+            dadosRequest.setNome(clienteRequest.nome());
+            dadosRequest.setLogin(clienteRequest.login());
+            dadosRequest.setCelular(clienteRequest.celular());
+            return participanteService.preencheParticipante(dadosRequest, existente);
+        }
+        Participante novo = new Participante();
+        novo.setNome(clienteRequest.nome());
+        novo.setLogin(clienteRequest.login());
+        novo.setCelular(clienteRequest.celular());
+        return createParticipante(novo);
     }
 
-    public void update(Long id, Oportunidade oportunidade,MultipartFile file) {
-        Oportunidade oportunidadeBanco = oportunidadeRepository.findById(id)
+    private Participante createParticipante(Participante participante) {
+        Participante novo = new Participante();
+        novo.setNome(participante.getNome());
+        novo.setLogin(participante.getLogin());
+        novo.setUrlPicture("assets/img/avatar/padrao.jpeg");
+        novo.setCelular(participante.getCelular());
+        novo.setTipoParticipante(TipoParticipante.PARTICIPANTE);
+        Participante salvo = participanteRepository.save(novo);
+        UsuarioContatoDto contatoDto = new UsuarioContatoDto(salvo.getId(), salvo.getNome(), salvo.getUrlPicture());
+        afterCommit(() -> messagingTemplate.convertAndSend("/topic/usuarios", contatoDto));
+        return salvo;
+    }
+
+    private List<Tag> resolveTags(List<Long> tagIds) {
+        if (tagIds == null || tagIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Tag> tags = tagRepository.findAllById(tagIds);
+        if (tags.size() != new HashSet<>(tagIds).size()) {
+            throw new RuntimeException("Uma ou mais tags informadas não foram encontradas");
+        }
+        return tags;
+    }
+
+    public OportunidadeDTO update(Long id, OportunidadeUpdateRequest request, MultipartFile file) {
+        if (!oportunidadeRepository.existsById(id)) {
+            throw new RuntimeException("Oportunidade com id " + id + " nao encontrada");
+        }
+        String urlAnexoAtual = oportunidadeRepository.findUrlAnexoById(id).orElse(null);
+        String urlAnexoFinal = resolveAnexo(urlAnexoAtual, request.urlAnexo(), file);
+        return atualizarComAnexoResolvido(id, request, urlAnexoFinal);
+    }
+
+    @Transactional
+    OportunidadeDTO atualizarComAnexoResolvido(Long id, OportunidadeUpdateRequest request, String urlAnexoFinal) {
+        Oportunidade oportunidadeBanco = oportunidadeRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Oportunidade com id " + id + " nao encontrada"));
-        Participante cliente = participanteRepository.findById(oportunidade.getCliente().getId())
-                .orElseThrow(() -> new RuntimeException("Cliente encontrado"));
+        Etapa novaEtapa = etapaRepository.findById(request.etapaId())
+                .orElseThrow(() -> new RuntimeException("Etapa não encontrado"));
+        Usuario criador = usuarioRepository.findById(request.criadorId())
+                .orElseThrow(() -> new RuntimeException("Dono não encontrado"));
+        Participante clienteBanco = participanteRepository.findById(request.cliente().id())
+                .orElseThrow(() -> new RuntimeException("Cliente não encontrado"));
 
-        if(!oportunidade.getOrigem().equals(Origem.OUTRO)){
-            oportunidade.setDescricao(null);
-        }
+        Etapa etapaAntiga = oportunidadeBanco.getEtapa();
+        BigDecimal valorAntigo = oportunidadeBanco.getValor();
+        boolean etapaChanged = etapaAntiga == null || !etapaAntiga.getId().equals(novaEtapa.getId());
+        BigDecimal diferenca = request.valor().subtract(valorAntigo);
 
-        BigDecimal diferenca = oportunidade.getValor().subtract(oportunidadeBanco.getValor());
-        boolean etapaChanged = false;
-        if (oportunidade.getEtapa() != null && oportunidadeBanco.getEtapa() != null) {
-            etapaChanged = !Objects.equals(oportunidade.getEtapa().getId(), oportunidadeBanco.getEtapa().getId());
-        }
-        
         if (etapaChanged) {
-            oportunidade.setDataEntradaEtapa(LocalDateTime.now());
-            etapaService.updateAddValor(oportunidade.getEtapa().getId(), oportunidade.getValor());
-            etapaService.updateSubValor(oportunidadeBanco.getEtapa().getId(), oportunidadeBanco.getValor());
+            etapaService.updateAddValor(novaEtapa.getId(), request.valor());
+            if (etapaAntiga != null) {
+                etapaService.updateSubValor(etapaAntiga.getId(), valorAntigo);
+            }
         } else if (diferenca.compareTo(BigDecimal.ZERO) != 0) {
             if (diferenca.compareTo(BigDecimal.ZERO) > 0) {
-                etapaService.updateAddValor(oportunidade.getEtapa().getId(), diferenca);
+                etapaService.updateAddValor(novaEtapa.getId(), diferenca);
             } else {
-                etapaService.updateSubValor(oportunidade.getEtapa().getId(), diferenca.abs());
+                etapaService.updateSubValor(novaEtapa.getId(), diferenca.abs());
             }
-        }
-        if (oportunidadeBanco.getUrl_anexo() != null && !oportunidadeBanco.getUrl_anexo().isEmpty()) {
-            if (oportunidade.getUrl_anexo() == null && file == null) {
-                String chaveArquivo = getFileKeyFromUrl(oportunidadeBanco.getUrl_anexo());
-                s3Service.deleteFile(chaveArquivo);
-            }
-            else if (file != null) {
-                String chaveArquivo = getFileKeyFromUrl(oportunidadeBanco.getUrl_anexo());
-                s3Service.deleteFile(chaveArquivo);
-                String key = "imgetapa/" + file.getOriginalFilename();
-                oportunidade.setUrl_anexo(s3Service.uploadFile(file, key));
-            }
-        } else {
-            if (file != null) {
-                if (file.getSize() > maxSizeBytes) {
-                    throw new RuntimeException("O arquivo selecionado excede o limite de 100 MB.");
-                }
-                String key = "imgetapa/" + file.getOriginalFilename();
-                oportunidade.setUrl_anexo(s3Service.uploadFile(file, key));
-            }
-        }
-        if (oportunidade.getTags() != null && !oportunidade.getTags().isEmpty()) {
-            List<Tag> tagsAtualizadas = new ArrayList<>();
-            for (Tag tagRecebida : oportunidade.getTags()) {
-                Tag tag = tagRepository.findById(tagRecebida.getId())
-                        .orElseThrow(() -> new RuntimeException("Tag com id " + tagRecebida.getId() + " não encontrada"));
-                tagsAtualizadas.add(tag);
-            }
-
-            oportunidade.setTags(tagsAtualizadas);
         }
 
-        Oportunidade newOportunidade = preencheOportunidade(oportunidadeBanco, oportunidade);
-        Participante updateClient = preencheCliente(cliente, oportunidade.getCliente());
-        participanteRepository.save(updateClient);
+        List<Tag> tags = resolveTags(request.tagIds());
+        Participante clienteAtualizado = preencheCliente(clienteBanco, request.cliente());
+        participanteRepository.save(clienteAtualizado);
 
-        if (newOportunidade.getData_criacao() == null) {
-            newOportunidade.setData_criacao(LocalDateTime.now());
+        oportunidadeBanco.setTitulo(request.titulo());
+        oportunidadeBanco.setEtapa(novaEtapa);
+        oportunidadeBanco.setCriador(criador);
+        oportunidadeBanco.setCliente(clienteAtualizado);
+        oportunidadeBanco.setValor(request.valor());
+        if (oportunidadeBanco.getData_criacao() == null) {
+            oportunidadeBanco.setData_criacao(request.dataCriacao() != null ? request.dataCriacao() : LocalDateTime.now());
         }
-        newOportunidade.setAtualizadoEm(LocalDateTime.now());
-        OportunidadeDTO dto = new OportunidadeDTO(oportunidadeRepository.save(newOportunidade));
-        if (dto.getUrl_anexo() != null && dto.getUrl_anexo().contains(cloudFrontService.getBaseUrl())) {
-            String signedUrl = cloudFrontService.generateSignedUrl(dto.getUrl_anexo(), Duration.ofMinutes(60));
-            dto.setUrl_anexo(signedUrl);
+        oportunidadeBanco.setUrl_anexo(urlAnexoFinal);
+        oportunidadeBanco.setOrigem(request.origem());
+        oportunidadeBanco.setInteresse(request.interesse());
+        oportunidadeBanco.setDescricao(Origem.OUTRO.equals(request.origem()) ? request.descricao() : null);
+        oportunidadeBanco.setObservacoes(request.observacoes());
+        oportunidadeBanco.setSituacao(request.situacao());
+        oportunidadeBanco.setTags(tags);
+        if (etapaChanged) {
+            oportunidadeBanco.setDataEntradaEtapa(LocalDateTime.now());
         }
+        oportunidadeBanco.setAtualizadoEm(LocalDateTime.now());
+
+        Oportunidade salva = oportunidadeRepository.save(oportunidadeBanco);
+        OportunidadeDTO dto = toDto(salva);
         String topic = etapaChanged ? "/topic/newoportunidade" : "/topic/updateOportunidade";
-        messagingTemplate.convertAndSend(topic, dto);
+        afterCommit(() -> messagingTemplate.convertAndSend(topic, dto));
+        return dto;
+    }
+
+    private String resolveAnexo(String urlAnexoAtual, String urlAnexoRequest, MultipartFile file) {
+        boolean existiaAnexo = urlAnexoAtual != null && !urlAnexoAtual.isEmpty();
+        if (existiaAnexo) {
+            if (urlAnexoRequest == null && (file == null || file.isEmpty())) {
+                s3Service.deleteFile(getFileKeyFromUrl(urlAnexoAtual));
+                return null;
+            }
+            if (file != null && !file.isEmpty()) {
+                validarArquivo(file);
+                s3Service.deleteFile(getFileKeyFromUrl(urlAnexoAtual));
+                return uploadArquivo(file);
+            }
+            return urlAnexoAtual;
+        }
+        if (file != null && !file.isEmpty()) {
+            validarArquivo(file);
+            return uploadArquivo(file);
+        }
+        return null;
     }
 
     private String getFileKeyFromUrl(String url) {
-        return url.substring(url.indexOf("imgetapa/"));
+        int idx = url.indexOf("imgetapa/");
+        if (idx < 0) {
+            throw new RuntimeException("URL de anexo inválida: " + url);
+        }
+        return url.substring(idx);
     }
 
-    public void movimentoOportunidade(Long oportunidadeId, Long etapaId, int novoIndice) {
-        Oportunidade oportunidade = oportunidadeRepository.findById(oportunidadeId)
-                .orElseThrow(() -> new RuntimeException("Oportunidade não encontrada"));
+    private void validarArquivo(MultipartFile file) {
+        if (file.getSize() > MAX_SIZE_BYTES) {
+            throw new RuntimeException("O arquivo selecionado excede o limite de 100 MB.");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
+            throw new RuntimeException("Tipo de arquivo não permitido. Envie uma imagem (PNG, JPG, JPEG, WEBP ou GIF).");
+        }
+    }
 
+    private String uploadArquivo(MultipartFile file) {
+        String key = "imgetapa/" + UUID.randomUUID() + extrairExtensao(file.getOriginalFilename());
+        return s3Service.uploadFile(file, key);
+    }
+
+    private String extrairExtensao(String nomeOriginal) {
+        if (nomeOriginal == null) {
+            return "";
+        }
+        int idx = nomeOriginal.lastIndexOf('.');
+        return idx >= 0 ? nomeOriginal.substring(idx) : "";
+    }
+
+    @Transactional
+    public void movimentoOportunidade(Long oportunidadeId, Long etapaId, int novoIndice) {
+        Oportunidade oportunidade = oportunidadeRepository.findByIdWithDetails(oportunidadeId)
+                .orElseThrow(() -> new RuntimeException("Oportunidade não encontrada"));
+        movimentarOportunidadeCarregada(oportunidade, etapaId, novoIndice);
+    }
+
+    /**
+     * Mesma lógica de {@link #movimentoOportunidade}, mas recebe a entidade já carregada
+     * (com os relacionamentos necessários via JOIN FETCH) para evitar um SELECT redundante
+     * quando o chamador (ex.: scheduler de cadência) já obteve a oportunidade em outra consulta.
+     */
+    void movimentarOportunidadeCarregada(Oportunidade oportunidade, Long etapaId, int novoIndice) {
         Etapa etapaAtual = oportunidade.getEtapa();
+        if (etapaAtual == null) {
+            throw new RuntimeException("Oportunidade sem etapa definida");
+        }
 
         if (etapaAtual.getId().equals(etapaId)) {
-            reorganizarIndicesOportunidades(etapaAtual, oportunidade, novoIndice);
+            reorganizarIndices(etapaAtual.getId(), oportunidade, novoIndice);
         } else {
-            Etapa newEtapa = etapaRepository.findById(etapaId)
+            Etapa novaEtapa = etapaRepository.findById(etapaId)
                     .orElseThrow(() -> new RuntimeException("Etapa não encontrado"));
 
-            etapaService.updateAddValor(newEtapa.getId(), oportunidade.getValor());
+            etapaService.updateAddValor(novaEtapa.getId(), oportunidade.getValor());
             etapaService.updateSubValor(etapaAtual.getId(), oportunidade.getValor());
 
-            reorganizarIndicesOportunidades(etapaAtual, oportunidade, -1);
+            reorganizarIndices(etapaAtual.getId(), oportunidade, -1);
 
             oportunidade.setDataEntradaEtapa(LocalDateTime.now());
-            oportunidade.setEtapa(newEtapa);
-            reorganizarIndicesOportunidades(newEtapa, oportunidade, novoIndice);
+            oportunidade.setEtapa(novaEtapa);
+            reorganizarIndices(novaEtapa.getId(), oportunidade, novoIndice);
         }
-        OportunidadeDTO dto = new OportunidadeDTO(oportunidade);
-        if (dto.getUrl_anexo() != null && dto.getUrl_anexo().contains(cloudFrontService.getBaseUrl())) {
-            String signedUrl = cloudFrontService.generateSignedUrl(dto.getUrl_anexo(), Duration.ofMinutes(60));
-            dto.setUrl_anexo(signedUrl);
-        }
-        CriadorOportunidadeDto criador = dto.getCriador();
-        if (criador != null && criador.getUrlPicture() != null &&
-                criador.getUrlPicture().contains(cloudFrontService.getBaseUrl())) {
 
-            String signedPictureUrl = cloudFrontService.generateSignedUrl(criador.getUrlPicture(), Duration.ofMinutes(60));
-            criador.setUrlPicture(signedPictureUrl);
-        }
-        messagingTemplate.convertAndSend("/topic/movimentoOportunidade",dto);
-        oportunidadeRepository.save(oportunidade);
+        OportunidadeDTO dto = toDto(oportunidade);
+        afterCommit(() -> messagingTemplate.convertAndSend("/topic/movimentoOportunidade", dto));
     }
 
-
-    private void reorganizarIndicesOportunidades(Etapa etapa, Oportunidade oportunidadeMovida, int novoIndice) {
-        List<Oportunidade> oportunidades = oportunidadeRepository.findByEtapaId(etapa.getId());
-
-        oportunidades.sort(Comparator.comparingInt(Oportunidade::getIndice));
-
+    private void reorganizarIndices(Long etapaId, Oportunidade oportunidadeMovida, int novoIndice) {
+        List<Oportunidade> oportunidades = oportunidadeRepository.findCardsByEtapaId(etapaId);
         oportunidades.removeIf(o -> o.getId().equals(oportunidadeMovida.getId()));
 
         if (novoIndice != -1) {
-            oportunidades.add(novoIndice, oportunidadeMovida);
+            int indiceValido = Math.max(0, Math.min(novoIndice, oportunidades.size()));
+            oportunidades.add(indiceValido, oportunidadeMovida);
         }
         for (int i = 0; i < oportunidades.size(); i++) {
             oportunidades.get(i).setIndice(i);
         }
         oportunidadeRepository.saveAll(oportunidades);
+
         List<OportunidadeDTO> dtoList = oportunidades.stream()
-                .map(OportunidadeDTO::new)
-                .peek(dto -> {
-                    if (dto.getUrl_anexo() != null && dto.getUrl_anexo().contains(cloudFrontService.getBaseUrl())) {
-                        String signedUrl = cloudFrontService.generateSignedUrl(dto.getUrl_anexo(), Duration.ofMinutes(60));
-                        dto.setUrl_anexo(signedUrl);
-                    }
-
-                    CriadorOportunidadeDto criador = dto.getCriador();
-                    if (criador != null && criador.getUrlPicture() != null &&
-                            criador.getUrlPicture().contains(cloudFrontService.getBaseUrl())) {
-
-                        String signedPictureUrl = cloudFrontService.generateSignedUrl(criador.getUrlPicture(), Duration.ofMinutes(60));
-                        criador.setUrlPicture(signedPictureUrl);
-                    }
-                })
+                .map(this::toDto)
                 .collect(Collectors.toList());
-
-
-        messagingTemplate.convertAndSend("/topic/attoportunidades", dtoList);
+        afterCommit(() -> messagingTemplate.convertAndSend("/topic/attoportunidades", dtoList));
     }
 
-
-
+    @Transactional
     public void delete(Long id) {
-        Oportunidade oportunidadeBanco = oportunidadeRepository.findById(id).orElseThrow(()-> new RuntimeException("Oportunidade com id "+id+" nao encontrada"));
-        Etapa etapa = etapaRepository.findById(oportunidadeBanco.getEtapa().getId()).orElseThrow(()-> new RuntimeException("Etapa nao encontrado"));
+        Oportunidade oportunidadeBanco = oportunidadeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Oportunidade com id " + id + " nao encontrada"));
+        Etapa etapa = oportunidadeBanco.getEtapa();
         BigDecimal valor = oportunidadeBanco.getValor();
         oportunidadeRepository.delete(oportunidadeBanco);
-        oportunidadeRepository.flush();
-        etapaService.updateSubValor(etapa.getId(),valor);
-        messagingTemplate.convertAndSend("/topic/deletedoportunidade",id);
+        if (etapa != null) {
+            etapaService.updateSubValor(etapa.getId(), valor);
+        }
+        afterCommit(() -> messagingTemplate.convertAndSend("/topic/deletedoportunidade", id));
     }
 
-    public Oportunidade preencheOportunidade(Oportunidade oportunidadeBanco,Oportunidade newOportunidade){
-        oportunidadeBanco.setTitulo(newOportunidade.getTitulo());
-        oportunidadeBanco.setEtapa(newOportunidade.getEtapa());
-        oportunidadeBanco.setCriador(newOportunidade.getCriador());
-        oportunidadeBanco.setCliente(newOportunidade.getCliente());
-        oportunidadeBanco.setValor(newOportunidade.getValor());
-        oportunidadeBanco.setData_criacao(newOportunidade.getData_criacao());
-        oportunidadeBanco.setUrl_anexo(newOportunidade.getUrl_anexo());
-        oportunidadeBanco.setOrigem(newOportunidade.getOrigem());
-        oportunidadeBanco.setInteresse(newOportunidade.getInteresse());
-        oportunidadeBanco.setDescricao(newOportunidade.getDescricao());
-        oportunidadeBanco.setObservacoes(newOportunidade.getObservacoes());
-        oportunidadeBanco.setDataEntradaEtapa(newOportunidade.getDataEntradaEtapa());
-        oportunidadeBanco.setSituacao(newOportunidade.getSituacao());
-        oportunidadeBanco.setTags(newOportunidade.getTags());
-        return oportunidadeBanco;
-    }
-
-    public Participante preencheCliente(Participante participanteBanco,Participante newParticipante){
-        participanteBanco.setNome(newParticipante.getNome());
-        participanteBanco.setLogin(newParticipante.getLogin());
-        participanteBanco.setCelular(newParticipante.getCelular());
+    private Participante preencheCliente(Participante participanteBanco, OportunidadeClienteRequest cliente) {
+        participanteBanco.setNome(cliente.nome());
+        participanteBanco.setLogin(cliente.login());
+        participanteBanco.setCelular(cliente.celular());
         return participanteBanco;
     }
 
+    private OportunidadeDTO toDto(Oportunidade oportunidade) {
+        return new OportunidadeDTO(oportunidade);
+    }
+
+    private void afterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
+        }
+    }
 
 }

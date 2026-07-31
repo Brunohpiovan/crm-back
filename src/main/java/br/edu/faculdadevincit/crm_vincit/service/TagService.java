@@ -4,6 +4,7 @@ package br.edu.faculdadevincit.crm_vincit.service;
 import br.edu.faculdadevincit.crm_vincit.model.Tag;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.TagDTO;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.TagOportunidadeDTO;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.TagRequestDTO;
 import br.edu.faculdadevincit.crm_vincit.model.enums.Situacao;
 import br.edu.faculdadevincit.crm_vincit.repository.TagRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,12 +41,13 @@ public class TagService {
         return new TagDTO(tagRepository.findById(id).orElseThrow(()->new RuntimeException("Tag nao encontrada")));
     }
 
-    public void create(Tag tag){
+    public void create(TagRequestDTO tag){
         if (tagRepository.existsByNome(tag.getNome())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Já existe uma tag com este nome.");
         }
-        tag.setCriadoEm(LocalDateTime.now());
-        tagRepository.save(tag);
+        Tag newTag = preencheTag(new Tag(), tag);
+        newTag.setCriadoEm(LocalDateTime.now());
+        tagRepository.save(newTag);
     }
 
     public void delete(Long id){
@@ -53,7 +55,7 @@ public class TagService {
         tagRepository.delete(tag);
     }
 
-    public void update(Long id, Tag tag) {
+    public void update(Long id, TagRequestDTO tag) {
         Tag tagBanco = tagRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tag não encontrada"));
 
@@ -68,7 +70,7 @@ public class TagService {
         tagRepository.save(newTag);
     }
 
-    private Tag preencheTag(Tag tagBanco,Tag newTag){
+    private Tag preencheTag(Tag tagBanco, TagRequestDTO newTag){
         tagBanco.setNome(newTag.getNome());
         tagBanco.setCor(newTag.getCor());
         tagBanco.setSituacao(newTag.getSituacao());

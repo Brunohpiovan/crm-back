@@ -20,10 +20,10 @@ public class Mensagem {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "protocolo_id")
     private Protocolo protocolo;
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sender_id")
     private Participante sender;
     @Lob
@@ -32,6 +32,9 @@ public class Mensagem {
     private LocalDateTime data_envio;
 
     public String getDataEnvio() {
+        if (this.data_envio == null) {
+            return null;
+        }
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
         return this.data_envio.format(formatter);
     }

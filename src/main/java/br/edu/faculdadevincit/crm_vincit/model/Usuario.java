@@ -1,6 +1,6 @@
 package br.edu.faculdadevincit.crm_vincit.model;
 
-import br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioDTO;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioCreateDTO;
 import br.edu.faculdadevincit.crm_vincit.model.enums.Uf;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import br.edu.faculdadevincit.crm_vincit.model.enums.UserRole;
@@ -53,6 +53,7 @@ public class Usuario implements UserDetails {
     @NotBlank(message = "Informe uma senha")
     @Column(name = "senha",nullable = false)
     @Size(min = 8, max = 255, message = "O nome deve ter entre 6 e 254 caracteres")
+    @JsonIgnore
     private String senha;
 
     @NotBlank(message = "Informe um rg")
@@ -126,8 +127,7 @@ public class Usuario implements UserDetails {
     @Column(name = "bloqueado",nullable = false)
     private Boolean bloqueado;
 
-    public Usuario(UsuarioDTO usuarioDTO){
-        this.id = usuarioDTO.getId();
+    public Usuario(UsuarioCreateDTO usuarioDTO){
         this.urlPicture = usuarioDTO.getUrlPicture();
         this.nome = usuarioDTO.getNome();
         this.login = usuarioDTO.getLogin().toLowerCase();
@@ -144,10 +144,7 @@ public class Usuario implements UserDetails {
         this.cidade = usuarioDTO.getCidade();
         this.observacoes = usuarioDTO.getObservacoes();
         this.cargo = usuarioDTO.getCargo();
-        this.criadoEm = usuarioDTO.getCriadoEm();
-        this.atualizadoEm = usuarioDTO.getAtualizadoEm();
         this.cep = usuarioDTO.getCep();
-        this.bloqueado = usuarioDTO.getBloqueado();
     }
 
     public Usuario(String login,String senha,UserRole cargo){
@@ -171,6 +168,7 @@ public class Usuario implements UserDetails {
     }
 
     @Override
+    @JsonIgnore
     public String getPassword() {
         return senha;
     }

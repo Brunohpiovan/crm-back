@@ -24,7 +24,7 @@ public class Email {
     @Lob
     @Column(columnDefinition = "TEXT")
     private String corpo;
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "remetente_id", nullable = false)
     private Usuario remetente;
 

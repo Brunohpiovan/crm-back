@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -27,15 +28,15 @@ public class Oportunidade {
     @Size(max = 150, message = "O titulo deve ter no maximo 150 caracteres")
     private String titulo;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "card_id")
     private Etapa etapa;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "criador_id")
     private Usuario criador;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cliente_id")
     private Participante cliente;
 
@@ -70,13 +71,17 @@ public class Oportunidade {
     @Column(nullable = false, length = 20)
     private SituacaoOportunidade situacao;
 
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "oportunidade_tag",
             joinColumns = @JoinColumn(name = "oportunidade_id"),
             inverseJoinColumns = @JoinColumn(name = "tag_id")
     )
+    @BatchSize(size = 25)
     private List<Tag> tags;
 
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 
 }
