@@ -13,6 +13,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Schema(description = "Entidade Etapa (coluna de um funil de vendas). Para criar uma etapa, use EtapaCreateRequest.")
@@ -39,7 +40,7 @@ public class Etapa {
     private Funil funil;
     @Schema(description = "Oportunidades pertencentes a esta etapa (não são criadas diretamente aqui)")
     @OneToMany(mappedBy = "etapa", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Oportunidade> oportunidades;
+    private List<Oportunidade> oportunidades = new ArrayList<>();
     @Schema(description = "Soma do valor de todas as oportunidades da etapa; calculado/gerenciado pelo backend, não precisa ser informado ao criar")
     private BigDecimal valor_total;
 
