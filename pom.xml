@@ -122,23 +122,6 @@
 			<version>2.20.0</version>
 		</dependency>
 		<dependency>
-			<groupId>com.github.javafaker</groupId>
-			<artifactId>javafaker</artifactId>
-			<version>1.0.2</version>
-		</dependency>
-		<dependency>
-			<groupId>net.bramp.ffmpeg</groupId>
-			<artifactId>ffmpeg</artifactId>
-			<version>0.6.2</version>
-		</dependency>
-
-		<dependency>
-			<groupId>commons-fileupload</groupId>
-			<artifactId>commons-fileupload</artifactId>
-			<version>1.4</version>
-		</dependency>
-
-		<dependency>
 			<groupId>com.twilio.sdk</groupId>
 			<artifactId>twilio</artifactId>
 			<version>9.0.0</version>
@@ -150,16 +133,15 @@
 			<version>1.21</version>
 		</dependency>
 
+		<!--
+			Escopo compile (não test): MediaController e AudioConvertor usam
+			org.springframework.mock.web.MockMultipartFile em código de produção
+			(não só em testes), então precisa estar disponível fora do classpath de teste.
+		-->
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-test</artifactId>
-			<scope>compile</scope> <!-- ATENÇÃO: remova se for só em testes -->
-		</dependency>
-
-		<dependency>
-			<groupId>net.bramp.ffmpeg</groupId>
-			<artifactId>ffmpeg</artifactId>
-			<version>0.8.0</version>
+			<scope>compile</scope>
 		</dependency>
 
 		<dependency>
@@ -172,12 +154,6 @@
 			<groupId>org.bytedeco</groupId>
 			<artifactId>javacv-platform</artifactId>
 			<version>1.5.8</version>
-		</dependency>
-
-		<dependency>
-			<groupId>org.bouncycastle</groupId>
-			<artifactId>bcprov-jdk15on</artifactId>
-			<version>1.70</version>
 		</dependency>
 
 		<!--

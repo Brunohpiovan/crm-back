@@ -201,10 +201,6 @@ public class WhatsAppService {
         String celular = reverseWhatsAppNumber(from);
         Participante participante = participanteRepository.findByCelular(celular)
                 .orElseGet(() -> criaParticipante(celular, Optional.ofNullable(profileName)));
-        //List<Oportunidade> oportunidades = oportunidadeRepository.findByClienteId(participante.getId());
-        //if (oportunidades.isEmpty()) {
-        //    criaOportunidade(participante);
-        //}
         Optional<Protocolo> optionalProtocolo = protocoloRepository.findByCelularAndStatus(celular, StatusProtocolo.ABERTO);
         handleMessage(optionalProtocolo, participante, body,null);
     }

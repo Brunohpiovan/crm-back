@@ -14,8 +14,6 @@ import java.util.Optional;
 @Repository
 public interface CadenciaFunilRepository extends JpaRepository<CadenciaFunil, Long> {
 
-    List<CadenciaFunil> findAllBySituacao(Situacao situacao);
-
     /**
      * Usada pelo scheduler: traz etapaOrigem/etapaDestino já carregadas porque o processamento de
      * cada cadência roda fora de uma transação única (cada movimentação de oportunidade tem sua
