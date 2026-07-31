@@ -30,7 +30,7 @@ public class Etapa {
     @Column(name = "nome", nullable = false)
     @Size(max = 150, message = "O nome deve ter no maximo 150 caracteres")
     private String nome;
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "funil_id")
     @NotNull
     private Funil funil;

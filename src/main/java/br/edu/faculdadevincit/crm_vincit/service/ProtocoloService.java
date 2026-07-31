@@ -163,9 +163,9 @@ public class ProtocoloService {
             throw new br.edu.faculdadevincit.crm_vincit.service.exceptions.AccessDeniedException("Você não tem permissão para acessar este usuário.");
         }
         String login = usuario.getLogin();
-        Optional<List<Protocolo>> optionalProtocolos  = protocoloRepository.findByAdminLoginOrParticipanteLogin(login);
-        if (optionalProtocolos.isPresent() && !optionalProtocolos.get().isEmpty()) {
-            return optionalProtocolos.get().stream().map(ProtocoloMoveDTO::new).collect(Collectors.toList());
+        List<Protocolo> protocolos = protocoloRepository.findByAdminLoginOrParticipanteLogin(login);
+        if (!protocolos.isEmpty()) {
+            return protocolos.stream().map(ProtocoloMoveDTO::new).collect(Collectors.toList());
         } else {
             return null;
         }

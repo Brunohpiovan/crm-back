@@ -289,7 +289,15 @@ public class OportunidadeService {
     public void movimentoOportunidade(Long oportunidadeId, Long etapaId, int novoIndice) {
         Oportunidade oportunidade = oportunidadeRepository.findByIdWithDetails(oportunidadeId)
                 .orElseThrow(() -> new RuntimeException("Oportunidade não encontrada"));
+        movimentarOportunidadeCarregada(oportunidade, etapaId, novoIndice);
+    }
 
+    /**
+     * Mesma lógica de {@link #movimentoOportunidade}, mas recebe a entidade já carregada
+     * (com os relacionamentos necessários via JOIN FETCH) para evitar um SELECT redundante
+     * quando o chamador (ex.: scheduler de cadência) já obteve a oportunidade em outra consulta.
+     */
+    void movimentarOportunidadeCarregada(Oportunidade oportunidade, Long etapaId, int novoIndice) {
         Etapa etapaAtual = oportunidade.getEtapa();
         if (etapaAtual == null) {
             throw new RuntimeException("Oportunidade sem etapa definida");

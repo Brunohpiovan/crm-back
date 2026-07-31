@@ -22,7 +22,7 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
     Optional<Protocolo> findByAdminCelularAndParticipanteCelularAndStatus(@Param("celular1") String celular1, @Param("celular2") String celular2, @Param("status") StatusProtocolo status);
 
     @Query("SELECT p FROM Protocolo p JOIN FETCH p.admin JOIN FETCH p.participante LEFT JOIN FETCH p.adminAnterior WHERE (p.admin.login = :login OR p.participante.login = :login)")
-    Optional<List<Protocolo>> findByAdminLoginOrParticipanteLogin(@Param("login") String login);
+    List<Protocolo> findByAdminLoginOrParticipanteLogin(@Param("login") String login);
 
     @Query("SELECT p FROM Protocolo p JOIN FETCH p.admin JOIN FETCH p.participante LEFT JOIN FETCH p.adminAnterior WHERE (p.participante.celular = :celular) AND p.status = :status")
     Optional<Protocolo> findByCelularAndStatus(@Param("celular") String celular, @Param("status") StatusProtocolo status);

@@ -26,20 +26,20 @@ public class CadenciaFunil {
     @Column(nullable = false)
     private String nome;
 
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "funil_origem_id", nullable = false)
     private Funil funilOrigem;
 
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "etapa_origem_id", nullable = false)
     private Etapa etapaOrigem;
 
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "funil_destino_id", nullable = false)
     private Funil funilDestino;
 
 
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "etapa_destino_id", nullable = false)
     private Etapa etapaDestino;
 

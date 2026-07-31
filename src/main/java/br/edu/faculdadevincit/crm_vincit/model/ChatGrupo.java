@@ -32,7 +32,7 @@ public class ChatGrupo {
 
     private Boolean privado;
 
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "chat_grupo_usuario",
             joinColumns = @JoinColumn(name = "chat_grupo_id"),

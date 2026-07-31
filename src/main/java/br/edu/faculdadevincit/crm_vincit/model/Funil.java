@@ -25,7 +25,7 @@ public class Funil {
     private String nome;
     @OneToMany(mappedBy = "funil", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Etapa> etapas;
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "funil_funcionarios",
             joinColumns = @JoinColumn(name = "funil_id"),

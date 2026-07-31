@@ -4,6 +4,7 @@ import br.edu.faculdadevincit.crm_vincit.model.Usuario;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.CriadorDto;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioAllContactsDTO;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioAllDTO;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioContatoDto;
 import br.edu.faculdadevincit.crm_vincit.model.enums.UserRole;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,16 +20,21 @@ import java.util.Optional;
 @Repository
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     Optional<UserDetails> findByLogin(String login);
-    Optional<UserDetails> findByCpf(String cpf);
-    Optional<Usuario> findByCelular(String celular);
 
     boolean existsByLoginIgnoreCase(String login);
     boolean existsByLoginIgnoreCaseAndIdNot(String login, Long id);
     boolean existsByCpf(String cpf);
     boolean existsByCpfAndIdNot(String cpf, Long id);
 
-    @Query("SELECT u FROM Usuario u WHERE u.cargo <> :cargo")
-    List<Usuario> findByNotCargo(@Param("cargo") UserRole cargo);
+    @Query("""
+    SELECT new br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioContatoDto(u.id, u.nome, u.urlPicture)
+    FROM Usuario u
+    WHERE u.cargo <> :cargo
+    AND u.id NOT IN (
+        SELECT f.id FROM Funil fn JOIN fn.funcionarios f WHERE fn.id = :funilId
+    )
+    """)
+    List<UsuarioContatoDto> findDisponiveisParaFunil(@Param("funilId") Long funilId, @Param("cargo") UserRole cargo);
 
     @Query("""
     SELECT new br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioAllDTO(u.id, u.nome, u.login, u.celular)

@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -70,12 +71,13 @@ public class Oportunidade {
     @Column(nullable = false, length = 20)
     private SituacaoOportunidade situacao;
 
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "oportunidade_tag",
             joinColumns = @JoinColumn(name = "oportunidade_id"),
             inverseJoinColumns = @JoinColumn(name = "tag_id")
     )
+    @BatchSize(size = 25)
     private List<Tag> tags;
 
     @Version

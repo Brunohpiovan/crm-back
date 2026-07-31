@@ -60,7 +60,7 @@ public class CadenciaFunilService {
 
         for (Oportunidade oportunidade : oportunidades) {
             int novoIndice = calcularNovoIndice(cadencia.getEtapaDestino());
-            oportunidadeService.movimentoOportunidade(oportunidade.getId(), cadencia.getEtapaDestino().getId(), novoIndice);
+            oportunidadeService.movimentarOportunidadeCarregada(oportunidade, cadencia.getEtapaDestino().getId(), novoIndice);
         }
     }
     private int calcularNovoIndice(Etapa etapaDestino) {
@@ -69,7 +69,7 @@ public class CadenciaFunilService {
 
 
     public List<CadenciaAllDTO> findAll() {
-        return cadenciaFunilRepository.findAll()
+        return cadenciaFunilRepository.findAllWithDetails()
                 .stream()
                 .map(CadenciaAllDTO::new)
                 .toList();

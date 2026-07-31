@@ -97,7 +97,11 @@ public interface OportunidadeRepository extends JpaRepository<Oportunidade, Long
             @Param("tagIds") List<Long> tagIds);
 
     @Query("""
-    SELECT o FROM Oportunidade o
+    SELECT DISTINCT o FROM Oportunidade o
+    LEFT JOIN FETCH o.etapa
+    LEFT JOIN FETCH o.criador
+    LEFT JOIN FETCH o.cliente
+    LEFT JOIN FETCH o.tags
     WHERE o.etapa.id = :etapaOrigemId
       AND o.dataEntradaEtapa <= :dataLimite
 """)

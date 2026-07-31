@@ -56,25 +56,21 @@ public class FunilService {
 
 
     public List<UsuarioContatoDto> findFuncionariosFunil(Long funilId) {
-        Funil funil = funilRepository.findById(funilId)
-                .orElseThrow(() -> new RuntimeException("Funil não encontrado"));
+        if (!funilRepository.existsById(funilId)) {
+            throw new RuntimeException("Funil não encontrado");
+        }
 
-        List<Usuario> todosUsuarios = usuarioRepository.findByNotCargo(UserRole.ADMINISTRADOR);
-        List<Usuario> usuariosNaoNoFunil = todosUsuarios.stream()
-                .filter(usuario -> !funil.getFuncionarios().contains(usuario))
-                .toList();
+        List<UsuarioContatoDto> usuariosNaoNoFunil =
+                usuarioRepository.findDisponiveisParaFunil(funilId, UserRole.ADMINISTRADOR);
 
-        List<UsuarioContatoDto> usuariosNaoNoFunilDto = usuariosNaoNoFunil.stream()
-                .map(usuario -> {
-                    String urlPicture = usuario.getUrlPicture();
-                    if (urlPicture != null && urlPicture.contains(cloudFrontService.getBaseUrl())) {
-                        urlPicture = cloudFrontService.generateSignedUrl(urlPicture, Duration.ofMinutes(60));
-                    }
-                    return new UsuarioContatoDto(usuario.getId(), usuario.getNome(), urlPicture);
-                })
-                .collect(Collectors.toList());
+        usuariosNaoNoFunil.forEach(usuario -> {
+            String urlPicture = usuario.getUrlPicture();
+            if (urlPicture != null && urlPicture.contains(cloudFrontService.getBaseUrl())) {
+                usuario.setUrlPicture(cloudFrontService.generateSignedUrl(urlPicture, Duration.ofMinutes(60)));
+            }
+        });
 
-        return usuariosNaoNoFunilDto;
+        return usuariosNaoNoFunil;
     }
 
 
