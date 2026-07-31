@@ -43,4 +43,8 @@ public class Etapa {
     @Column(name = "atualizado_em")
     private LocalDateTime atualizadoEm;
 
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
 }

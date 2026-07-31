@@ -180,15 +180,19 @@
 			<version>1.70</version>
 		</dependency>
 
-		<dependency>
-			<groupId>software.amazon.awssdk</groupId>
-			<artifactId>cloudfront</artifactId>
-			<version>2.20.50</version>
-		</dependency>
+		<!--
+			CloudFrontService assina URLs localmente com com.amazonaws.services.cloudfront.CloudFrontUrlSigner
+			(AWS SDK v1). Essa classe utilitária não faz chamada de rede (só assina com a chave privada) e
+			não tem substituto direto simples no SDK v2 hoje (equivalente seria montar manualmente a policy
+			assinada via software.amazon.awssdk.services.cloudfront.CloudFrontUtilities). Mantido até que essa
+			migração seja avaliada e validada separadamente — não faz parte desta etapa.
+			A dependência "software.amazon.awssdk:cloudfront" (SDK v2) foi removida por não ser usada em
+			nenhum lugar do código (S3Service já usa "software.amazon.awssdk:s3", também v2).
+		-->
 		<dependency>
 			<groupId>com.amazonaws</groupId>
 			<artifactId>aws-java-sdk-cloudfront</artifactId>
-			<version>1.12.545</version> <!-- Use a versão mais atual disponível -->
+			<version>1.12.545</version>
 		</dependency>
 
 

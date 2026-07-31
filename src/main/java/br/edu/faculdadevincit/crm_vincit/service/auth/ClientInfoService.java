@@ -6,6 +6,7 @@ import eu.bitwalker.useragentutils.UserAgent;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -14,6 +15,9 @@ import java.util.Map;
 
 @Service
 public class ClientInfoService {
+
+    private static final int CONNECT_TIMEOUT_MS = 3_000;
+    private static final int READ_TIMEOUT_MS = 5_000;
 
     @Value("${api.ip-location.url}")
     private String ipApiUrl;
@@ -58,7 +62,10 @@ public class ClientInfoService {
 
     private String getPublicIp() {
         try {
-            RestTemplate restTemplate = new RestTemplate();
+            SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+            requestFactory.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            requestFactory.setReadTimeout(READ_TIMEOUT_MS);
+            RestTemplate restTemplate = new RestTemplate(requestFactory);
             Map<String, Object> response = restTemplate.getForObject(ipApiUrl, Map.class);
             return (String) response.get("query");
         } catch (Exception e) {

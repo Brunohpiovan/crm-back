@@ -84,8 +84,21 @@ public class OportunidadeService {
         return toDto(oportunidade);
     }
 
-    @Transactional
+    /**
+     * O upload ao S3 roda antes de abrir a transação (e o delete de anexo antigo, em {@link #update},
+     * depois de fechá-la) para que a conexão/transação JPA nunca fique presa esperando uma chamada de rede.
+     */
     public OportunidadeDTO create(OportunidadeCreateRequest request, MultipartFile file) {
+        String urlAnexo = null;
+        if (file != null && !file.isEmpty()) {
+            validarArquivo(file);
+            urlAnexo = uploadArquivo(file);
+        }
+        return criarComAnexoResolvido(request, urlAnexo);
+    }
+
+    @Transactional
+    OportunidadeDTO criarComAnexoResolvido(OportunidadeCreateRequest request, String urlAnexo) {
         Etapa etapa = etapaRepository.findById(request.etapaId())
                 .orElseThrow(() -> new RuntimeException("Etapa não encontrado"));
         Usuario criador = usuarioRepository.findById(request.criadorId())
@@ -109,15 +122,11 @@ public class OportunidadeService {
         oportunidade.setTags(tags);
         oportunidade.setIndice(0);
         oportunidade.setDataEntradaEtapa(LocalDateTime.now());
+        oportunidade.setUrl_anexo(urlAnexo);
 
         List<Oportunidade> oportunidadesNaEtapa = oportunidadeRepository.findCardsByEtapaId(etapa.getId());
         oportunidadesNaEtapa.forEach(op -> op.setIndice(op.getIndice() + 1));
         oportunidadeRepository.saveAll(oportunidadesNaEtapa);
-
-        if (file != null && !file.isEmpty()) {
-            validarArquivo(file);
-            oportunidade.setUrl_anexo(uploadArquivo(file));
-        }
 
         etapaService.updateAddValor(etapa.getId(), oportunidade.getValor());
         Oportunidade salva = oportunidadeRepository.save(oportunidade);
@@ -172,8 +181,15 @@ public class OportunidadeService {
         return tags;
     }
 
-    @Transactional
     public OportunidadeDTO update(Long id, OportunidadeUpdateRequest request, MultipartFile file) {
+        String urlAnexoAtual = oportunidadeRepository.findUrlAnexoById(id)
+                .orElseThrow(() -> new RuntimeException("Oportunidade com id " + id + " nao encontrada"));
+        String urlAnexoFinal = resolveAnexo(urlAnexoAtual, request.urlAnexo(), file);
+        return atualizarComAnexoResolvido(id, request, urlAnexoFinal);
+    }
+
+    @Transactional
+    OportunidadeDTO atualizarComAnexoResolvido(Long id, OportunidadeUpdateRequest request, String urlAnexoFinal) {
         Oportunidade oportunidadeBanco = oportunidadeRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Oportunidade com id " + id + " nao encontrada"));
         Etapa novaEtapa = etapaRepository.findById(request.etapaId())
@@ -201,7 +217,6 @@ public class OportunidadeService {
             }
         }
 
-        String urlAnexoFinal = resolveAnexo(oportunidadeBanco.getUrl_anexo(), request.urlAnexo(), file);
         List<Tag> tags = resolveTags(request.tagIds());
         Participante clienteAtualizado = preencheCliente(clienteBanco, request.cliente());
         participanteRepository.save(clienteAtualizado);

@@ -112,4 +112,7 @@ public interface OportunidadeRepository extends JpaRepository<Oportunidade, Long
 
     long countByEtapa(Etapa etapa);
 
+    @Query("SELECT o.url_anexo FROM Oportunidade o WHERE o.id = :id")
+    Optional<String> findUrlAnexoById(@Param("id") Long id);
+
 }

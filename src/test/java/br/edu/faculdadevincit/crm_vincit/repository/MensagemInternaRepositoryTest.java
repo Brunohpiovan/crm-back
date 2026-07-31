@@ -94,7 +94,7 @@ class MensagemInternaRepositoryTest {
         usuario.setLogin(login);
         usuario.setSenha("senha12345");
         usuario.setRg("654321");
-        usuario.setCpf(login);
+        usuario.setCpf(String.valueOf(Math.abs(login.hashCode())));
         usuario.setDataNascimento(LocalDate.of(1990, 5, 10));
         usuario.setCelular("11988888888");
         usuario.setCargo(UserRole.VENDEDOR);

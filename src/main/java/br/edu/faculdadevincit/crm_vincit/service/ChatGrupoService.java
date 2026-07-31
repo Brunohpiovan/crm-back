@@ -11,6 +11,7 @@ import br.edu.faculdadevincit.crm_vincit.model.enums.StatusProtocolo;
 import br.edu.faculdadevincit.crm_vincit.repository.ChatGrupoRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.UsuarioRepository;
 import jakarta.persistence.EntityNotFoundException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -22,10 +23,13 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class ChatGrupoService {
 
@@ -118,7 +122,8 @@ public class ChatGrupoService {
         grupo.setPrivado(false);
         grupo.setCriadoEm(LocalDateTime.now());
 
-        ChatGrupoResponseDTO grupoDTO = new ChatGrupoResponseDTO(chatGrupoRepository.save(grupo));
+        boolean anexosEnviadosAoS3 = foto != null || imagemFundo != null;
+        ChatGrupoResponseDTO grupoDTO = new ChatGrupoResponseDTO(salvarGrupo(grupo, anexosEnviadosAoS3));
         ChatGrupoResponseById idUsers = new ChatGrupoResponseById(grupo);
         for (Long userId : idUsers.getUsuarios()) {
             messagingTemplate.convertAndSend("/topic/newPublicGroup/" + userId, grupoDTO);
@@ -179,7 +184,8 @@ public class ChatGrupoService {
         grupo.setUsuarios(newgrupo.getUsuarios());
         grupo.setAtualizadoEm(LocalDateTime.now());
         ChatGrupoResponseById idUsers = new ChatGrupoResponseById(grupo);
-        ChatGrupoResponseDTO grupoDTO = new ChatGrupoResponseDTO(chatGrupoRepository.save(grupo));
+        boolean anexosAlteradosNoS3 = foto != null || imagemFundo != null;
+        ChatGrupoResponseDTO grupoDTO = new ChatGrupoResponseDTO(salvarGrupo(grupo, anexosAlteradosNoS3));
         for (Long userId : idUsers.getUsuarios()) {
             messagingTemplate.convertAndSend("/topic/attPublicGroup/" + userId, grupoDTO);
         }
@@ -189,21 +195,43 @@ public class ChatGrupoService {
 
     }
 
+    /**
+     * Os uploads/deletes no S3 acima já aconteceram quando este método é chamado. Se o save no
+     * banco falhar depois, o S3 já está no estado novo mas o grupo não foi persistido — logamos
+     * para deixar rastro dessa inconsistência (regra: não esconder erro, mas também não perder o
+     * registro de que o anexo já mudou no S3) e propagamos a exceção normalmente.
+     */
+    private ChatGrupo salvarGrupo(ChatGrupo grupo, boolean anexosAlteradosNoS3) {
+        try {
+            return chatGrupoRepository.save(grupo);
+        } catch (RuntimeException e) {
+            if (anexosAlteradosNoS3) {
+                log.error("Grupo '{}' teve avatar/imagem de fundo alterados no S3, mas a persistência no banco falhou. avatarUrl={}, imagemFundoUrl={}",
+                        grupo.getNome(), grupo.getAvatarUrl(), grupo.getImagemFundoUrl(), e);
+            }
+            throw e;
+        }
+    }
+
     private ChatGrupo dtoToModel(GrupoCreateDTO dto){
         ChatGrupo grupo = new ChatGrupo();
 
         grupo.setId(dto.getId());
         grupo.setNome(dto.getNome());
         grupo.setAvatarUrl(dto.getUrlPicture());
-        List<Usuario> listaUsuarios = new ArrayList<>();
-        for (Long usuarioId : dto.getUsuarios()) {
-            Usuario usuario = usuarioRepository.findById(usuarioId)
-                    .orElseThrow(() -> new EntityNotFoundException("Usuário com ID " + usuarioId + " não encontrado"));
-            listaUsuarios.add(usuario);
-        }
-        grupo.setUsuarios(listaUsuarios);
+        grupo.setUsuarios(buscarUsuarios(dto.getUsuarios()));
         grupo.setImagemFundoUrl(dto.getBackgroundImageUrl());
         return grupo;
+    }
+
+    private List<Usuario> buscarUsuarios(List<Long> usuarioIds) {
+        List<Usuario> usuarios = usuarioRepository.findAllById(usuarioIds);
+        if (usuarios.size() != new HashSet<>(usuarioIds).size()) {
+            Set<Long> encontrados = usuarios.stream().map(Usuario::getId).collect(Collectors.toSet());
+            List<Long> faltando = usuarioIds.stream().filter(id -> !encontrados.contains(id)).toList();
+            throw new EntityNotFoundException("Usuário(s) com ID " + faltando + " não encontrado(s)");
+        }
+        return usuarios;
     }
 
     public ChatGrupoResponseById findById(Long id) {
