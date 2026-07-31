@@ -3,6 +3,7 @@ package br.edu.faculdadevincit.crm_vincit.model.dtos;
 import br.edu.faculdadevincit.crm_vincit.model.enums.Uf;
 import br.edu.faculdadevincit.crm_vincit.model.enums.UserRole;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.annotation.Nullable;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -21,12 +22,14 @@ import java.time.LocalDate;
  * Não possui id, bloqueado, criadoEm ou atualizadoEm: esses valores são
  * definidos pelo servidor no momento da criação.
  */
+@Schema(description = "Payload multipart (parte 'usuario') para criação de um novo usuário do CRM. Enviado junto de uma parte opcional 'foto'. Restrito a ROLE_ADMIN.")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class UsuarioCreateDTO {
 
+    @Schema(description = "URL de foto/avatar já existente, se aplicável (normalmente omitido; a foto é enviada como arquivo na parte 'foto')")
     @Nullable
     private String urlPicture;
 
@@ -34,15 +37,18 @@ public class UsuarioCreateDTO {
     @Size(max = 150, message = "O nome deve ter no maximo 150 caracteres")
     private String nome;
 
+    @Schema(description = "Login do usuário, formato de e-mail")
     @Email(message = "O email informado é inválido")
     @NotNull(message = "O campo LOGIN é requerido.")
     @Size(max = 150, message = "O login deve ter no maximo 255 caracteres")
     private String login;
 
+    @Schema(description = "Senha em texto plano; será criptografada (BCrypt) pelo servidor antes de persistir")
     @NotNull(message = "o campo SENHA é requerido")
     @Size(min = 8, max = 255, message = "A Senha deve ter entre 6 e 100 caracteres")
     private String senha;
 
+    @Schema(description = "Confirmação da senha; deve ser idêntica ao campo 'senha'")
     @NotNull(message = "O campo SENHA de confirmação é requerido")
     @Size(min = 8, max = 255, message = "A senha de confirmação deve ter entre 6 e 100 caracteres")
     private String senha2;
@@ -55,6 +61,7 @@ public class UsuarioCreateDTO {
     @Size(max = 14, message = "O cpf deve ter no maximo 14 caracteres")
     private String cpf;
 
+    @Schema(description = "Data de nascimento no formato dd/MM/yyyy", type = "string", example = "01/01/1990")
     @NotNull(message = "O campo DATA DE NASCIMENTO é requerido.")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "dd/MM/yyyy")
     private LocalDate dataNascimento;
@@ -78,6 +85,7 @@ public class UsuarioCreateDTO {
     @Size(max = 100, message = "O campo bairro deve ter no maximo 100 caracteres")
     private String bairro;
 
+    @Schema(description = "Sigla da unidade federativa (UF) brasileira")
     @NotNull(message = "O campo UF é requerido.")
     @Enumerated(EnumType.STRING)
     private Uf uf;
@@ -90,6 +98,7 @@ public class UsuarioCreateDTO {
     @Size(max = 10, message = "O cep deve ter no maximo 10 caracteres")
     private String cep;
 
+    @Schema(description = "Cargo do usuário: ADMINISTRADOR concede as autoridades ROLE_ADMIN e ROLE_VENDEDOR; VENDEDOR concede apenas ROLE_VENDEDOR")
     @NotNull(message = "O campo CARGO é requerido.")
     private UserRole cargo;
 

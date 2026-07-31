@@ -3,6 +3,7 @@ package br.edu.faculdadevincit.crm_vincit.model.dtos;
 import br.edu.faculdadevincit.crm_vincit.model.enums.Uf;
 import br.edu.faculdadevincit.crm_vincit.model.enums.UserRole;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.annotation.Nullable;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -20,12 +21,14 @@ import java.time.LocalDate;
  * Payload de atualização administrativa (PUT /usuario/all/{id}, restrito a ROLE_ADMIN).
  * É o único payload de atualização que pode alterar cargo e bloqueado.
  */
+@Schema(description = "Payload multipart (parte 'usuario') para atualização administrativa de um usuário (PUT /usuario/all/{id}, restrito a ROLE_ADMIN). Único payload que pode alterar cargo e bloqueado.")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class UsuarioAdminUpdateDTO implements UsuarioDadosPessoaisDTO {
 
+    @Schema(description = "URL de foto/avatar já existente, se aplicável (normalmente omitido; a foto é enviada como arquivo na parte 'foto')")
     @Nullable
     private String urlPicture;
 
@@ -38,9 +41,11 @@ public class UsuarioAdminUpdateDTO implements UsuarioDadosPessoaisDTO {
     @Size(max = 150, message = "O login deve ter no maximo 255 caracteres")
     private String login;
 
+    @Schema(description = "Nova senha em texto plano (opcional; se informada, deve coincidir com 'senha2'). Deixe em branco para manter a senha atual.")
     @Size(min = 8, max = 255, message = "A Senha deve ter entre 6 e 100 caracteres")
     private String senha;
 
+    @Schema(description = "Confirmação da nova senha; obrigatória apenas quando 'senha' é informada")
     @Size(min = 8, max = 255, message = "A senha de confirmação deve ter entre 6 e 100 caracteres")
     private String senha2;
 
@@ -75,6 +80,7 @@ public class UsuarioAdminUpdateDTO implements UsuarioDadosPessoaisDTO {
     @Size(max = 100, message = "O campo bairro deve ter no maximo 100 caracteres")
     private String bairro;
 
+    @Schema(description = "Sigla da unidade federativa (UF) brasileira")
     @NotNull(message = "O campo UF é requerido.")
     @Enumerated(EnumType.STRING)
     private Uf uf;
@@ -87,9 +93,11 @@ public class UsuarioAdminUpdateDTO implements UsuarioDadosPessoaisDTO {
     @Size(max = 10, message = "O cep deve ter no maximo 10 caracteres")
     private String cep;
 
+    @Schema(description = "Cargo do usuário: ADMINISTRADOR concede as autoridades ROLE_ADMIN e ROLE_VENDEDOR; VENDEDOR concede apenas ROLE_VENDEDOR")
     @NotNull(message = "O campo CARGO é requerido.")
     private UserRole cargo;
 
+    @Schema(description = "Se true, inativa/bloqueia o usuário (impede login); se false, reativa o usuário")
     @NotNull(message = "O campo BLOQUEADO é requerido.")
     private Boolean bloqueado;
 

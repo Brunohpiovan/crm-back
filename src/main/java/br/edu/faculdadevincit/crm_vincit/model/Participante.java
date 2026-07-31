@@ -4,6 +4,7 @@ import br.edu.faculdadevincit.crm_vincit.model.enums.TipoParticipante;
 import br.edu.faculdadevincit.crm_vincit.model.enums.Uf;
 import br.edu.faculdadevincit.crm_vincit.model.enums.UserRole;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -16,6 +17,12 @@ import lombok.Setter;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/**
+ * Entidade JPA usada diretamente como corpo de requisição/resposta em
+ * POST /participante e PUT /participante/{id} (ParticipanteController não
+ * usa um DTO dedicado de entrada nesses dois endpoints).
+ */
+@Schema(description = "Participante (contato externo do CRM, ex.: cliente via WhatsApp) ou usuário interno espelhado (tipoParticipante = FUNCIONARIO). Usado como corpo de requisição em POST/PUT /participante.")
 @Getter
 @Setter
 @Entity
@@ -74,6 +81,7 @@ public class Participante {
     @Size(max = 100, message = "O campo bairro deve ter no maximo 100 caracteres")
     private String bairro;
 
+    @Schema(description = "Sigla da unidade federativa (UF) brasileira")
     @Column(name = "uf")
     @Enumerated(EnumType.STRING)
     private Uf uf;
@@ -86,6 +94,7 @@ public class Participante {
     @Lob
     private String observacoes;
 
+    @Schema(description = "Tipo do participante: FUNCIONARIO (usuário interno do CRM espelhado como participante, para chat interno) ou PARTICIPANTE (contato externo, ex.: cliente via WhatsApp)")
     @Enumerated(EnumType.STRING)
     @Column(name = "tipo_participante", nullable = false)
     private TipoParticipante tipoParticipante;

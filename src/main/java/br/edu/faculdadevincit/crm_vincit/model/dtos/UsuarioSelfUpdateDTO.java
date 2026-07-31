@@ -2,6 +2,7 @@ package br.edu.faculdadevincit.crm_vincit.model.dtos;
 
 import br.edu.faculdadevincit.crm_vincit.model.enums.Uf;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.annotation.Nullable;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -20,12 +21,14 @@ import java.time.LocalDate;
  * Não possui cargo nem bloqueado: essas propriedades administrativas só
  * podem ser alteradas através de UsuarioAdminUpdateDTO (PUT /usuario/all/{id}).
  */
+@Schema(description = "Payload multipart (parte 'usuario') para o próprio usuário atualizar seus dados pessoais (PUT /usuario/{id}). Não permite alterar cargo nem bloqueado.")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class UsuarioSelfUpdateDTO implements UsuarioDadosPessoaisDTO {
 
+    @Schema(description = "URL de foto/avatar já existente, se aplicável (normalmente omitido; a foto é enviada como arquivo na parte 'foto')")
     @Nullable
     private String urlPicture;
 
@@ -38,9 +41,11 @@ public class UsuarioSelfUpdateDTO implements UsuarioDadosPessoaisDTO {
     @Size(max = 150, message = "O login deve ter no maximo 255 caracteres")
     private String login;
 
+    @Schema(description = "Nova senha em texto plano (opcional; se informada, deve coincidir com 'senha2'). Deixe em branco para manter a senha atual.")
     @Size(min = 8, max = 255, message = "A Senha deve ter entre 6 e 100 caracteres")
     private String senha;
 
+    @Schema(description = "Confirmação da nova senha; obrigatória apenas quando 'senha' é informada")
     @Size(min = 8, max = 255, message = "A senha de confirmação deve ter entre 6 e 100 caracteres")
     private String senha2;
 
@@ -75,6 +80,7 @@ public class UsuarioSelfUpdateDTO implements UsuarioDadosPessoaisDTO {
     @Size(max = 100, message = "O campo bairro deve ter no maximo 100 caracteres")
     private String bairro;
 
+    @Schema(description = "Sigla da unidade federativa (UF) brasileira")
     @NotNull(message = "O campo UF é requerido.")
     @Enumerated(EnumType.STRING)
     private Uf uf;

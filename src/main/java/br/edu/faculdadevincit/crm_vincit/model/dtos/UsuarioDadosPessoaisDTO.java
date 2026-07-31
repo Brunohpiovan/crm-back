@@ -1,9 +1,17 @@
 package br.edu.faculdadevincit.crm_vincit.model.dtos;
 
 import br.edu.faculdadevincit.crm_vincit.model.enums.Uf;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
 
+/**
+ * Contrato comum entre UsuarioSelfUpdateDTO e UsuarioAdminUpdateDTO: os campos
+ * de dados pessoais compartilhados por ambos os payloads de atualização de usuário.
+ * Não é exposto diretamente como corpo de requisição/resposta (as implementações
+ * concretas é que carregam a documentação Schema completa).
+ */
+@Schema(description = "Contrato de dados pessoais comuns às atualizações de usuário (self-update e admin-update).")
 public interface UsuarioDadosPessoaisDTO {
     String getUrlPicture();
     String getNome();
