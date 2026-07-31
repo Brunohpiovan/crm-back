@@ -14,7 +14,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -30,9 +29,6 @@ public class MensagemInternaService {
 
     @Autowired
     private MensagemInternaRepository mensagemInternaRepository;
-
-    @Autowired
-    private CloudFrontService cloudFrontService;
 
 
     public List<MensagemInternaResponseDTO> getMessagesForProtocolLimit(Long grupoId, int offset, int limit) {
@@ -65,22 +61,15 @@ public class MensagemInternaService {
                     UsuarioAllContactsDTO sender = new UsuarioAllContactsDTO();
                     sender.setId(senderUser.getId());
                     sender.setNome(senderUser.getNome());
-                    sender.setUrlPicture(assinarSeForCloudFront(senderUser.getUrlPicture()));
+                    sender.setUrlPicture(senderUser.getUrlPicture());
 
                     dto.setSender(sender);
-                    dto.setConteudo(assinarSeForCloudFront(mensagem.getConteudo()));
+                    dto.setConteudo(mensagem.getConteudo());
                     dto.setDataEnvio(mensagem.getDataEnvio());
 
                     return dto;
                 })
                 .getContent();
-    }
-
-    private String assinarSeForCloudFront(String msg) {
-        if (msg != null && msg.contains(cloudFrontService.getBaseUrl())) {
-            return cloudFrontService.generateSignedUrl(msg, Duration.ofMinutes(30));
-        }
-        return msg;
     }
 
 }

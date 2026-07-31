@@ -31,9 +31,6 @@ public class ChatService {
     @Autowired
     private ParticipanteRepository participanteRepository;
 
-    @Autowired
-    private CloudFrontService cloudFrontService;
-
     public List<Mensagem> sendMessage(MensagemDto mensagem) {
         Protocolo protocol = protocoloRepository.findById(mensagem.getId_protocolo()).orElseThrow(()-> new RuntimeException("Protocolo nao encontrado"));
         Usuario usuario = usuarioRepository.findById(mensagem.getId_sender()).orElseThrow(()->new RuntimeException("Usuario nao encontrado"));

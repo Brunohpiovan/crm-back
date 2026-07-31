@@ -53,9 +53,6 @@ class UsuarioServiceUpdateTest {
     @Mock
     private ParticipanteService participanteService;
 
-    @Mock
-    private CloudFrontService cloudFrontService;
-
     @InjectMocks
     private UsuarioService usuarioService;
 
@@ -66,7 +63,7 @@ class UsuarioServiceUpdateTest {
 
     @BeforeEach
     void stubsComuns() {
-        lenient().when(cloudFrontService.getBaseUrl()).thenReturn("https://cdn-nao-usado-neste-teste.example.com/");
+        lenient().when(s3Service.getBaseUrl()).thenReturn("https://cdn-nao-usado-neste-teste.example.com/");
     }
 
     private Usuario usuarioExistente() {

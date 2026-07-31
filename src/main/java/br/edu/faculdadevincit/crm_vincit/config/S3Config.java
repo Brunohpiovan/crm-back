@@ -19,13 +19,13 @@ import java.util.List;
 @Configuration
 public class S3Config {
 
-    @Value("${aws.access-key-id}")
+    @Value("${aws.s3.access-key-id}")
     private String accessKeyId;
 
-    @Value("${aws.secret-access-key}")
+    @Value("${aws.s3.secret-access-key}")
     private String secretAccessKey;
 
-    @Value("${aws.region}")
+    @Value("${aws.s3.region}")
     private String region;
 
     @Bean

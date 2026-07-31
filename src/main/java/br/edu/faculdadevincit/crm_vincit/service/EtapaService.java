@@ -3,7 +3,6 @@ package br.edu.faculdadevincit.crm_vincit.service;
 import br.edu.faculdadevincit.crm_vincit.model.Etapa;
 import br.edu.faculdadevincit.crm_vincit.model.Funil;
 import br.edu.faculdadevincit.crm_vincit.model.Oportunidade;
-import br.edu.faculdadevincit.crm_vincit.model.dtos.CriadorOportunidadeDto;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaDto;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaFunilDTO;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaUpdate2DTO;
@@ -20,7 +19,6 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -39,9 +37,6 @@ public class EtapaService {
 
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
-
-    @Autowired
-    private CloudFrontService cloudFrontService;
 
     public List<EtapaDto> findAll() {
         List<Etapa> etapas = etapaRepository.findAll();
@@ -65,8 +60,7 @@ public class EtapaService {
     }
 
     /**
-     * Carrega, em uma única consulta, os cards de todas as etapas informadas (evita N+1 por etapa)
-     * e assina as URLs do CloudFront.
+     * Carrega, em uma única consulta, os cards de todas as etapas informadas (evita N+1 por etapa).
      */
     Map<Long, List<OportunidadeDTO>> carregarOportunidadesPorEtapa(List<Long> etapaIds) {
         if (etapaIds == null || etapaIds.isEmpty()) {
@@ -76,7 +70,6 @@ public class EtapaService {
         Map<Long, List<OportunidadeDTO>> resultado = new HashMap<>();
         for (Oportunidade oportunidade : oportunidades) {
             OportunidadeDTO dto = new OportunidadeDTO(oportunidade);
-            assinarUrls(dto);
             resultado.computeIfAbsent(oportunidade.getEtapa().getId(), k -> new ArrayList<>()).add(dto);
         }
         return resultado;
@@ -94,21 +87,9 @@ public class EtapaService {
         Map<Long, List<OportunidadeDTO>> resultado = new HashMap<>();
         for (Oportunidade oportunidade : oportunidades) {
             OportunidadeDTO dto = new OportunidadeDTO(oportunidade);
-            assinarUrls(dto);
             resultado.computeIfAbsent(oportunidade.getEtapa().getId(), k -> new ArrayList<>()).add(dto);
         }
         return resultado;
-    }
-
-    void assinarUrls(OportunidadeDTO dto) {
-        if (dto.getUrl_anexo() != null && dto.getUrl_anexo().contains(cloudFrontService.getBaseUrl())) {
-            dto.setUrl_anexo(cloudFrontService.generateSignedUrl(dto.getUrl_anexo(), Duration.ofMinutes(60)));
-        }
-        CriadorOportunidadeDto criador = dto.getCriador();
-        if (criador != null && criador.getUrlPicture() != null
-                && criador.getUrlPicture().contains(cloudFrontService.getBaseUrl())) {
-            criador.setUrlPicture(cloudFrontService.generateSignedUrl(criador.getUrlPicture(), Duration.ofMinutes(60)));
-        }
     }
 
 

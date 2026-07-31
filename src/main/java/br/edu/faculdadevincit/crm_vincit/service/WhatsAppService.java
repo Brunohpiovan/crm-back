@@ -30,7 +30,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
@@ -70,9 +69,6 @@ public class WhatsAppService {
     private OportunidadeRepository oportunidadeRepository;
 
     @Autowired
-    private CloudFrontService cloudFrontService;
-
-    @Autowired
     private WhatsappWebhookEventoRepository whatsappWebhookEventoRepository;
 
     String media;
@@ -106,7 +102,7 @@ public class WhatsAppService {
                             new com.twilio.type.PhoneNumber("whatsapp:" + twilioNumber),
                             messageBody
                     )
-                    .setMediaUrl(Arrays.asList(URI.create(cloudFrontService.generateSignedUrl(media, Duration.ofMinutes(60)))))
+                    .setMediaUrl(Arrays.asList(URI.create(media)))
                     .create();
             return message;
         } else {

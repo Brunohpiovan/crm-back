@@ -48,7 +48,7 @@ public class AuthenticationService {
             Long logId = acessoService.save(acesso);
             return new LoginResponseDTO(token,logId);
         } catch (InternalAuthenticationServiceException ex) {
-            throw new InternalAuthenticationServiceException("Erro na autenticação");
+            throw new InternalAuthenticationServiceException("Erro na autenticação: " + ex.getMessage(), ex);
         }
     }
 

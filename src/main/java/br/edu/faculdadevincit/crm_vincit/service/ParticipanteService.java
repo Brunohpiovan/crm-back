@@ -10,7 +10,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.util.List;
 
 @Service
@@ -19,24 +18,11 @@ public class ParticipanteService {
     @Autowired
     private ParticipanteRepository participanteRepository;
 
-    @Autowired
-    private CloudFrontService cloudFrontService;
-
     public List<ParticipanteDTO> findAllFilter(Long id){
         List<Participante> participantes = participanteRepository.findAllWithoutOpenProtocoloFromOtherAdmins(id);
 
         return participantes.stream()
-                .map(participante -> {
-                    ParticipanteDTO dto = new ParticipanteDTO(participante);
-
-                    String urlPicture = dto.getUrlPicture();
-                    if (urlPicture != null && urlPicture.contains(cloudFrontService.getBaseUrl())) {
-                        String urlAssinada = cloudFrontService.generateSignedUrl(urlPicture, Duration.ofMinutes(30));
-                        dto.setUrlPicture(urlAssinada);
-                    }
-
-                    return dto;
-                })
+                .map(ParticipanteDTO::new)
                 .toList();
     }
 
@@ -44,17 +30,7 @@ public class ParticipanteService {
     public List<ParticipanteDTO> findAll() {
         return participanteRepository.findAll()
                 .stream()
-                .map(participante -> {
-                    ParticipanteDTO dto = new ParticipanteDTO(participante);
-
-                    String urlPicture = dto.getUrlPicture();
-                    if (urlPicture != null && urlPicture.contains(cloudFrontService.getBaseUrl())) {
-                        String urlAssinada = cloudFrontService.generateSignedUrl(urlPicture, Duration.ofMinutes(30));
-                        dto.setUrlPicture(urlAssinada);
-                    }
-
-                    return dto;
-                })
+                .map(ParticipanteDTO::new)
                 .toList();
     }
 
@@ -70,15 +46,7 @@ public class ParticipanteService {
         Participante participante = participanteRepository.findById(id)
                 .orElseThrow(() -> new UsernameNotFoundException("Participante não encontrado"));
 
-        ParticipanteDTO dto = new ParticipanteDTO(participante);
-
-        String urlPicture = dto.getUrlPicture();
-        if (urlPicture != null && urlPicture.contains(cloudFrontService.getBaseUrl())) {
-            String urlAssinada = cloudFrontService.generateSignedUrl(urlPicture, Duration.ofMinutes(30));
-            dto.setUrlPicture(urlAssinada);
-        }
-
-        return dto;
+        return new ParticipanteDTO(participante);
     }
 
 

@@ -5,7 +5,6 @@ import br.edu.faculdadevincit.crm_vincit.model.Oportunidade;
 import br.edu.faculdadevincit.crm_vincit.model.Participante;
 import br.edu.faculdadevincit.crm_vincit.model.Tag;
 import br.edu.faculdadevincit.crm_vincit.model.Usuario;
-import br.edu.faculdadevincit.crm_vincit.model.dtos.CriadorOportunidadeDto;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.OportunidadeClienteRequest;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.OportunidadeCreateRequest;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.OportunidadeDTO;
@@ -26,7 +25,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -61,9 +59,6 @@ public class OportunidadeService {
 
     @Autowired
     private S3Service s3Service;
-
-    @Autowired
-    private CloudFrontService cloudFrontService;
 
     @Autowired
     private TagRepository tagRepository;
@@ -182,8 +177,10 @@ public class OportunidadeService {
     }
 
     public OportunidadeDTO update(Long id, OportunidadeUpdateRequest request, MultipartFile file) {
-        String urlAnexoAtual = oportunidadeRepository.findUrlAnexoById(id)
-                .orElseThrow(() -> new RuntimeException("Oportunidade com id " + id + " nao encontrada"));
+        if (!oportunidadeRepository.existsById(id)) {
+            throw new RuntimeException("Oportunidade com id " + id + " nao encontrada");
+        }
+        String urlAnexoAtual = oportunidadeRepository.findUrlAnexoById(id).orElse(null);
         String urlAnexoFinal = resolveAnexo(urlAnexoAtual, request.urlAnexo(), file);
         return atualizarComAnexoResolvido(id, request, urlAnexoFinal);
     }
@@ -378,20 +375,7 @@ public class OportunidadeService {
     }
 
     private OportunidadeDTO toDto(Oportunidade oportunidade) {
-        OportunidadeDTO dto = new OportunidadeDTO(oportunidade);
-        signUrls(dto);
-        return dto;
-    }
-
-    private void signUrls(OportunidadeDTO dto) {
-        if (dto.getUrl_anexo() != null && dto.getUrl_anexo().contains(cloudFrontService.getBaseUrl())) {
-            dto.setUrl_anexo(cloudFrontService.generateSignedUrl(dto.getUrl_anexo(), Duration.ofMinutes(60)));
-        }
-        CriadorOportunidadeDto criador = dto.getCriador();
-        if (criador != null && criador.getUrlPicture() != null
-                && criador.getUrlPicture().contains(cloudFrontService.getBaseUrl())) {
-            criador.setUrlPicture(cloudFrontService.generateSignedUrl(criador.getUrlPicture(), Duration.ofMinutes(60)));
-        }
+        return new OportunidadeDTO(oportunidade);
     }
 
     private void afterCommit(Runnable action) {

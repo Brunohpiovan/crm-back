@@ -24,7 +24,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -48,9 +47,6 @@ public class UsuarioService {
     @Autowired
     private ParticipanteService participanteService;
 
-    @Autowired
-    private CloudFrontService cloudFrontService;
-
     public UsuarioResponseNoAuthDto findByIdParaEdicao(Long id) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String authenticatedUsername = authentication.getName();
@@ -64,28 +60,15 @@ public class UsuarioService {
             throw new AccessDeniedException("Você não tem permissão para acessar este usuário.");
         }
 
-        if (usuario.getUrlPicture().contains(cloudFrontService.getBaseUrl())) {
-            String signedUrl = cloudFrontService.generateSignedUrl(usuario.getUrlPicture(), Duration.ofMinutes(60));
-            usuario.setUrlPicture(signedUrl);
-        }
         return new UsuarioResponseNoAuthDto(usuario);
     }
 
     public List<UsuarioAllContactsDTO> findAllContacts(Long userId) {
-        return assinarFotos(usuarioRepository.findAllContactsWithPrivateGroups(userId));
+        return usuarioRepository.findAllContactsWithPrivateGroups(userId);
     }
 
     public List<UsuarioAllContactsDTO> findAllContactsDispo(Long userId) {
-        return assinarFotos(usuarioRepository.findUsuariosSemGrupoPrivadoComum(userId));
-    }
-
-    private List<UsuarioAllContactsDTO> assinarFotos(List<UsuarioAllContactsDTO> contatos) {
-        contatos.forEach(dto -> {
-            if (dto.getUrlPicture() != null && dto.getUrlPicture().contains(cloudFrontService.getBaseUrl())) {
-                dto.setUrlPicture(cloudFrontService.generateSignedUrl(dto.getUrlPicture(), Duration.ofMinutes(60)));
-            }
-        });
-        return contatos;
+        return usuarioRepository.findUsuariosSemGrupoPrivadoComum(userId);
     }
 
     public Page<UsuarioAllDTO> findAll(String search, Pageable pageable) {
@@ -96,13 +79,7 @@ public class UsuarioService {
     }
 
     public List<CriadorDto> findAllCriador() {
-        List<CriadorDto> criadores = usuarioRepository.findAllCriadores();
-        criadores.forEach(dto -> {
-            if (dto.getUrlPicture() != null && dto.getUrlPicture().contains(cloudFrontService.getBaseUrl())) {
-                dto.setUrlPicture(cloudFrontService.generateSignedUrl(dto.getUrlPicture(), Duration.ofMinutes(60)));
-            }
-        });
-        return criadores;
+        return usuarioRepository.findAllCriadores();
     }
 
     public List<UsuarioAllDTO> findByAdmin() {
@@ -120,14 +97,7 @@ public class UsuarioService {
             throw new AccessDeniedException("Você não tem permissão para acessar este usuário.");
         }
 
-        UsuarioResponseDto resposta = new UsuarioResponseDto(usuario);
-
-        if (usuario.getUrlPicture().contains(cloudFrontService.getBaseUrl())) {
-            String signedUrl = cloudFrontService.generateSignedUrl(usuario.getUrlPicture(), Duration.ofMinutes(60));
-            resposta.setUrlPicture(signedUrl);
-        }
-
-        return resposta;
+        return new UsuarioResponseDto(usuario);
     }
 
     public UsuarioAllDTO save(UsuarioCreateDTO dto, MultipartFile foto) {
@@ -152,10 +122,6 @@ public class UsuarioService {
         usuario.setBloqueado(false);
         usuario = usuarioRepository.save(usuario);
 
-        if (usuario.getUrlPicture().contains(cloudFrontService.getBaseUrl())) {
-            String signedUrl = cloudFrontService.generateSignedUrl(usuario.getUrlPicture(), Duration.ofMinutes(60));
-            usuario.setUrlPicture(signedUrl);
-        }
         return new UsuarioAllDTO(usuario);
     }
 
@@ -184,10 +150,6 @@ public class UsuarioService {
         usuarioDoBanco.setBloqueado(dto.getBloqueado());
         usuarioRepository.save(usuarioDoBanco);
 
-        if (usuarioDoBanco.getUrlPicture().contains(cloudFrontService.getBaseUrl())) {
-            String signedUrl = cloudFrontService.generateSignedUrl(usuarioDoBanco.getUrlPicture(), Duration.ofMinutes(60));
-            usuarioDoBanco.setUrlPicture(signedUrl);
-        }
         return new UsuarioAllDTO(usuarioDoBanco);
     }
 
@@ -205,11 +167,12 @@ public class UsuarioService {
         validatePassword(dto);
         validarDuplicidadeAtualizacao(dto.getLogin(), dto.getCpf(), usuarioDoBanco.getId());
 
+        String loginAntigo = usuarioDoBanco.getLogin();
         String urlPicture = resolveUrlPicture(usuarioDoBanco, dto, foto);
         preencherDadosPessoais(dto, usuarioDoBanco);
         usuarioDoBanco.setUrlPicture(urlPicture);
 
-        sincronizarParticipante(usuarioDoBanco);
+        sincronizarParticipante(usuarioDoBanco, loginAntigo);
 
         usuarioDoBanco.setAtualizadoEm(LocalDateTime.now());
     }
@@ -225,7 +188,7 @@ public class UsuarioService {
     private String resolveUrlPicture(Usuario usuarioDoBanco, UsuarioDadosPessoaisDTO dto, MultipartFile foto) {
         String urlPictureSolicitada = dto.getUrlPicture();
 
-        if (usuarioDoBanco.getUrlPicture().contains(cloudFrontService.getBaseUrl()) && foto != null) {
+        if (usuarioDoBanco.getUrlPicture().contains(s3Service.getBaseUrl()) && foto != null) {
             deleteOldPhoto(usuarioDoBanco);
             urlPictureSolicitada = "assets/img/avatar/padrao.jpeg";
         }
@@ -262,8 +225,8 @@ public class UsuarioService {
         usuarioRepository.save(usuarioDoBanco);
     }
 
-    private void sincronizarParticipante(Usuario usuario) {
-        Participante participante = participanteService.findByLoginSystem(usuario.getLogin());
+    private void sincronizarParticipante(Usuario usuario, String loginAntigo) {
+        Participante participante = participanteService.findByLoginSystem(loginAntigo);
         Participante novoParticipante = preencheParticipanteEntity(usuario, participante);
         participanteService.update(novoParticipante, participante.getId());
     }

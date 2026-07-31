@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -17,7 +18,11 @@ public interface SchedulerLockRepository extends JpaRepository<SchedulerLock, St
      * lock anterior estiver parado há mais tempo que o limite de obsolescência (proteção contra
      * lock preso por uma instância que caiu no meio do processamento). Retorna 1 se este chamador
      * adquiriu o lock, 0 se outra instância já está processando.
+     * {@code @Transactional} explícito aqui porque o chamador ({@code CadenciaFunilService.processarCadenciasAtivas})
+     * é intencionalmente não-transacional (cada oportunidade movida tem sua própria transação isolada),
+     * e uma query {@code @Modifying(flushAutomatically = true)} exige uma transação ativa para o flush.
      */
+    @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
     UPDATE SchedulerLock l SET l.running = true, l.iniciadoEm = :agora
@@ -27,6 +32,7 @@ public interface SchedulerLockRepository extends JpaRepository<SchedulerLock, St
                         @Param("agora") LocalDateTime agora,
                         @Param("limiteObsolescencia") LocalDateTime limiteObsolescencia);
 
+    @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE SchedulerLock l SET l.running = false WHERE l.nome = :nome")
     void liberar(@Param("nome") String nome);

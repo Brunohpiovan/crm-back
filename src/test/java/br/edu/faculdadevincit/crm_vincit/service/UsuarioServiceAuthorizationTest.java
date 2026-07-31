@@ -6,7 +6,6 @@ import br.edu.faculdadevincit.crm_vincit.model.enums.UserRole;
 import br.edu.faculdadevincit.crm_vincit.repository.UsuarioRepository;
 import br.edu.faculdadevincit.crm_vincit.service.exceptions.AccessDeniedException;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -22,7 +21,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /**
@@ -36,9 +34,6 @@ class UsuarioServiceAuthorizationTest {
 
     @Mock
     private UsuarioRepository usuarioRepository;
-
-    @Mock
-    private CloudFrontService cloudFrontService;
 
     @InjectMocks
     private UsuarioService usuarioService;
@@ -65,11 +60,6 @@ class UsuarioServiceAuthorizationTest {
         Authentication authentication =
                 new UsernamePasswordAuthenticationToken(login, null, grantedAuthorities);
         SecurityContextHolder.getContext().setAuthentication(authentication);
-    }
-
-    @BeforeEach
-    void stubsComuns() {
-        lenient().when(cloudFrontService.getBaseUrl()).thenReturn("https://cdn-nao-usado-neste-teste.example.com/");
     }
 
     @Test

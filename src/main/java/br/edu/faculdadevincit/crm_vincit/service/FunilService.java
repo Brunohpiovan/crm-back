@@ -14,7 +14,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -28,9 +27,6 @@ public class FunilService {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
-
-    @Autowired
-    private CloudFrontService cloudFrontService;
 
     @Autowired
     private EtapaService etapaService;
@@ -62,13 +58,6 @@ public class FunilService {
 
         List<UsuarioContatoDto> usuariosNaoNoFunil =
                 usuarioRepository.findDisponiveisParaFunil(funilId, UserRole.ADMINISTRADOR);
-
-        usuariosNaoNoFunil.forEach(usuario -> {
-            String urlPicture = usuario.getUrlPicture();
-            if (urlPicture != null && urlPicture.contains(cloudFrontService.getBaseUrl())) {
-                usuario.setUrlPicture(cloudFrontService.generateSignedUrl(urlPicture, Duration.ofMinutes(60)));
-            }
-        });
 
         return usuariosNaoNoFunil;
     }

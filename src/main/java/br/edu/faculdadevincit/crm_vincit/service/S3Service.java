@@ -23,6 +23,9 @@ public class S3Service {
     @Value("${aws.s3.base-url}")
     private String baseUrl;
 
+    public String getBaseUrl() {
+        return baseUrl;
+    }
 
     public String uploadFile(MultipartFile file, String key) {
         if (file.isEmpty()) {
@@ -82,7 +85,7 @@ public class S3Service {
                     .build();
             s3Client.deleteObject(deleteObjectRequest);
         } catch (Exception e) {
-            throw new RuntimeException("Falha na deleção do objeto");
+            throw new RuntimeException("Falha na deleção do objeto: " + e.getMessage(), e);
         }
     }
 

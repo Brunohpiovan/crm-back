@@ -49,7 +49,6 @@ class OportunidadeServiceTransactionBoundaryTest {
     @Mock private EtapaService etapaService;
     @Mock private ParticipanteService participanteService;
     @Mock private S3Service s3Service;
-    @Mock private CloudFrontService cloudFrontService;
     @Mock private TagRepository tagRepository;
     @Mock private MultipartFile file;
 
@@ -66,7 +65,6 @@ class OportunidadeServiceTransactionBoundaryTest {
         ReflectionTestUtils.setField(oportunidadeService, "etapaService", etapaService);
         ReflectionTestUtils.setField(oportunidadeService, "participanteService", participanteService);
         ReflectionTestUtils.setField(oportunidadeService, "s3Service", s3Service);
-        ReflectionTestUtils.setField(oportunidadeService, "cloudFrontService", cloudFrontService);
         ReflectionTestUtils.setField(oportunidadeService, "tagRepository", tagRepository);
     }
 

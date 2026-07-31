@@ -16,10 +16,6 @@ public class AudioConvertor {
     @Autowired
     private S3Service s3Service;
 
-    @Autowired
-    private CloudFrontService cloudFrontService;
-
-
     public String convertAndUpload(MultipartFile file) throws Exception {
         if (!file.getContentType().startsWith("audio/")) {
             throw new IllegalArgumentException("O arquivo enviado não é um áudio.");

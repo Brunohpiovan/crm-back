@@ -19,7 +19,6 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -48,10 +47,6 @@ public class ChatGrupoService {
     @Value("${aws.s3.bucket-name}")
     private String bucketName;
 
-
-    @Autowired
-    private CloudFrontService cloudFrontService;
-
     public Optional<Long> getGrupoByUsuario(Long id_usuario1, Long id_usuario2) {
         Optional<Usuario> usuario1 = usuarioRepository.findById(id_usuario1);
         Optional<Usuario> usuario2 = usuarioRepository.findById(id_usuario2);
@@ -77,14 +72,7 @@ public class ChatGrupoService {
 
         List<ChatGrupoResponseDTO> dtoList = chatGrupos.stream().map(grupo -> {
             String avatarUrl = grupo.getAvatarUrl();
-            if (avatarUrl != null && avatarUrl.contains(cloudFrontService.getBaseUrl())) {
-                avatarUrl = cloudFrontService.generateSignedUrl(avatarUrl, Duration.ofMinutes(30));
-            }
-
             String imagemFundoUrl = grupo.getImagemFundoUrl();
-            if (imagemFundoUrl != null && imagemFundoUrl.contains(cloudFrontService.getBaseUrl())) {
-                imagemFundoUrl = cloudFrontService.generateSignedUrl(imagemFundoUrl, Duration.ofMinutes(30));
-            }
 
             return new ChatGrupoResponseDTO(
                     grupo.getId(),
@@ -135,12 +123,12 @@ public class ChatGrupoService {
         ChatGrupo newgrupo = dtoToModel(dto);
         ChatGrupo grupo = chatGrupoRepository.findById(id).orElseThrow(()->new RuntimeException("Grupo nao encontrado"));
         if(foto == null && newgrupo.getAvatarUrl().contains("assets/img/avatar/grupo3.jpg") && grupo.getAvatarUrl().contains(bucketName)){
-            String keyAntiga = grupo.getAvatarUrl().replace(cloudFrontService.getBaseUrl() + "/", "");
+            String keyAntiga = grupo.getAvatarUrl().replace(s3Service.getBaseUrl() + "/", "");
             s3Service.deleteFile(keyAntiga);
             grupo.setAvatarUrl("assets/img/avatar/grupo3.jpg");
         }
-        if(foto!=null && grupo.getAvatarUrl().contains(cloudFrontService.getBaseUrl())){
-            String keyAntiga = grupo.getAvatarUrl().replace(cloudFrontService.getBaseUrl() + "/", "");
+        if(foto!=null && grupo.getAvatarUrl().contains(s3Service.getBaseUrl())){
+            String keyAntiga = grupo.getAvatarUrl().replace(s3Service.getBaseUrl() + "/", "");
             s3Service.deleteFile(keyAntiga);
         }
 
@@ -153,12 +141,12 @@ public class ChatGrupoService {
         }
 
         if (imagemFundo == null && newgrupo.getImagemFundoUrl() == null && grupo.getImagemFundoUrl() != null && grupo.getImagemFundoUrl().contains(bucketName)) {
-            String keyAntiga = grupo.getImagemFundoUrl().replace(cloudFrontService.getBaseUrl() + "/", "");
+            String keyAntiga = grupo.getImagemFundoUrl().replace(s3Service.getBaseUrl() + "/", "");
             s3Service.deleteFile(keyAntiga);
             grupo.setImagemFundoUrl(null);
         }
         if (imagemFundo != null && grupo.getImagemFundoUrl() != null && grupo.getImagemFundoUrl().contains(bucketName)) {
-            String keyAntiga = grupo.getImagemFundoUrl().replace(cloudFrontService.getBaseUrl() + "/", "");
+            String keyAntiga = grupo.getImagemFundoUrl().replace(s3Service.getBaseUrl() + "/", "");
             s3Service.deleteFile(keyAntiga);
         }
         if (imagemFundo != null) {
@@ -239,14 +227,7 @@ public class ChatGrupoService {
                 .orElseThrow(() -> new RuntimeException("grupo nao encontrado"));
 
         String avatarUrl = grupo.getAvatarUrl();
-        if (avatarUrl != null && avatarUrl.contains(cloudFrontService.getBaseUrl())) {
-            avatarUrl = cloudFrontService.generateSignedUrl(avatarUrl, Duration.ofMinutes(30));
-        }
-
         String imagemFundoUrl = grupo.getImagemFundoUrl();
-        if (imagemFundoUrl != null && imagemFundoUrl.contains(cloudFrontService.getBaseUrl())) {
-            imagemFundoUrl = cloudFrontService.generateSignedUrl(imagemFundoUrl, Duration.ofMinutes(30));
-        }
 
         return new ChatGrupoResponseById(
                 grupo.getId(),
