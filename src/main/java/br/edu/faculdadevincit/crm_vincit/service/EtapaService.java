@@ -3,6 +3,7 @@ package br.edu.faculdadevincit.crm_vincit.service;
 import br.edu.faculdadevincit.crm_vincit.model.Etapa;
 import br.edu.faculdadevincit.crm_vincit.model.Funil;
 import br.edu.faculdadevincit.crm_vincit.model.Oportunidade;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaCreateRequest;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaDto;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaFunilDTO;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaUpdate2DTO;
@@ -93,18 +94,21 @@ public class EtapaService {
     }
 
 
-    public EtapaDto create(Etapa etapa) {
-        boolean exists = etapaRepository.existsByNomeAndFunilId(etapa.getNome(), etapa.getFunil().getId());
+    public EtapaDto create(EtapaCreateRequest etapaCreateRequest) {
+        Long funilId = etapaCreateRequest.funil().getId();
+        boolean exists = etapaRepository.existsByNomeAndFunilId(etapaCreateRequest.nome(), funilId);
         if (exists) {
             throw new RuntimeException("Já existe um etapa com o mesmo nome neste funil.");
         }
-        Funil funil = funilRepository.findById(etapa.getFunil().getId())
+        Funil funil = funilRepository.findById(funilId)
                 .orElseThrow(() -> new RuntimeException("Funil não encontrado"));
+        Etapa etapa = new Etapa();
+        etapa.setNome(etapaCreateRequest.nome());
         etapa.setFunil(funil);
         etapa.setValor_total(BigDecimal.ZERO);
+        etapa.setCriadoEm(LocalDateTime.now());
         Etapa savedEtapa = etapaRepository.save(etapa);
         messagingTemplate.convertAndSend("/topic/newetapa", savedEtapa);
-        savedEtapa.setCriadoEm(LocalDateTime.now());
         return new EtapaDto(savedEtapa, List.of());
     }
 

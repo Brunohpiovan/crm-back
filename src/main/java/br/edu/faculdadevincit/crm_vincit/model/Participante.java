@@ -18,11 +18,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * Entidade JPA usada diretamente como corpo de requisição/resposta em
- * POST /participante e PUT /participante/{id} (ParticipanteController não
- * usa um DTO dedicado de entrada nesses dois endpoints).
+ * Ainda usada diretamente como corpo de resposta em GET /participante/celular/{celular}
+ * e PUT /participante/{id} (ver ParticipanteDTO para as listagens/buscas por id). As
+ * requisições de entrada de POST/PUT usam ParticipanteCreateRequest/ParticipanteUpdateRequest.
  */
-@Schema(description = "Participante (contato externo do CRM, ex.: cliente via WhatsApp) ou usuário interno espelhado (tipoParticipante = FUNCIONARIO). Usado como corpo de requisição em POST/PUT /participante.")
+@Schema(description = "Participante (contato externo do CRM, ex.: cliente via WhatsApp) ou usuário interno espelhado (tipoParticipante = FUNCIONARIO).")
 @Getter
 @Setter
 @Entity

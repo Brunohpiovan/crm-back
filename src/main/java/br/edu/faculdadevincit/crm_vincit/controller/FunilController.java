@@ -1,8 +1,8 @@
 package br.edu.faculdadevincit.crm_vincit.controller;
 
-import br.edu.faculdadevincit.crm_vincit.model.Funil;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.FiltroFunilDto;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.FunilAllDTO;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.FunilCreateRequest;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.FunilDto;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioContatoDto;
 import br.edu.faculdadevincit.crm_vincit.service.FunilService;
@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -82,11 +83,14 @@ public class FunilController {
 
 
     @Operation(summary = "Criar um novo funil", description = "Requer JWT. Cria um funil vazio (sem etapas) a partir dos dados informados.")
-    @ApiResponse(responseCode = "200", description = "Funil criado com sucesso",
-            content = @Content(schema = @Schema(implementation = FunilDto.class)))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Funil criado com sucesso",
+                    content = @Content(schema = @Schema(implementation = FunilDto.class))),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos (ex.: nome ausente ou em branco)")
+    })
     @PostMapping
-    public ResponseEntity<FunilDto> create(@RequestBody Funil funil) {
-        FunilDto dto = funilService.create(funil);
+    public ResponseEntity<FunilDto> create(@RequestBody @Valid FunilCreateRequest funilCreateRequest) {
+        FunilDto dto = funilService.create(funilCreateRequest);
         return ResponseEntity.ok(dto);
     }
 

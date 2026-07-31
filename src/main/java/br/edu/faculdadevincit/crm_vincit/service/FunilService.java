@@ -112,9 +112,11 @@ public class FunilService {
     }
 
 
-    public FunilDto create(Funil funil) {
+    public FunilDto create(FunilCreateRequest funilCreateRequest) {
+        Funil funil = new Funil();
+        funil.setNome(funilCreateRequest.nome());
+        funil.setCriadoEm(LocalDateTime.now());
         Funil savedFunil = funilRepository.save(funil);
-        savedFunil.setCriadoEm(LocalDateTime.now());
         return new FunilDto(savedFunil);
     }
 

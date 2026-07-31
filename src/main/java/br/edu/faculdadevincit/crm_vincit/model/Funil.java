@@ -9,10 +9,11 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-@Schema(description = "Entidade Funil, usada diretamente como corpo de POST /funil (não é um DTO dedicado). Apenas o campo `nome` precisa ser informado ao criar; os demais campos são preenchidos/gerenciados pelo backend.")
+@Schema(description = "Entidade Funil (pipeline de vendas). Etapas e funcionários são geridos por endpoints próprios; para criar um funil, use FunilCreateRequest.")
 @Getter
 @Setter
 @Entity
@@ -27,7 +28,7 @@ public class Funil {
     private String nome;
     @Schema(description = "Etapas pertencentes a este funil (gerenciadas via /etapa, não são criadas diretamente aqui)")
     @OneToMany(mappedBy = "funil", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<Etapa> etapas;
+    private Set<Etapa> etapas = new HashSet<>();
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "funil_funcionarios",

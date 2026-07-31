@@ -1,6 +1,6 @@
 package br.edu.faculdadevincit.crm_vincit.controller;
 
-import br.edu.faculdadevincit.crm_vincit.model.Etapa;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaCreateRequest;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaDto;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaFunilDTO;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EtapaUpdate2DTO;
@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -69,8 +70,8 @@ public class EtapaController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Já existe um etapa com o mesmo nome neste funil.")))
     })
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody Etapa etapa) {
-        EtapaDto newEtapa = etapaService.create(etapa);
+    public ResponseEntity<?> create(@RequestBody @Valid EtapaCreateRequest etapaCreateRequest) {
+        EtapaDto newEtapa = etapaService.create(etapaCreateRequest);
         return ResponseEntity.ok(newEtapa);
     }
 

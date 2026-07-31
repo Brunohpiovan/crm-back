@@ -15,7 +15,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Schema(description = "Entidade Etapa, usada diretamente como corpo de POST /etapa (não é um DTO dedicado). É necessário informar `nome` e o id do `funil` ao qual a etapa pertence; os demais campos são preenchidos/gerenciados pelo backend.")
+@Schema(description = "Entidade Etapa (coluna de um funil de vendas). Para criar uma etapa, use EtapaCreateRequest.")
 @Getter
 @Setter
 @Entity
