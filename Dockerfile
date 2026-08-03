@@ -1,5 +1,14 @@
-FROM openjdk:17
+FROM eclipse-temurin:17-jdk AS build
 WORKDIR /app
-COPY ./target/crm_vincit.jar /app
+COPY mvnw .
+COPY .mvn .mvn
+COPY pom.xml .
+RUN ./mvnw dependency:go-offline -B
+COPY src src
+RUN ./mvnw package -DskipTests
+
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY --from=build /app/target/crm_vincit.jar /app/crm_vincit.jar
 EXPOSE 8080
 CMD ["java", "-jar", "crm_vincit.jar"]
