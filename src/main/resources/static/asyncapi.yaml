@@ -204,11 +204,14 @@ channels:
         $ref: '#/components/messages/OportunidadeDTO'
 
   /topic/movimentoOportunidade:
-    description: '**Servidor → Cliente.** Oportunidade movida entre etapas via drag-and-drop no Kanban (`PUT /oportunidade/move`).'
+    description: >
+      **Servidor → Cliente.** Oportunidade movida entre etapas via drag-and-drop no Kanban (`PUT /oportunidade/move`).
+      Payload enxuto (apenas os ids da oportunidade e da etapa de destino) — o cliente já mantém os demais dados
+      do card localmente e deve apenas reposicioná-lo; o estado completo é sincronizado por `/topic/attoportunidades`.
     publish:
       operationId: oportunidadeMovida
       message:
-        $ref: '#/components/messages/OportunidadeDTO'
+        $ref: '#/components/messages/OportunidadeMovimentoDTO'
 
   /topic/attoportunidades:
     description: >
@@ -366,6 +369,12 @@ components:
         type: array
         items:
           $ref: '#/components/schemas/OportunidadeDTO'
+    OportunidadeMovimentoDTO:
+      name: OportunidadeMovimentoDTO
+      title: Ids de uma movimentação de oportunidade no Kanban
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OportunidadeMovimentoDTO'
     ProtocoloMoveDTO:
       name: ProtocoloMoveDTO
       contentType: application/json
@@ -704,3 +713,15 @@ components:
     IdLong:
       type: integer
       format: int64
+
+    OportunidadeMovimentoDTO:
+      type: object
+      properties:
+        oportunidadeId:
+          type: integer
+          format: int64
+          description: Id da oportunidade que foi movida
+        etapaId:
+          type: integer
+          format: int64
+          description: Id da etapa de destino para onde a oportunidade foi movida

@@ -106,7 +106,7 @@ public class OportunidadeController {
     }
 
     @Operation(summary = "Mover uma oportunidade entre etapas (drag-and-drop no Kanban)",
-            description = "Requer JWT. Move a oportunidade para a etapa informada, posicionando-a no índice indicado dentro da lista de oportunidades da etapa de destino (reindexação das demais oportunidades da(s) etapa(s) afetada(s)). Se a etapa de destino for diferente da etapa atual, os valores totais das duas etapas são recalculados. Após a operação, o backend publica: a oportunidade movida no canal WebSocket /topic/movimentoOportunidade, e a lista reordenada de oportunidades de cada etapa afetada no canal /topic/attoportunidades — para atualização em tempo real de outros clientes conectados.")
+            description = "Requer JWT. Move a oportunidade para a etapa informada, posicionando-a no índice indicado dentro da lista de oportunidades da etapa de destino (reindexação das demais oportunidades da(s) etapa(s) afetada(s)). Se a etapa de destino for diferente da etapa atual, os valores totais das duas etapas são recalculados. Após a operação, o backend publica: os ids da oportunidade e da etapa de destino (payload enxuto) no canal WebSocket /topic/movimentoOportunidade, e a lista reordenada de oportunidades de cada etapa afetada no canal /topic/attoportunidades — para atualização em tempo real de outros clientes conectados.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Oportunidade movida com sucesso (resposta sem corpo)"),
             @ApiResponse(responseCode = "400",
