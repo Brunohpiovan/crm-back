@@ -108,8 +108,15 @@ public class EtapaService {
         etapa.setValor_total(BigDecimal.ZERO);
         etapa.setCriadoEm(LocalDateTime.now());
         Etapa savedEtapa = etapaRepository.save(etapa);
-        messagingTemplate.convertAndSend("/topic/newetapa", savedEtapa);
-        return new EtapaDto(savedEtapa, List.of());
+        // Publica um EtapaDto (mesmo padrão do update(), que já usa EtapaUpdate2DTO),
+        // nunca a entidade JPA crua: savedEtapa.funil.etapas cria uma referência
+        // circular (Etapa -> Funil -> etapas -> Etapa -> ...) que o Jackson não
+        // consegue serializar e derruba a publicação no /topic/newetapa em
+        // silêncio (a etapa fica salva no banco, mas ninguém recebe o evento
+        // em tempo real).
+        EtapaDto dto = new EtapaDto(savedEtapa, List.of());
+        messagingTemplate.convertAndSend("/topic/newetapa", dto);
+        return dto;
     }
 
     public EtapaDto updateAddValor(Long id, BigDecimal valor){
