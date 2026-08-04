@@ -22,6 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -56,6 +57,8 @@ public class ChatGrupoService {
         }
 
         return chatGrupoRepository.findGrupoPrivadoByUsuarios(usuario1.get().getId(), usuario2.get().getId())
+                .stream()
+                .min(Comparator.comparing(ChatGrupo::getCriadoEm))
                 .map(ChatGrupo::getId);
     }
 

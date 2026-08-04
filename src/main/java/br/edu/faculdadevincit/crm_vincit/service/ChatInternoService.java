@@ -13,8 +13,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class ChatInternoService {
@@ -45,9 +47,18 @@ public class ChatInternoService {
         Usuario reciver = usuarioRepository.findById(mensagem.getId_reciver()).orElseThrow(()->new RuntimeException("Usuario Reciver nao encontrado"));
         MensagemInterna mensagemNew = new MensagemInterna();
         if(mensagem.getId_group() == null){
-            mensagemNew.setChatGrupo(criaGroup(sender,reciver));
-            messagingTemplate.convertAndSend("/topic/newGroup/" + sender.getId(), criaDto(reciver));
-            messagingTemplate.convertAndSend("/topic/newGroup/" + reciver.getId(), criaDto(sender));
+            Optional<ChatGrupo> grupoExistente = chatGrupoRepository
+                    .findGrupoPrivadoByUsuarios(sender.getId(), reciver.getId())
+                    .stream()
+                    .min(Comparator.comparing(ChatGrupo::getCriadoEm));
+
+            if (grupoExistente.isPresent()) {
+                mensagemNew.setChatGrupo(grupoExistente.get());
+            } else {
+                mensagemNew.setChatGrupo(criaGroup(sender, reciver));
+                messagingTemplate.convertAndSend("/topic/newGroup/" + sender.getId(), criaDto(reciver));
+                messagingTemplate.convertAndSend("/topic/newGroup/" + reciver.getId(), criaDto(sender));
+            }
         }else{
             mensagemNew.setChatGrupo(chatGrupoRepository.findById(mensagem.getId_group()).orElseThrow(()->new RuntimeException("chatGrupo nao encontrado")));
         }

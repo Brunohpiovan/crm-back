@@ -27,8 +27,8 @@ public interface ChatGrupoRepository extends JpaRepository<ChatGrupo, Long> {
           AND u2.id = :idUsuario2
           AND SIZE(g.usuarios) = 2
     """)
-    Optional<ChatGrupo> findGrupoPrivadoByUsuarios(@Param("idUsuario1") Long idUsuario1,
-                                                   @Param("idUsuario2") Long idUsuario2);
+    List<ChatGrupo> findGrupoPrivadoByUsuarios(@Param("idUsuario1") Long idUsuario1,
+                                                @Param("idUsuario2") Long idUsuario2);
 
     @Query("""
     SELECT g
