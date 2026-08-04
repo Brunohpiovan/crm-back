@@ -37,15 +37,14 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     List<UsuarioContatoDto> findDisponiveisParaFunil(@Param("funilId") Long funilId, @Param("cargo") UserRole cargo);
 
     @Query("""
-    SELECT new br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioAllDTO(u.id, u.nome, u.login, u.celular)
+    SELECT new br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioAllDTO(u.id, u.nome, u.login, u.celular, u.cargo, u.bloqueado)
     FROM Usuario u
-    WHERE u.bloqueado = false
-    AND (:search IS NULL OR LOWER(u.nome) LIKE :search OR LOWER(u.login) LIKE :search)
+    WHERE (:search IS NULL OR LOWER(u.nome) LIKE :search OR LOWER(u.login) LIKE :search)
     """)
-    Page<UsuarioAllDTO> findAllAtivos(@Param("search") String search, Pageable pageable);
+    Page<UsuarioAllDTO> findAllPaginado(@Param("search") String search, Pageable pageable);
 
     @Query("""
-    SELECT new br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioAllDTO(u.id, u.nome, u.login, u.celular)
+    SELECT new br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioAllDTO(u.id, u.nome, u.login, u.celular, u.cargo, u.bloqueado)
     FROM Usuario u
     WHERE u.cargo = :cargo
     """)

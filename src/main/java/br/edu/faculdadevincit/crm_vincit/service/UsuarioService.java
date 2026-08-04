@@ -75,7 +75,7 @@ public class UsuarioService {
         String termoBusca = (search == null || search.isBlank())
                 ? null
                 : "%" + search.trim().toLowerCase() + "%";
-        return usuarioRepository.findAllAtivos(termoBusca, pageable);
+        return usuarioRepository.findAllPaginado(termoBusca, pageable);
     }
 
     public List<CriadorDto> findAllCriador() {

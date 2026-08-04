@@ -44,8 +44,10 @@ public class UsuarioController {
                     Requer JWT com cargo ROLE_VENDEDOR (usuários ADMINISTRADOR também possuem \
                     ROLE_VENDEDOR, então todo usuário autenticado do CRM consegue acessar). \
                     `search` filtra por nome/login (case-insensitive); se omitido ou em branco, \
-                    retorna todos os usuários ativos. Resultado paginado (parâmetros padrão do \
-                    Spring Data: `page`, `size`, `sort`), ordenado por `nome` por padrão.
+                    retorna todos os usuários, incluindo os bloqueados (necessário para que um \
+                    administrador consiga localizar e desbloquear um usuário). Resultado paginado \
+                    (parâmetros padrão do Spring Data: `page`, `size`, `sort`), ordenado por `nome` \
+                    por padrão.
                     """
     )
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Página de usuários resumidos")
