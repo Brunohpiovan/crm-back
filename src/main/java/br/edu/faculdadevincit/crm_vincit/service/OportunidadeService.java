@@ -8,6 +8,7 @@ import br.edu.faculdadevincit.crm_vincit.model.Usuario;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.OportunidadeClienteRequest;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.OportunidadeCreateRequest;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.OportunidadeDTO;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.OportunidadeMovimentoDTO;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.OportunidadeUpdateRequest;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioContatoDto;
 import br.edu.faculdadevincit.crm_vincit.model.enums.Origem;
@@ -331,8 +332,8 @@ public class OportunidadeService {
             reorganizarIndices(novaEtapa.getId(), oportunidade, novoIndice);
         }
 
-        OportunidadeDTO dto = toDto(oportunidade);
-        afterCommit(() -> messagingTemplate.convertAndSend("/topic/movimentoOportunidade", dto));
+        OportunidadeMovimentoDTO movimentoDto = new OportunidadeMovimentoDTO(oportunidade.getId(), etapaId);
+        afterCommit(() -> messagingTemplate.convertAndSend("/topic/movimentoOportunidade", movimentoDto));
     }
 
     private void reorganizarIndices(Long etapaId, Oportunidade oportunidadeMovida, int novoIndice) {
