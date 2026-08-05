@@ -2,6 +2,7 @@ package br.edu.faculdadevincit.crm_vincit.repository;
 
 import br.edu.faculdadevincit.crm_vincit.model.Equipe;
 import br.edu.faculdadevincit.crm_vincit.model.Usuario;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,4 +17,8 @@ public interface EquipeRepository extends JpaRepository<Equipe, Long> {
     List<Long> findMembroIdsById(@Param("equipeId") Long equipeId);
 
     boolean existsByIdAndMembrosContains(Long id, Usuario usuario);
+
+    @Override
+    @EntityGraph(attributePaths = {"membros"})
+    List<Equipe> findAll();
 }

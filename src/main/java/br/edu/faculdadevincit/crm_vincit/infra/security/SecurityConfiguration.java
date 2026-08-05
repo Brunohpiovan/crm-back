@@ -47,6 +47,10 @@ public class SecurityConfiguration {
                                 "/v3/api-docs/**",
                                 "/asyncapi.yaml"
                         ).permitAll()
+                        // Healthcheck da plataforma (Railway) não envia JWT. show-details=never
+                        // (application.properties) garante que só o status UP/DOWN fica visível
+                        // aqui, sem detalhe de infraestrutura (ex.: datasource) exposto sem auth.
+                        .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers(HttpMethod.POST,"/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST,"/auth/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/recover-password").permitAll()
@@ -57,6 +61,15 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.PUT, "/usuario/all/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/usuario/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/usuario/**").hasAuthority("ROLE_VENDEDOR")
+                        // Só ADMINISTRADOR cria/atualiza/exclui funil e etapa (afeta o pipeline
+                        // de vendas de todos os vendedores). Match exato em "/funil" (POST) não
+                        // pega POST /funil/filtro (consulta) nem POST /funil/add-funcionario/**.
+                        .requestMatchers(HttpMethod.POST, "/funil").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/funil/**").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/funil/**").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/etapa").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/etapa/**").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/etapa/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/log/finalizar/**").permitAll()
                         .anyRequest().authenticated()

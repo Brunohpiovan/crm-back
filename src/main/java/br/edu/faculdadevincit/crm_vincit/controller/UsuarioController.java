@@ -113,7 +113,7 @@ public class UsuarioController {
             summary = "Buscar usuário por id",
             description = """
                     Requer JWT com cargo ROLE_VENDEDOR. Além da exigência de cargo, o service \
-                    valida que o `id` solicitado corresponde ao próprio usuário autenticado \
+                    valida que o solicitante seja ADMINISTRADOR ou o próprio dono do cadastro \
                     (comparando o login do token com o login do usuário buscado); caso \
                     contrário, retorna 403 (AccessDeniedException).
                     """
@@ -122,7 +122,7 @@ public class UsuarioController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Usuário encontrado", content = @Content(schema = @Schema(implementation = UsuarioResponseDto.class))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Usuário não encontrado para o id informado (resposta em texto puro, não JSON estruturado — cai no handler genérico de RuntimeException)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Usuário não encontrado"))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "O usuário autenticado não é o dono do cadastro solicitado",
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "O usuário autenticado não é ADMINISTRADOR nem o dono do cadastro solicitado",
                     content = @Content(schema = @Schema(implementation = ApiResponse.class)))
     })
     @GetMapping(value = "/{id}")

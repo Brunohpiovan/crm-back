@@ -10,6 +10,8 @@ import br.edu.faculdadevincit.crm_vincit.repository.ParticipanteRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.ProtocoloRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
@@ -41,6 +43,15 @@ public class ParticipanteService {
                 .stream()
                 .map(ParticipanteDTO::new)
                 .toList();
+    }
+
+    /**
+     * Versão paginada de {@link #findAll()}, que continua sem limite (mantida por
+     * compatibilidade com o frontend atual). Usar esta para telas/listagens novas, dado que a
+     * tabela de participantes cresce com todo contato recebido via WhatsApp.
+     */
+    public Page<ParticipanteDTO> findAllPaginado(Pageable pageable) {
+        return participanteRepository.findAll(pageable).map(ParticipanteDTO::new);
     }
 
 

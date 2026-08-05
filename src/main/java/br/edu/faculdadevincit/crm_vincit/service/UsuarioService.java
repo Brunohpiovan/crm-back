@@ -89,11 +89,13 @@ public class UsuarioService {
     public UsuarioResponseDto findById(Long id) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String authenticatedUsername = authentication.getName();
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
 
         Usuario usuario = usuarioRepository.findById(id).orElseThrow(() ->
                 new UsernameNotFoundException("Usuário não encontrado"));
 
-        if (!usuario.getLogin().equals(authenticatedUsername)) {
+        if (!isAdmin && !usuario.getLogin().equals(authenticatedUsername)) {
             throw new AccessDeniedException("Você não tem permissão para acessar este usuário.");
         }
 

@@ -22,6 +22,8 @@ import java.util.List;
 @RestController
 public class MensagemController {
 
+    private static final int LIMIT_MAXIMO = 100;
+
     @Autowired
     private MensagemService mensagemService;
 
@@ -63,8 +65,9 @@ public class MensagemController {
     @GetMapping("/api/messages/{protocoloId}")
     public List<MensagemResponseDTO> getMessagesLimit(@Parameter(description = "Id do protocolo", required = true) @PathVariable Long protocoloId,
                                                       @Parameter(description = "Deslocamento (offset) usado para calcular a página: page = offset / limit") @RequestParam(defaultValue = "0") int offset,
-                                                      @Parameter(description = "Quantidade máxima de mensagens por página") @RequestParam(defaultValue = "10") int limit) {
-        return mensagemService.getMessagesForProtocolLimit(protocoloId, offset, limit);
+                                                      @Parameter(description = "Quantidade máxima de mensagens por página (limitado a " + LIMIT_MAXIMO + ")") @RequestParam(defaultValue = "10") int limit) {
+        int limiteValido = Math.max(1, Math.min(limit, LIMIT_MAXIMO));
+        return mensagemService.getMessagesForProtocolLimit(protocoloId, offset, limiteValido);
     }
 
     @Operation(summary = "Listar mensagens sem protocolo (públicas) de um remetente", description = "Requer JWT. Retorna as mensagens enviadas por `userId` (id do Participante) que ainda não foram vinculadas a nenhum protocolo — típico de contatos que ainda não têm atendimento aberto.")

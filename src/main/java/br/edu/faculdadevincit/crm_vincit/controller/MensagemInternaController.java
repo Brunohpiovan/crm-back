@@ -26,6 +26,8 @@ import java.util.List;
 @RestController
 public class MensagemInternaController {
 
+    private static final int LIMIT_MAXIMO = 100;
+
     @Autowired
     private MensagemInternaService mensagemInternaService;
 
@@ -49,7 +51,8 @@ public class MensagemInternaController {
     public List<MensagemInternaResponseDTO> getMessagesLimit(
             @Parameter(description = "Id do grupo de chat", required = true) @PathVariable Long grupoId,
             @Parameter(description = "Deslocamento (offset) usado para calcular a página: página = offset / limit") @RequestParam(defaultValue = "0") int offset,
-            @Parameter(description = "Quantidade máxima de mensagens retornadas na página") @RequestParam(defaultValue = "10") int limit) {
-        return mensagemInternaService.getMessagesForProtocolLimit(grupoId, offset, limit);
+            @Parameter(description = "Quantidade máxima de mensagens retornadas na página (limitado a " + LIMIT_MAXIMO + ")") @RequestParam(defaultValue = "10") int limit) {
+        int limiteValido = Math.max(1, Math.min(limit, LIMIT_MAXIMO));
+        return mensagemInternaService.getMessagesForProtocolLimit(grupoId, offset, limiteValido);
     }
 }

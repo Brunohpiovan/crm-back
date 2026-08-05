@@ -1,6 +1,7 @@
 package br.edu.faculdadevincit.crm_vincit.service;
 
 
+import br.edu.faculdadevincit.crm_vincit.config.CacheConfig;
 import br.edu.faculdadevincit.crm_vincit.model.Tag;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.TagDTO;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.TagOportunidadeDTO;
@@ -8,6 +9,8 @@ import br.edu.faculdadevincit.crm_vincit.model.dtos.TagRequestDTO;
 import br.edu.faculdadevincit.crm_vincit.model.enums.Situacao;
 import br.edu.faculdadevincit.crm_vincit.repository.TagRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -29,6 +32,13 @@ public class TagService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Cacheado (CacheConfig.TAGS_CACHE, TTL 5min): usado para popular o seletor de tags ao
+     * criar/editar oportunidade, chamado com frequência e mudando raramente. A lista retornada é
+     * compartilhada entre requisições enquanto o cache estiver quente — não deve ser mutada pelo
+     * chamador.
+     */
+    @Cacheable(CacheConfig.TAGS_CACHE)
     public List<TagOportunidadeDTO> findAllAtivas(){
         return tagRepository.findBySituacaoOrderByNomeAsc(Situacao.ATIVA)
                 .stream()
@@ -41,6 +51,7 @@ public class TagService {
         return new TagDTO(tagRepository.findById(id).orElseThrow(()->new RuntimeException("Tag nao encontrada")));
     }
 
+    @CacheEvict(value = CacheConfig.TAGS_CACHE, allEntries = true)
     public void create(TagRequestDTO tag){
         if (tagRepository.existsByNome(tag.getNome())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Já existe uma tag com este nome.");
@@ -50,11 +61,13 @@ public class TagService {
         tagRepository.save(newTag);
     }
 
+    @CacheEvict(value = CacheConfig.TAGS_CACHE, allEntries = true)
     public void delete(Long id){
         Tag tag = tagRepository.findById(id).orElseThrow(()-> new RuntimeException("Tag nao encontrada"));
         tagRepository.delete(tag);
     }
 
+    @CacheEvict(value = CacheConfig.TAGS_CACHE, allEntries = true)
     public void update(Long id, TagRequestDTO tag) {
         Tag tagBanco = tagRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tag não encontrada"));

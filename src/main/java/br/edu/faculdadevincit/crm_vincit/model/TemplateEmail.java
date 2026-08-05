@@ -28,6 +28,7 @@ public class TemplateEmail {
     @Column(columnDefinition = "TEXT")
     private String mensagem;
 
+    @Enumerated(EnumType.STRING)
     private Situacao situacao;
     @ElementCollection
     @CollectionTable(name = "template_email_anexos", joinColumns = @JoinColumn(name = "template_email_id"))

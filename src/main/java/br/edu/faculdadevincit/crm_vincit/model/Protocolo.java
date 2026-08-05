@@ -40,6 +40,10 @@ public class Protocolo {
     @Column(name = "data_encerramento")
     private LocalDateTime dataEncerramento;
 
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
     @Override
     public String toString() {
         return "Protocolo{" +

@@ -17,7 +17,7 @@ import lombok.Setter;
 
 import java.time.LocalDate;
 
-@Schema(description = "Dados completos do usuário, retornados por GET /usuario/{id} (apenas para o próprio usuário autenticado).")
+@Schema(description = "Dados completos do usuário, retornados por GET /usuario/{id} (para o próprio usuário autenticado ou para um administrador).")
 @Getter
 @Setter
 @NoArgsConstructor

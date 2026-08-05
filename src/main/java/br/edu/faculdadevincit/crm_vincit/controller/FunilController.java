@@ -82,7 +82,7 @@ public class FunilController {
     }
 
 
-    @Operation(summary = "Criar um novo funil", description = "Requer JWT. Cria um funil vazio (sem etapas) a partir dos dados informados.")
+    @Operation(summary = "Criar um novo funil", description = "Requer JWT com cargo ROLE_ADMIN. Cria um funil vazio (sem etapas) a partir dos dados informados.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Funil criado com sucesso",
                     content = @Content(schema = @Schema(implementation = FunilDto.class))),
@@ -109,7 +109,7 @@ public class FunilController {
         return ResponseEntity.ok().build();
     }
 
-    @Operation(summary = "Atualizar o nome de um funil", description = "Requer JWT. Atualiza os dados básicos (nome) de um funil existente.")
+    @Operation(summary = "Atualizar o nome de um funil", description = "Requer JWT com cargo ROLE_ADMIN. Atualiza os dados básicos (nome) de um funil existente.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Funil atualizado com sucesso",
                     content = @Content(schema = @Schema(implementation = FunilAllDTO.class))),
@@ -122,11 +122,12 @@ public class FunilController {
         return ResponseEntity.ok(funil);
     }
 
-    @Operation(summary = "Excluir um funil", description = "Requer JWT. Remove o funil e, em cascata, todas as suas etapas e oportunidades associadas.")
+    @Operation(summary = "Excluir um funil", description = "Requer JWT com cargo ROLE_ADMIN. Remove o funil somente se nenhuma de suas etapas tiver oportunidades (mova ou envie para a lixeira antes).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Funil excluído com sucesso (resposta sem corpo)"),
             @ApiResponse(responseCode = "400", description = "Funil não encontrado para o id informado (resposta em texto puro, não JSON estruturado)",
-                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil com id 1 não encontrado")))
+                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil com id 1 não encontrado"))),
+            @ApiResponse(responseCode = "409", description = "Funil possui etapas com oportunidades e não pode ser excluído")
     })
     @DeleteMapping(value = "/{id}")
     public ResponseEntity<?> delete(@Parameter(description = "Id do funil", required = true) @PathVariable Long id) {

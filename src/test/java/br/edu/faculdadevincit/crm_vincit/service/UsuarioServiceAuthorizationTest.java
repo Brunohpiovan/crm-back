@@ -1,6 +1,7 @@
 package br.edu.faculdadevincit.crm_vincit.service;
 
 import br.edu.faculdadevincit.crm_vincit.model.Usuario;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioResponseDto;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioResponseNoAuthDto;
 import br.edu.faculdadevincit.crm_vincit.model.enums.UserRole;
 import br.edu.faculdadevincit.crm_vincit.repository.UsuarioRepository;
@@ -24,10 +25,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 /**
- * UsuarioService.findByIdParaEdicao é o único ponto do sistema que implementa os 3 níveis de
- * autorização de consulta de usuário pedidos pela etapa: próprio usuário, administrador e usuário
- * sem permissão. (UsuarioService.findById, usado por GET /usuario/{id}, só libera o próprio login,
- * mesmo para administradores — não é o caso testado aqui.)
+ * Cobre os 3 níveis de autorização de consulta de usuário (próprio usuário, administrador e
+ * usuário sem permissão) tanto em findByIdParaEdicao (GET /usuario/{id}/edicao) quanto em
+ * findById (GET /usuario/{id}) — antes da correção, findById não tinha o bypass de administrador,
+ * então nem admin conseguia consultar o cadastro de outro usuário por ali.
  */
 @ExtendWith(MockitoExtension.class)
 class UsuarioServiceAuthorizationTest {
@@ -50,6 +51,7 @@ class UsuarioServiceAuthorizationTest {
         usuario.setNome("Usuário Alvo");
         usuario.setUrlPicture("assets/img/avatar/padrao.jpeg");
         usuario.setCargo(UserRole.VENDEDOR);
+        usuario.setCep("01000-000");
         return usuario;
     }
 
@@ -92,6 +94,39 @@ class UsuarioServiceAuthorizationTest {
         autenticarComo("outro-vendedor@teste.com", "ROLE_VENDEDOR");
 
         assertThatThrownBy(() -> usuarioService.findByIdParaEdicao(42L))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("permissão");
+    }
+
+    @Test
+    void findById_proprioUsuario_podeConsultarSeuProprioCadastro() {
+        Usuario alvo = usuarioAlvo();
+        when(usuarioRepository.findById(42L)).thenReturn(Optional.of(alvo));
+        autenticarComo("alvo@teste.com", "ROLE_VENDEDOR");
+
+        UsuarioResponseDto resposta = usuarioService.findById(42L);
+
+        assertThat(resposta.getId()).isEqualTo(42L);
+    }
+
+    @Test
+    void findById_administrador_podeConsultarCadastroDeOutroUsuario() {
+        Usuario alvo = usuarioAlvo();
+        when(usuarioRepository.findById(42L)).thenReturn(Optional.of(alvo));
+        autenticarComo("admin@teste.com", "ROLE_ADMIN", "ROLE_VENDEDOR");
+
+        UsuarioResponseDto resposta = usuarioService.findById(42L);
+
+        assertThat(resposta.getId()).isEqualTo(42L);
+    }
+
+    @Test
+    void findById_usuarioSemPermissao_naoPodeConsultarCadastroDeOutroUsuario() {
+        Usuario alvo = usuarioAlvo();
+        when(usuarioRepository.findById(42L)).thenReturn(Optional.of(alvo));
+        autenticarComo("outro-vendedor@teste.com", "ROLE_VENDEDOR");
+
+        assertThatThrownBy(() -> usuarioService.findById(42L))
                 .isInstanceOf(AccessDeniedException.class)
                 .hasMessageContaining("permissão");
     }

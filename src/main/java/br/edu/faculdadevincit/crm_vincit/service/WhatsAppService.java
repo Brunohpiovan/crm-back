@@ -11,7 +11,8 @@ import br.edu.faculdadevincit.crm_vincit.repository.ProtocoloRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.WhatsappWebhookEventoRepository;
 import br.edu.faculdadevincit.crm_vincit.service.exceptions.AccessDeniedException;
 import br.edu.faculdadevincit.crm_vincit.service.exceptions.IntegrationException;
-import com.twilio.Twilio;
+import com.twilio.exception.ApiConnectionException;
+import com.twilio.http.TwilioRestClient;
 import com.twilio.rest.api.v2010.account.Message;
 import com.twilio.security.RequestValidator;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
@@ -71,9 +74,16 @@ public class WhatsAppService {
     @Autowired
     private WhatsappWebhookEventoRepository whatsappWebhookEventoRepository;
 
-    public Message sendWhatsAppMessage(MensagemRequest mensagemRequest) {
-        Twilio.init(accountSid, authToken);
+    @Autowired
+    private TwilioRestClient twilioRestClient;
 
+    /**
+     * Retry só em falha de conectividade (ApiConnectionException) — não em ApiException, que
+     * representa uma resposta de erro válida da Twilio (ex.: número inválido) e não se resolveria
+     * tentando de novo.
+     */
+    @Retryable(retryFor = ApiConnectionException.class, maxAttempts = 3, backoff = @Backoff(delay = 500, multiplier = 2))
+    public Message sendWhatsAppMessage(MensagemRequest mensagemRequest) {
         String to = mensagemRequest.getTo();
         String media = mensagemRequest.getMedia();
 
@@ -101,14 +111,14 @@ public class WhatsAppService {
                             messageBody
                     )
                     .setMediaUrl(Arrays.asList(URI.create(media)))
-                    .create();
+                    .create(twilioRestClient);
             return message;
         } else {
             return Message.creator(
                     new com.twilio.type.PhoneNumber(to),
                     new com.twilio.type.PhoneNumber("whatsapp:" + twilioNumber),
                     mensagemRequest.getMessage()
-            ).create();
+            ).create(twilioRestClient);
         }
     }
 
@@ -118,54 +128,73 @@ public class WhatsAppService {
         }
 
         String messageSid = params.get("MessageSid");
-        if (isMensagemJaProcessada(messageSid)) {
-            log.info("Webhook Twilio ignorado: MessageSid {} já foi processado anteriormente.", messageSid);
+        if (!tentarRegistrarMensagemComoProcessada(messageSid)) {
+            log.info("Webhook Twilio ignorado: MessageSid {} já foi processado ou está em processamento.", messageSid);
             return;
         }
 
-        String from = params.get("From");
-        String body = params.get("Body");
-        String profileName = params.get("ProfileName");
-        String mediaUrl = params.get("MediaUrl0");
-        String mediaType = params.get("MediaContentType0");
-        if (mediaUrl != null && mediaType != null && mediaType.startsWith("image")) {
-            receiveImage(from,profileName, mediaUrl, mediaType,body);
-        }
-        else if (mediaUrl != null && mediaType != null && mediaType.startsWith("audio")) {
-            receiveAudio(from,profileName, mediaUrl, mediaType,body);
-        }else if (mediaType!= null && mediaType.startsWith("application/")) {
-            if (mediaType.equals("application/pdf") ||
-                    mediaType.equals("application/msword") ||
-                    mediaType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document")) {
-
-                receiveDocument(from,profileName, mediaUrl, mediaType,body);
+        try {
+            String from = params.get("From");
+            String body = params.get("Body");
+            String profileName = params.get("ProfileName");
+            String mediaUrl = params.get("MediaUrl0");
+            String mediaType = params.get("MediaContentType0");
+            if (mediaUrl != null && mediaType != null && mediaType.startsWith("image")) {
+                receiveImage(from,profileName, mediaUrl, mediaType,body);
             }
-        } else {
-            receiveMessage(from,profileName, body);
-        }
+            else if (mediaUrl != null && mediaType != null && mediaType.startsWith("audio")) {
+                receiveAudio(from,profileName, mediaUrl, mediaType,body);
+            }else if (mediaType!= null && mediaType.startsWith("application/")) {
+                if (mediaType.equals("application/pdf") ||
+                        mediaType.equals("application/msword") ||
+                        mediaType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document")) {
 
-        registrarMensagemProcessada(messageSid);
+                    receiveDocument(from,profileName, mediaUrl, mediaType,body);
+                }
+            } else {
+                receiveMessage(from,profileName, body);
+            }
+        } catch (RuntimeException e) {
+            // Sem isso, uma falha real (ex.: S3 fora do ar) deixaria o MessageSid marcado como
+            // processado para sempre, e o reenvio automático do webhook pela Twilio nunca mais
+            // conseguiria reprocessar essa mensagem.
+            desfazerRegistroDeProcessamento(messageSid);
+            throw e;
+        }
     }
 
-    private boolean isMensagemJaProcessada(String messageSid) {
+    /**
+     * Registra o MessageSid como processado ANTES do processamento pesado (download de mídia,
+     * upload S3, persistência) em vez de depois: assim, um reenvio do mesmo webhook pela Twilio
+     * — comum quando o processamento anterior ainda está rodando e estoura o timeout do lado
+     * deles — esbarra na constraint única de whatsapp_webhook_evento.message_sid em vez de
+     * reprocessar tudo em paralelo (duplicando mensagem/participante/oportunidade).
+     * Retorna false se o SID já estava registrado (processado ou em processamento).
+     */
+    private boolean tentarRegistrarMensagemComoProcessada(String messageSid) {
         if (messageSid == null || messageSid.isBlank()) {
+            return true;
+        }
+        if (whatsappWebhookEventoRepository.existsByMessageSid(messageSid)) {
             return false;
-        }
-        return whatsappWebhookEventoRepository.existsByMessageSid(messageSid);
-    }
-
-    private void registrarMensagemProcessada(String messageSid) {
-        if (messageSid == null || messageSid.isBlank()) {
-            return;
         }
         try {
             WhatsappWebhookEvento evento = new WhatsappWebhookEvento();
             evento.setMessageSid(messageSid);
             evento.setProcessadoEm(LocalDateTime.now());
             whatsappWebhookEventoRepository.save(evento);
+            return true;
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
             log.warn("MessageSid {} já havia sido registrado como processado (corrida concorrente).", messageSid);
+            return false;
         }
+    }
+
+    private void desfazerRegistroDeProcessamento(String messageSid) {
+        if (messageSid == null || messageSid.isBlank()) {
+            return;
+        }
+        whatsappWebhookEventoRepository.deleteByMessageSid(messageSid);
     }
     public void receiveAudio(String from,String profileName, String mediaUrl, String mediaType ,String body)  {
         String celular = reverseWhatsAppNumber(from);
