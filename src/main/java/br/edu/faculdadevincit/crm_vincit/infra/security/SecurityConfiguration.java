@@ -61,6 +61,15 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.PUT, "/usuario/all/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/usuario/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/usuario/**").hasAuthority("ROLE_VENDEDOR")
+                        // Só ADMINISTRADOR cria/atualiza/exclui funil e etapa (afeta o pipeline
+                        // de vendas de todos os vendedores). Match exato em "/funil" (POST) não
+                        // pega POST /funil/filtro (consulta) nem POST /funil/add-funcionario/**.
+                        .requestMatchers(HttpMethod.POST, "/funil").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/funil/**").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/funil/**").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/etapa").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/etapa/**").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/etapa/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/log/finalizar/**").permitAll()
                         .anyRequest().authenticated()

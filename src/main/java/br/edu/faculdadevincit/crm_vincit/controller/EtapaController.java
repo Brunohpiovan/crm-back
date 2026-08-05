@@ -62,7 +62,7 @@ public class EtapaController {
         return ResponseEntity.ok(etapa);
     }
 
-    @Operation(summary = "Criar uma nova etapa", description = "Requer JWT. Cria uma etapa vinculada a um funil existente (id do funil informado dentro do corpo). Não é permitido criar duas etapas com o mesmo nome no mesmo funil. O valor total da etapa começa zerado. Após a criação, o backend publica a nova etapa no canal WebSocket /topic/newetapa.")
+    @Operation(summary = "Criar uma nova etapa", description = "Requer JWT com cargo ROLE_ADMIN. Cria uma etapa vinculada a um funil existente (id do funil informado dentro do corpo). Não é permitido criar duas etapas com o mesmo nome no mesmo funil. O valor total da etapa começa zerado. Após a criação, o backend publica a nova etapa no canal WebSocket /topic/newetapa.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Etapa criada com sucesso",
                     content = @Content(schema = @Schema(implementation = EtapaDto.class))),
@@ -75,7 +75,7 @@ public class EtapaController {
         return ResponseEntity.ok(newEtapa);
     }
 
-    @Operation(summary = "Atualizar uma etapa", description = "Requer JWT. Atualiza o nome (e, opcionalmente, o funil) de uma etapa existente. Não é permitido renomear para um nome já usado por outra etapa do mesmo funil. Após a atualização, o backend publica a etapa atualizada no canal WebSocket /topic/updateEtapa.")
+    @Operation(summary = "Atualizar uma etapa", description = "Requer JWT com cargo ROLE_ADMIN. Atualiza o nome (e, opcionalmente, o funil) de uma etapa existente. Não é permitido renomear para um nome já usado por outra etapa do mesmo funil. Após a atualização, o backend publica a etapa atualizada no canal WebSocket /topic/updateEtapa.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Etapa atualizada com sucesso (resposta sem corpo)"),
             @ApiResponse(responseCode = "400", description = "Etapa/funil não encontrado, ou já existe outra etapa com o mesmo nome neste funil (resposta em texto puro, não JSON estruturado)",
@@ -87,7 +87,7 @@ public class EtapaController {
         return ResponseEntity.ok().build();
     }
 
-    @Operation(summary = "Excluir uma etapa", description = "Requer JWT. Remove a etapa somente se ela não tiver oportunidades (mova ou envie para a lixeira antes). Após a exclusão, o backend publica o id da etapa removida no canal WebSocket /topic/deleteetapa.")
+    @Operation(summary = "Excluir uma etapa", description = "Requer JWT com cargo ROLE_ADMIN. Remove a etapa somente se ela não tiver oportunidades (mova ou envie para a lixeira antes). Após a exclusão, o backend publica o id da etapa removida no canal WebSocket /topic/deleteetapa.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Etapa excluída com sucesso (resposta sem corpo)"),
             @ApiResponse(responseCode = "400", description = "Etapa não encontrada para o id informado (resposta em texto puro, não JSON estruturado)",
