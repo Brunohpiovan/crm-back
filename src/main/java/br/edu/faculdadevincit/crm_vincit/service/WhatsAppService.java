@@ -71,13 +71,11 @@ public class WhatsAppService {
     @Autowired
     private WhatsappWebhookEventoRepository whatsappWebhookEventoRepository;
 
-    String media;
-
     public Message sendWhatsAppMessage(MensagemRequest mensagemRequest) {
         Twilio.init(accountSid, authToken);
 
         String to = mensagemRequest.getTo();
-        media = mensagemRequest.getMedia();
+        String media = mensagemRequest.getMedia();
 
         if (!to.startsWith("+55")) {
             if (to.startsWith("55")) {
