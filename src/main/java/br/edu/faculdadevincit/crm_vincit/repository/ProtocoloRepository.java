@@ -39,7 +39,7 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
     SELECT COUNT(p) FROM Protocolo p
     WHERE p.status = br.edu.faculdadevincit.crm_vincit.model.enums.StatusProtocolo.ABERTO
       AND p.dataCriacao BETWEEN :#{#filtro.startDate} AND :#{#filtro.endDate}
-      AND (:#{#filtro.userId} IS NULL OR p.admin.id = :#{#filtro.userId})
+      AND (:#{#filtro.userIds.size()} = 0 OR p.admin.id IN :#{#filtro.userIds})
     """)
     long countAbertos(@Param("filtro") DashboardFiltroRequest filtro);
 
@@ -48,7 +48,7 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
     WHERE p.status = br.edu.faculdadevincit.crm_vincit.model.enums.StatusProtocolo.ABERTO
       AND p.dataCriacao BETWEEN :#{#filtro.startDate} AND :#{#filtro.endDate}
       AND p.dataCriacao <= :limiteRisco
-      AND (:#{#filtro.userId} IS NULL OR p.admin.id = :#{#filtro.userId})
+      AND (:#{#filtro.userIds.size()} = 0 OR p.admin.id IN :#{#filtro.userIds})
     """)
     long countEmRisco(@Param("filtro") DashboardFiltroRequest filtro, @Param("limiteRisco") LocalDateTime limiteRisco);
 
@@ -56,7 +56,7 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
     SELECT AVG(CAST(FUNCTION('TIMESTAMPDIFF', MINUTE, p.dataCriacao, p.dataEncerramento) AS double)) FROM Protocolo p
     WHERE p.status = br.edu.faculdadevincit.crm_vincit.model.enums.StatusProtocolo.FECHADO
       AND p.dataCriacao BETWEEN :#{#filtro.startDate} AND :#{#filtro.endDate}
-      AND (:#{#filtro.userId} IS NULL OR p.admin.id = :#{#filtro.userId})
+      AND (:#{#filtro.userIds.size()} = 0 OR p.admin.id IN :#{#filtro.userIds})
     """)
     Double avgTempoAtendimentoMinutos(@Param("filtro") DashboardFiltroRequest filtro);
 
@@ -66,29 +66,40 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
     FROM Protocolo p JOIN p.admin u
     WHERE p.status = br.edu.faculdadevincit.crm_vincit.model.enums.StatusProtocolo.FECHADO
       AND p.dataCriacao BETWEEN :#{#filtro.startDate} AND :#{#filtro.endDate}
-      AND (:#{#filtro.userId} IS NULL OR u.id = :#{#filtro.userId})
+      AND (:#{#filtro.userIds.size()} = 0 OR u.id IN :#{#filtro.userIds})
     GROUP BY u.id, u.nome
     """)
     List<DashboardRankingProtocoloRow> rankingProtocolosPorUsuario(@Param("filtro") DashboardFiltroRequest filtro);
 
+    /**
+     * Nativa (ver comentário de classe/DASHBOARD.md §5) — por isso o filtro de usuário é feito
+     * com uma flag booleana + lista (nunca vazia) em vez de "IN :usuarioIds" direto: um parâmetro
+     * de coleção vazio gera "IN ()" em SQL nativo, que é erro de sintaxe no MySQL. Quando não há
+     * restrição de usuário, o service passa semRestricaoUsuario=true e uma lista dummy não-vazia
+     * (nunca avaliada, por causa do curto-circuito do OR).
+     */
     @Query(value = """
     SELECT DATE(data_criacao) AS dia, COUNT(*) AS quantidade
     FROM protocolo
     WHERE data_criacao BETWEEN :inicio AND :fim
-      AND (:usuarioId IS NULL OR admin_id = :usuarioId)
+      AND (:semRestricaoUsuario = TRUE OR admin_id IN (:usuarioIds))
     GROUP BY DATE(data_criacao)
     """, nativeQuery = true)
-    List<DiaContagemProjection> countAbertosPorDia(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim, @Param("usuarioId") Long usuarioId);
+    List<DiaContagemProjection> countAbertosPorDia(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim,
+                                                     @Param("semRestricaoUsuario") boolean semRestricaoUsuario,
+                                                     @Param("usuarioIds") List<Long> usuarioIds);
 
     @Query(value = """
     SELECT DATE(data_encerramento) AS dia, COUNT(*) AS quantidade
     FROM protocolo
     WHERE status = 'FECHADO'
       AND data_encerramento BETWEEN :inicio AND :fim
-      AND (:usuarioId IS NULL OR admin_id = :usuarioId)
+      AND (:semRestricaoUsuario = TRUE OR admin_id IN (:usuarioIds))
     GROUP BY DATE(data_encerramento)
     """, nativeQuery = true)
-    List<DiaContagemProjection> countFechadosPorDia(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim, @Param("usuarioId") Long usuarioId);
+    List<DiaContagemProjection> countFechadosPorDia(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim,
+                                                      @Param("semRestricaoUsuario") boolean semRestricaoUsuario,
+                                                      @Param("usuarioIds") List<Long> usuarioIds);
 
     interface DiaContagemProjection {
         LocalDate getDia();

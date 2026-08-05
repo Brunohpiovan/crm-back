@@ -133,8 +133,8 @@ public interface OportunidadeRepository extends JpaRepository<Oportunidade, Long
       AND o.data_criacao BETWEEN :#{#filtro.startDate} AND :#{#filtro.endDate}
       AND o.etapa.funil.id IN :#{#filtro.funilIdsPermitidos}
       AND (:#{#filtro.pipelineId} IS NULL OR o.etapa.funil.id = :#{#filtro.pipelineId})
-      AND (:#{#filtro.userId} IS NULL OR o.criador.id = :#{#filtro.userId})
-      AND (:#{#filtro.origin} IS NULL OR o.origem = :#{#filtro.origin})
+      AND (:#{#filtro.userIds.size()} = 0 OR o.criador.id IN :#{#filtro.userIds})
+      AND (:#{#filtro.origin.size()} = 0 OR o.origem IN :#{#filtro.origin})
       AND (:#{#filtro.tagIds.size()} = 0 OR EXISTS (SELECT 1 FROM o.tags t WHERE t.id IN :#{#filtro.tagIds}))
     """)
     BigDecimal sumValorPorSituacao(@Param("filtro") DashboardFiltroRequest filtro, @Param("situacao") SituacaoOportunidade situacao);
@@ -145,8 +145,8 @@ public interface OportunidadeRepository extends JpaRepository<Oportunidade, Long
       AND o.data_criacao BETWEEN :#{#filtro.startDate} AND :#{#filtro.endDate}
       AND o.etapa.funil.id IN :#{#filtro.funilIdsPermitidos}
       AND (:#{#filtro.pipelineId} IS NULL OR o.etapa.funil.id = :#{#filtro.pipelineId})
-      AND (:#{#filtro.userId} IS NULL OR o.criador.id = :#{#filtro.userId})
-      AND (:#{#filtro.origin} IS NULL OR o.origem = :#{#filtro.origin})
+      AND (:#{#filtro.userIds.size()} = 0 OR o.criador.id IN :#{#filtro.userIds})
+      AND (:#{#filtro.origin.size()} = 0 OR o.origem IN :#{#filtro.origin})
       AND (:#{#filtro.tagIds.size()} = 0 OR EXISTS (SELECT 1 FROM o.tags t WHERE t.id IN :#{#filtro.tagIds}))
     """)
     long countPorSituacao(@Param("filtro") DashboardFiltroRequest filtro, @Param("situacao") SituacaoOportunidade situacao);
@@ -164,9 +164,9 @@ public interface OportunidadeRepository extends JpaRepository<Oportunidade, Long
     LEFT JOIN e.oportunidades o
         ON o.situacao <> br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade.LIXEIRA
         AND o.data_criacao BETWEEN :#{#filtro.startDate} AND :#{#filtro.endDate}
-        AND (:#{#filtro.status} IS NULL OR o.situacao = :#{#filtro.status})
-        AND (:#{#filtro.userId} IS NULL OR o.criador.id = :#{#filtro.userId})
-        AND (:#{#filtro.origin} IS NULL OR o.origem = :#{#filtro.origin})
+        AND (:#{#filtro.status.size()} = 0 OR o.situacao IN :#{#filtro.status})
+        AND (:#{#filtro.userIds.size()} = 0 OR o.criador.id IN :#{#filtro.userIds})
+        AND (:#{#filtro.origin.size()} = 0 OR o.origem IN :#{#filtro.origin})
         AND (:#{#filtro.tagIds.size()} = 0 OR EXISTS (SELECT 1 FROM o.tags t WHERE t.id IN :#{#filtro.tagIds}))
     WHERE e.funil.id IN :#{#filtro.funilIdsPermitidos}
       AND (:#{#filtro.pipelineId} IS NULL OR e.funil.id = :#{#filtro.pipelineId})
@@ -181,9 +181,9 @@ public interface OportunidadeRepository extends JpaRepository<Oportunidade, Long
     WHERE o.situacao <> br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade.LIXEIRA
       AND o.data_criacao BETWEEN :#{#filtro.startDate} AND :#{#filtro.endDate}
       AND o.etapa.funil.id IN :#{#filtro.funilIdsPermitidos}
-      AND (:#{#filtro.status} IS NULL OR o.situacao = :#{#filtro.status})
+      AND (:#{#filtro.status.size()} = 0 OR o.situacao IN :#{#filtro.status})
       AND (:#{#filtro.pipelineId} IS NULL OR o.etapa.funil.id = :#{#filtro.pipelineId})
-      AND (:#{#filtro.userId} IS NULL OR o.criador.id = :#{#filtro.userId})
+      AND (:#{#filtro.userIds.size()} = 0 OR o.criador.id IN :#{#filtro.userIds})
       AND (:#{#filtro.tagIds.size()} = 0 OR EXISTS (SELECT 1 FROM o.tags t WHERE t.id IN :#{#filtro.tagIds}))
     GROUP BY o.origem
     ORDER BY COUNT(o) DESC
@@ -201,8 +201,8 @@ public interface OportunidadeRepository extends JpaRepository<Oportunidade, Long
       AND o.data_criacao BETWEEN :#{#filtro.startDate} AND :#{#filtro.endDate}
       AND o.etapa.funil.id IN :#{#filtro.funilIdsPermitidos}
       AND (:#{#filtro.pipelineId} IS NULL OR o.etapa.funil.id = :#{#filtro.pipelineId})
-      AND (:#{#filtro.userId} IS NULL OR u.id = :#{#filtro.userId})
-      AND (:#{#filtro.origin} IS NULL OR o.origem = :#{#filtro.origin})
+      AND (:#{#filtro.userIds.size()} = 0 OR u.id IN :#{#filtro.userIds})
+      AND (:#{#filtro.origin.size()} = 0 OR o.origem IN :#{#filtro.origin})
       AND (:#{#filtro.tagIds.size()} = 0 OR EXISTS (SELECT 1 FROM o.tags t WHERE t.id IN :#{#filtro.tagIds}))
     GROUP BY u.id, u.nome
     """)
@@ -214,13 +214,5 @@ public interface OportunidadeRepository extends JpaRepository<Oportunidade, Long
       AND o.situacao <> br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade.LIXEIRA
     """)
     long countPorEtapaIdIn(@Param("etapaIds") List<Long> etapaIds);
-
-    @Query("""
-    SELECT COUNT(o) FROM Oportunidade o
-    WHERE o.etapa.id IN :etapaIds
-      AND o.dataEntradaEtapa >= :inicioDia
-      AND o.dataEntradaEtapa < :fimDia
-    """)
-    long countMovidasNoDiaPorEtapaIdIn(@Param("etapaIds") List<Long> etapaIds, @Param("inicioDia") LocalDateTime inicioDia, @Param("fimDia") LocalDateTime fimDia);
 
 }

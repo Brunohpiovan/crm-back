@@ -14,12 +14,15 @@ import br.edu.faculdadevincit.crm_vincit.model.dtos.DashboardRankingResponse;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.DashboardResponse;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.DashboardSerieDiariaResponse;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.DashboardSummaryResponse;
+import br.edu.faculdadevincit.crm_vincit.model.dtos.PageResponse;
 import br.edu.faculdadevincit.crm_vincit.model.enums.Origem;
 import br.edu.faculdadevincit.crm_vincit.model.enums.Situacao;
 import br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade;
 import br.edu.faculdadevincit.crm_vincit.model.enums.UserRole;
 import br.edu.faculdadevincit.crm_vincit.repository.CadenciaFunilRepository;
+import br.edu.faculdadevincit.crm_vincit.repository.EquipeRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.FunilRepository;
+import br.edu.faculdadevincit.crm_vincit.repository.LogMovimentacaoCadenciaRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.OportunidadeRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.ProtocoloRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.ProtocoloRepository.DiaContagemProjection;
@@ -50,6 +53,8 @@ import java.util.stream.Collectors;
 public class DashboardService {
 
     private static final int PERIODO_PADRAO_DIAS = 30;
+    private static final int RANKING_PAGE_SIZE_MAXIMO = 100;
+    private static final List<Long> USUARIO_IDS_DUMMY_NATIVE_QUERY = List.of(-1L);
 
     @Autowired
     private ProtocoloRepository protocoloRepository;
@@ -64,6 +69,12 @@ public class DashboardService {
     private FunilRepository funilRepository;
 
     @Autowired
+    private EquipeRepository equipeRepository;
+
+    @Autowired
+    private LogMovimentacaoCadenciaRepository logMovimentacaoCadenciaRepository;
+
+    @Autowired
     private UsuarioRepository usuarioRepository;
 
     @Value("${dashboard.protocolo.risco-horas:24}")
@@ -72,23 +83,26 @@ public class DashboardService {
     @Cacheable(value = CacheConfig.DASHBOARD_CACHE,
             key = "T(org.springframework.security.core.context.SecurityContextHolder).context.authentication.name" +
                     " + '|' + #startDateParam + '|' + #endDateParam + '|' + #pipelineId + '|' + #userIdFiltro" +
-                    " + '|' + #status + '|' + #origin + '|' + #tagIds")
+                    " + '|' + #teamId + '|' + #status + '|' + #origin + '|' + #tagIds")
     public DashboardResponse getDashboard(LocalDateTime startDateParam, LocalDateTime endDateParam, Long pipelineId,
-                                           Long userIdFiltro, SituacaoOportunidade status, Origem origin, List<Long> tagIds) {
+                                           Long userIdFiltro, Long teamId, List<SituacaoOportunidade> status,
+                                           List<Origem> origin, List<Long> tagIds) {
         Usuario usuario = getUsuarioAutenticado();
 
         LocalDateTime endDate = endDateParam != null ? endDateParam : LocalDateTime.now();
         LocalDateTime startDate = startDateParam != null ? startDateParam : endDate.minusDays(PERIODO_PADRAO_DIAS);
 
-        Long userId = resolverUserIdComAutorizacao(usuario, userIdFiltro);
+        List<Long> userIds = resolverUserIdsComAutorizacao(usuario, userIdFiltro, teamId);
         List<Long> funilIdsPermitidos = resolverFunilIdsPermitidos(usuario, pipelineId);
         if (funilIdsPermitidos.isEmpty()) {
             return dashboardVazio();
         }
 
+        List<SituacaoOportunidade> statusNormalizado = status != null ? status : List.of();
+        List<Origem> originNormalizado = origin != null ? origin : List.of();
         List<Long> tagsNormalizadas = tagIds != null ? tagIds : List.of();
         DashboardFiltroRequest filtro = new DashboardFiltroRequest(
-                startDate, endDate, pipelineId, userId, status, origin, tagsNormalizadas, funilIdsPermitidos);
+                startDate, endDate, pipelineId, userIds, statusNormalizado, originNormalizado, tagsNormalizadas, funilIdsPermitidos);
 
         return new DashboardResponse(
                 montarSummary(filtro),
@@ -99,6 +113,45 @@ public class DashboardService {
                 montarCadencias(filtro));
     }
 
+    /**
+     * Ranking paginado — endpoint próprio (GET /dashboard/ranking), separado de getDashboard.
+     * O merge de montarRanking já é feito em memória (ver comentário do próprio método: duas
+     * queries pequenas, uma linha por usuário com atividade no período — nunca milhares de
+     * linhas), então paginar com subList depois do merge é o trade-off certo aqui; paginação
+     * real no banco exigiria reescrever como uma única query com UNION (MySQL não tem FULL
+     * OUTER JOIN), o que não compensa pelo volume real.
+     */
+    @Cacheable(value = CacheConfig.DASHBOARD_CACHE,
+            key = "T(org.springframework.security.core.context.SecurityContextHolder).context.authentication.name" +
+                    " + '|ranking|' + #startDateParam + '|' + #endDateParam + '|' + #pipelineId + '|' + #userIdFiltro" +
+                    " + '|' + #teamId + '|' + #status + '|' + #origin + '|' + #tagIds + '|' + #page + '|' + #size")
+    public PageResponse<DashboardRankingResponse> getRanking(LocalDateTime startDateParam, LocalDateTime endDateParam, Long pipelineId,
+                                                               Long userIdFiltro, Long teamId, List<SituacaoOportunidade> status,
+                                                               List<Origem> origin, List<Long> tagIds, int page, int size) {
+        Usuario usuario = getUsuarioAutenticado();
+
+        LocalDateTime endDate = endDateParam != null ? endDateParam : LocalDateTime.now();
+        LocalDateTime startDate = startDateParam != null ? startDateParam : endDate.minusDays(PERIODO_PADRAO_DIAS);
+
+        List<Long> userIds = resolverUserIdsComAutorizacao(usuario, userIdFiltro, teamId);
+        List<Long> funilIdsPermitidos = resolverFunilIdsPermitidos(usuario, pipelineId);
+
+        int tamanhoValido = Math.max(1, Math.min(size, RANKING_PAGE_SIZE_MAXIMO));
+        int paginaValida = Math.max(0, page);
+
+        if (funilIdsPermitidos.isEmpty()) {
+            return PageResponse.of(List.of(), paginaValida, tamanhoValido);
+        }
+
+        List<SituacaoOportunidade> statusNormalizado = status != null ? status : List.of();
+        List<Origem> originNormalizado = origin != null ? origin : List.of();
+        List<Long> tagsNormalizadas = tagIds != null ? tagIds : List.of();
+        DashboardFiltroRequest filtro = new DashboardFiltroRequest(
+                startDate, endDate, pipelineId, userIds, statusNormalizado, originNormalizado, tagsNormalizadas, funilIdsPermitidos);
+
+        return PageResponse.of(montarRanking(filtro), paginaValida, tamanhoValido);
+    }
+
     private Usuario getUsuarioAutenticado() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String login = authentication.getName();
@@ -106,14 +159,42 @@ public class DashboardService {
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
     }
 
-    private Long resolverUserIdComAutorizacao(Usuario usuario, Long userIdFiltro) {
-        if (usuario.getCargo() == UserRole.ADMINISTRADOR) {
-            return userIdFiltro;
+    /**
+     * Resolve userId + teamId para uma única lista de ids elegível para os filtros do dashboard.
+     * Lista vazia = sem restrição (só é possível para ADMINISTRADOR sem nenhum dos dois filtros).
+     * teamId só amplia a visão de ADMINISTRADOR (vê o time inteiro); para quem não é
+     * ADMINISTRADOR, o resultado continua restrito ao próprio id mesmo informando uma equipe da
+     * qual é membro — só serve para não dar erro, não para ver dados de colegas (a entidade
+     * Equipe não tem noção de líder/permissão elevada).
+     */
+    private List<Long> resolverUserIdsComAutorizacao(Usuario usuario, Long userIdFiltro, Long teamId) {
+        boolean administrador = usuario.getCargo() == UserRole.ADMINISTRADOR;
+        List<Long> membrosDaEquipe = null;
+
+        if (teamId != null) {
+            if (!equipeRepository.existsById(teamId)) {
+                throw new AccessDeniedException("Você não tem acesso a esta equipe.");
+            }
+            if (!administrador && !equipeRepository.existsByIdAndMembrosContains(teamId, usuario)) {
+                throw new AccessDeniedException("Você não tem acesso a esta equipe.");
+            }
+            membrosDaEquipe = equipeRepository.findMembroIdsById(teamId);
         }
+
+        if (administrador) {
+            if (userIdFiltro == null) {
+                return membrosDaEquipe != null ? membrosDaEquipe : List.of();
+            }
+            if (membrosDaEquipe != null && !membrosDaEquipe.contains(userIdFiltro)) {
+                throw new AccessDeniedException("O usuário informado não pertence à equipe informada.");
+            }
+            return List.of(userIdFiltro);
+        }
+
         if (userIdFiltro != null && !userIdFiltro.equals(usuario.getId())) {
             throw new AccessDeniedException("Você só pode consultar seus próprios indicadores.");
         }
-        return usuario.getId();
+        return List.of(usuario.getId());
     }
 
     private List<Long> resolverFunilIdsPermitidos(Usuario usuario, Long pipelineId) {
@@ -150,7 +231,7 @@ public class DashboardService {
         Duration duracao = Duration.between(filtro.getStartDate(), filtro.getEndDate());
         LocalDateTime endAnterior = filtro.getStartDate();
         LocalDateTime startAnterior = endAnterior.minus(duracao);
-        return new DashboardFiltroRequest(startAnterior, endAnterior, filtro.getPipelineId(), filtro.getUserId(),
+        return new DashboardFiltroRequest(startAnterior, endAnterior, filtro.getPipelineId(), filtro.getUserIds(),
                 filtro.getStatus(), filtro.getOrigin(), filtro.getTagIds(), filtro.getFunilIdsPermitidos());
     }
 
@@ -201,10 +282,13 @@ public class DashboardService {
     }
 
     private List<DashboardSerieDiariaResponse> montarSerieDiaria(DashboardFiltroRequest filtro) {
+        boolean semRestricaoUsuario = filtro.getUserIds().isEmpty();
+        List<Long> usuarioIdsParaQueryNativa = semRestricaoUsuario ? USUARIO_IDS_DUMMY_NATIVE_QUERY : filtro.getUserIds();
+
         Map<LocalDate, Long> abertosPorDia = mapaPorDia(
-                protocoloRepository.countAbertosPorDia(filtro.getStartDate(), filtro.getEndDate(), filtro.getUserId()));
+                protocoloRepository.countAbertosPorDia(filtro.getStartDate(), filtro.getEndDate(), semRestricaoUsuario, usuarioIdsParaQueryNativa));
         Map<LocalDate, Long> fechadosPorDia = mapaPorDia(
-                protocoloRepository.countFechadosPorDia(filtro.getStartDate(), filtro.getEndDate(), filtro.getUserId()));
+                protocoloRepository.countFechadosPorDia(filtro.getStartDate(), filtro.getEndDate(), semRestricaoUsuario, usuarioIdsParaQueryNativa));
 
         List<DashboardSerieDiariaResponse> serie = new ArrayList<>();
         LocalDate dia = filtro.getStartDate().toLocalDate();
@@ -270,7 +354,7 @@ public class DashboardService {
         LocalDateTime inicioHoje = LocalDate.now().atStartOfDay();
         LocalDateTime fimHoje = inicioHoje.plusDays(1);
         long execucoesHoje = etapasDestino.isEmpty() ? 0L
-                : oportunidadeRepository.countMovidasNoDiaPorEtapaIdIn(etapasDestino, inicioHoje, fimHoje);
+                : logMovimentacaoCadenciaRepository.countByExecutadoEmBetweenAndEtapaDestinoIdIn(inicioHoje, fimHoje, etapasDestino);
 
         return new DashboardCadenciaResponse(ativas, pausadas, execucoesHoje, oportunidadesEmExecucao, calcularProximaExecucao(cadenciasAtivas));
     }
