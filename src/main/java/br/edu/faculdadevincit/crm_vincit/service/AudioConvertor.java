@@ -46,6 +46,7 @@ public class AudioConvertor {
                 "-i", inputFile.getAbsolutePath(),
                 "-vn",
                 "-c:a", "libopus",
+                "-ac", "1",
                 "-b:a", "96k",
                 outputFile.getAbsolutePath()
         );
@@ -63,7 +64,7 @@ public class AudioConvertor {
     private MultipartFile convertFileToMultipartFile(File file) throws Exception {
         String fileName = file.getName();
         byte[] content = Files.readAllBytes(file.toPath());
-        return new MockMultipartFile(fileName, fileName, "audio/ogg", content);
+        return new MockMultipartFile(fileName, fileName, "audio/ogg; codecs=opus", content);
     }
 
 }
