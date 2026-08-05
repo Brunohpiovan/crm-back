@@ -8,6 +8,7 @@ import br.edu.faculdadevincit.crm_vincit.model.enums.Situacao;
 import br.edu.faculdadevincit.crm_vincit.repository.CadenciaFunilRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.EtapaRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.FunilRepository;
+import br.edu.faculdadevincit.crm_vincit.repository.LogMovimentacaoCadenciaRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.OportunidadeRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.SchedulerLockRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +47,9 @@ public class CadenciaFunilService {
 
     @Autowired
     private SchedulerLockRepository schedulerLockRepository;
+
+    @Autowired
+    private LogMovimentacaoCadenciaRepository logMovimentacaoCadenciaRepository;
 
     /**
      * Ponto de entrada chamado pelo scheduler. Não é transacional: o lock é adquirido/liberado em
@@ -93,7 +97,11 @@ public class CadenciaFunilService {
         int falhas = 0;
         for (Oportunidade oportunidade : oportunidades) {
             try {
-                moverOportunidadeIsolada(oportunidade.getId(), etapaDestinoId);
+                boolean movida = moverOportunidadeIsolada(oportunidade.getId(), etapaDestinoId);
+                if (movida) {
+                    logMovimentacaoCadenciaRepository.save(new LogMovimentacaoCadencia(
+                            cadencia.getId(), oportunidade.getId(), etapaOrigemId, etapaDestinoId));
+                }
                 movidas++;
             } catch (Exception e) {
                 falhas++;
@@ -108,21 +116,26 @@ public class CadenciaFunilService {
      * Transação própria por oportunidade: se esta movimentação falhar (ex.: OptimisticLockException
      * por conflito com uma edição manual concorrente), só ela é desfeita — as demais oportunidades
      * do lote continuam sendo processadas normalmente por {@link #moverOportunidades}.
+     *
+     * @return true se uma movimentação real aconteceu; false se a oportunidade já estava na etapa
+     * destino (reprocessamento ignorado) — usado por {@link #moverOportunidades} para não gravar
+     * uma entrada de log de auditoria para um "no-op".
      */
     @Transactional
-    void moverOportunidadeIsolada(Long oportunidadeId, Long etapaDestinoId) {
+    boolean moverOportunidadeIsolada(Long oportunidadeId, Long etapaDestinoId) {
         Oportunidade oportunidade = oportunidadeRepository.findByIdWithDetails(oportunidadeId)
                 .orElseThrow(() -> new RuntimeException("Oportunidade " + oportunidadeId + " não encontrada"));
 
         if (oportunidade.getEtapa() != null && oportunidade.getEtapa().getId().equals(etapaDestinoId)) {
             log.debug("Oportunidade {} já está na etapa destino {}, reprocessamento ignorado.", oportunidadeId, etapaDestinoId);
-            return;
+            return false;
         }
 
         Etapa etapaDestino = etapaRepository.findById(etapaDestinoId)
                 .orElseThrow(() -> new RuntimeException("Etapa " + etapaDestinoId + " não encontrada"));
         int novoIndice = calcularNovoIndice(etapaDestino);
         oportunidadeService.movimentarOportunidadeCarregada(oportunidade, etapaDestinoId, novoIndice);
+        return true;
     }
 
     private int calcularNovoIndice(Etapa etapaDestino) {
