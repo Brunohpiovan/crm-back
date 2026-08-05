@@ -12,7 +12,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -97,6 +102,28 @@ public class ProtocoloController {
     @GetMapping("/get/{idUsuario}")
     public ResponseEntity<?> getProtocolo(@Parameter(description = "Id do usuário", required = true) @PathVariable Long idUsuario){
         return ResponseEntity.ok(protocoloService.getProtocols(idUsuario));
+    }
+
+    @Operation(
+            summary = "Listar protocolos do usuário autenticado (paginado)",
+            description = """
+                    Requer JWT. Mesma checagem de autorização de GET /protocolos/get/{idUsuario} \
+                    (idUsuario precisa corresponder ao login do token autenticado), porém com \
+                    paginação (page/size) e busca opcional por id, nome do administrador ou nome \
+                    do participante. Ordenado por id decrescente (mais recentes primeiro) por padrão.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Página de protocolos do usuário"),
+            @ApiResponse(responseCode = "400", description = "Usuário não encontrado"),
+            @ApiResponse(responseCode = "403", description = "O usuário autenticado não corresponde ao idUsuario informado")
+    })
+    @GetMapping("/get/{idUsuario}/paginado")
+    public Page<ProtocoloMoveDTO> getProtocolosPaginado(
+            @Parameter(description = "Id do usuário", required = true) @PathVariable Long idUsuario,
+            @Parameter(description = "Termo de busca opcional (id, nome do administrador ou do participante)") @RequestParam(required = false) String search,
+            @ParameterObject @PageableDefault(size = 6, sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
+        return protocoloService.getProtocolsPaginado(idUsuario, search, pageable);
     }
 
     @Operation(summary = "Buscar protocolo por id", description = "Requer JWT. Retorna o protocolo `id` apenas se o usuário autenticado for o administrador ou o participante desse protocolo.")

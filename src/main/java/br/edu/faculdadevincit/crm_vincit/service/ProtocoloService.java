@@ -12,6 +12,8 @@ import br.edu.faculdadevincit.crm_vincit.repository.ParticipanteRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.ProtocoloRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
@@ -171,13 +173,32 @@ public class ProtocoloService {
         }
     }
 
+    public Page<ProtocoloMoveDTO> getProtocolsPaginado(Long id_usuario, String search, Pageable pageable) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String authenticatedUsername = authentication.getName();
+        Usuario usuario = usuarioRepository.findById(id_usuario).orElseThrow(() ->
+                new UsernameNotFoundException("Usuário não encontrado"));
+        if (!usuario.getLogin().equals(authenticatedUsername)) {
+            throw new br.edu.faculdadevincit.crm_vincit.service.exceptions.AccessDeniedException("Você não tem permissão para acessar este usuário.");
+        }
+        String termoBusca = (search == null || search.isBlank())
+                ? null
+                : "%" + search.trim().toLowerCase() + "%";
+        return protocoloRepository
+                .findByAdminLoginOrParticipanteLoginPaginado(usuario.getLogin(), termoBusca, pageable)
+                .map(ProtocoloMoveDTO::new);
+    }
+
     public ProtocoloMoveDTO findById(Long id) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String authenticatedUsername = authentication.getName();
         Optional<Protocolo> protocolo = protocoloRepository.findById(id);
         if (protocolo.isPresent()) {
             Protocolo p = protocolo.get();
-            if (!p.getAdmin().getLogin().equals(authenticatedUsername) && !p.getParticipante().getLogin().equals(authenticatedUsername)) {
+            boolean isAdminAtual = p.getAdmin().getLogin().equals(authenticatedUsername);
+            boolean isParticipante = authenticatedUsername.equals(p.getParticipante().getLogin());
+            boolean isAdminAnterior = p.getAdminAnterior() != null && p.getAdminAnterior().getLogin().equals(authenticatedUsername);
+            if (!isAdminAtual && !isParticipante && !isAdminAnterior) {
                 throw new RuntimeException("Usuário não autorizado a acessar este protocolo.");
             }
             return new ProtocoloMoveDTO(p);
@@ -200,7 +221,7 @@ public class ProtocoloService {
         Protocolo protocoloSalvo = protocoloRepository.save(protocolo);
 
         ProtocoloMoveDTO dto = new ProtocoloMoveDTO(protocoloSalvo);
-        ParticipanteDTO participanteDTO = new ParticipanteDTO(protocoloSalvo.getParticipante());
+        ParticipanteDTO participanteDTO = new ParticipanteDTO(protocoloSalvo.getParticipante(), true);
         ProtocoloNotificacao2DTO notify = new ProtocoloNotificacao2DTO(dto,participanteDTO);
         publishAfterCommit(() -> messagingTemplate.convertAndSend("/topic/protocolo/aberto/" + usuario_adm.getId(), notify));
         return dto;
