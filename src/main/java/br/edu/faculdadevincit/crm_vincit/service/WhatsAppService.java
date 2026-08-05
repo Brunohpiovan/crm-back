@@ -118,54 +118,73 @@ public class WhatsAppService {
         }
 
         String messageSid = params.get("MessageSid");
-        if (isMensagemJaProcessada(messageSid)) {
-            log.info("Webhook Twilio ignorado: MessageSid {} já foi processado anteriormente.", messageSid);
+        if (!tentarRegistrarMensagemComoProcessada(messageSid)) {
+            log.info("Webhook Twilio ignorado: MessageSid {} já foi processado ou está em processamento.", messageSid);
             return;
         }
 
-        String from = params.get("From");
-        String body = params.get("Body");
-        String profileName = params.get("ProfileName");
-        String mediaUrl = params.get("MediaUrl0");
-        String mediaType = params.get("MediaContentType0");
-        if (mediaUrl != null && mediaType != null && mediaType.startsWith("image")) {
-            receiveImage(from,profileName, mediaUrl, mediaType,body);
-        }
-        else if (mediaUrl != null && mediaType != null && mediaType.startsWith("audio")) {
-            receiveAudio(from,profileName, mediaUrl, mediaType,body);
-        }else if (mediaType!= null && mediaType.startsWith("application/")) {
-            if (mediaType.equals("application/pdf") ||
-                    mediaType.equals("application/msword") ||
-                    mediaType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document")) {
-
-                receiveDocument(from,profileName, mediaUrl, mediaType,body);
+        try {
+            String from = params.get("From");
+            String body = params.get("Body");
+            String profileName = params.get("ProfileName");
+            String mediaUrl = params.get("MediaUrl0");
+            String mediaType = params.get("MediaContentType0");
+            if (mediaUrl != null && mediaType != null && mediaType.startsWith("image")) {
+                receiveImage(from,profileName, mediaUrl, mediaType,body);
             }
-        } else {
-            receiveMessage(from,profileName, body);
-        }
+            else if (mediaUrl != null && mediaType != null && mediaType.startsWith("audio")) {
+                receiveAudio(from,profileName, mediaUrl, mediaType,body);
+            }else if (mediaType!= null && mediaType.startsWith("application/")) {
+                if (mediaType.equals("application/pdf") ||
+                        mediaType.equals("application/msword") ||
+                        mediaType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document")) {
 
-        registrarMensagemProcessada(messageSid);
+                    receiveDocument(from,profileName, mediaUrl, mediaType,body);
+                }
+            } else {
+                receiveMessage(from,profileName, body);
+            }
+        } catch (RuntimeException e) {
+            // Sem isso, uma falha real (ex.: S3 fora do ar) deixaria o MessageSid marcado como
+            // processado para sempre, e o reenvio automático do webhook pela Twilio nunca mais
+            // conseguiria reprocessar essa mensagem.
+            desfazerRegistroDeProcessamento(messageSid);
+            throw e;
+        }
     }
 
-    private boolean isMensagemJaProcessada(String messageSid) {
+    /**
+     * Registra o MessageSid como processado ANTES do processamento pesado (download de mídia,
+     * upload S3, persistência) em vez de depois: assim, um reenvio do mesmo webhook pela Twilio
+     * — comum quando o processamento anterior ainda está rodando e estoura o timeout do lado
+     * deles — esbarra na constraint única de whatsapp_webhook_evento.message_sid em vez de
+     * reprocessar tudo em paralelo (duplicando mensagem/participante/oportunidade).
+     * Retorna false se o SID já estava registrado (processado ou em processamento).
+     */
+    private boolean tentarRegistrarMensagemComoProcessada(String messageSid) {
         if (messageSid == null || messageSid.isBlank()) {
+            return true;
+        }
+        if (whatsappWebhookEventoRepository.existsByMessageSid(messageSid)) {
             return false;
-        }
-        return whatsappWebhookEventoRepository.existsByMessageSid(messageSid);
-    }
-
-    private void registrarMensagemProcessada(String messageSid) {
-        if (messageSid == null || messageSid.isBlank()) {
-            return;
         }
         try {
             WhatsappWebhookEvento evento = new WhatsappWebhookEvento();
             evento.setMessageSid(messageSid);
             evento.setProcessadoEm(LocalDateTime.now());
             whatsappWebhookEventoRepository.save(evento);
+            return true;
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
             log.warn("MessageSid {} já havia sido registrado como processado (corrida concorrente).", messageSid);
+            return false;
         }
+    }
+
+    private void desfazerRegistroDeProcessamento(String messageSid) {
+        if (messageSid == null || messageSid.isBlank()) {
+            return;
+        }
+        whatsappWebhookEventoRepository.deleteByMessageSid(messageSid);
     }
     public void receiveAudio(String from,String profileName, String mediaUrl, String mediaType ,String body)  {
         String celular = reverseWhatsAppNumber(from);

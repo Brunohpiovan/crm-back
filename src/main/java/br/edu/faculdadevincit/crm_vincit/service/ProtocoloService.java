@@ -63,7 +63,17 @@ public class ProtocoloService {
         protocolo.setParticipante(participante);
         protocolo.setStatus(StatusProtocolo.ABERTO);
         protocolo.setDataCriacao(LocalDateTime.now());
-        protocoloRepository.save(protocolo);
+        try {
+            protocoloRepository.save(protocolo);
+            protocoloRepository.flush();
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // A checagem acima (findByParticipanteIdAndStatusAberto) e um check-then-act: duas
+            // requisicoes concorrentes para o mesmo participante podem passar por ela antes de
+            // qualquer uma persistir. O indice unico uk_protocolo_participante_aberto (ver
+            // migration V2026.08.05.20.30.00) e quem garante a invariante de fato; se ele for
+            // violado aqui, e porque perdemos essa corrida.
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Já existe um protocolo em andamento com esse usuário");
+        }
         List<Mensagem> mensagensSemProtocolo = mensagemRepository.findBySenderIdAndProtocoloIsNull(participante.getId());
 
         for (Mensagem mensagem : mensagensSemProtocolo) {

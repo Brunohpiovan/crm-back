@@ -13,6 +13,7 @@ import br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade;
 import br.edu.faculdadevincit.crm_vincit.repository.EtapaRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.FunilRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.OportunidadeRepository;
+import br.edu.faculdadevincit.crm_vincit.service.exceptions.ConflictException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -157,6 +158,11 @@ public class EtapaService {
 
     public void delete(Long id) {
         Etapa etapaBanco = etapaRepository.findById(id).orElseThrow(()-> new RuntimeException("Etapa com id "+id+" nao encontrada"));
+        long oportunidadesAtivas = oportunidadeRepository.countPorEtapaIdIn(List.of(id));
+        if (oportunidadesAtivas > 0) {
+            throw new ConflictException("Não é possível excluir a etapa: existem " + oportunidadesAtivas
+                    + " oportunidade(s) nela. Mova ou envie para a lixeira antes de excluir.");
+        }
         etapaRepository.delete(etapaBanco);
         messagingTemplate.convertAndSend("/topic/deleteetapa", etapaBanco.getId());
     }

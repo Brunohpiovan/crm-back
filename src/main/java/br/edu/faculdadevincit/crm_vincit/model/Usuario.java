@@ -76,6 +76,7 @@ public class Usuario implements UserDetails {
     private String celular;
 
     @Column(name = "cargo",nullable = false)
+    @Enumerated(EnumType.STRING)
     private UserRole cargo;   //Exemplo: admin, user, maneger
 
     @NotBlank(message = "Informe um endereco")

@@ -6,8 +6,11 @@ import br.edu.faculdadevincit.crm_vincit.model.Usuario;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.*;
 import br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade;
 import br.edu.faculdadevincit.crm_vincit.model.enums.UserRole;
+import br.edu.faculdadevincit.crm_vincit.repository.EtapaRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.FunilRepository;
+import br.edu.faculdadevincit.crm_vincit.repository.OportunidadeRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.UsuarioRepository;
+import br.edu.faculdadevincit.crm_vincit.service.exceptions.ConflictException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -30,6 +33,12 @@ public class FunilService {
 
     @Autowired
     private EtapaService etapaService;
+
+    @Autowired
+    private EtapaRepository etapaRepository;
+
+    @Autowired
+    private OportunidadeRepository oportunidadeRepository;
 
     public List<FunilAllDTO> findAll() {
         Usuario usuario = getUsuarioAutenticado();
@@ -132,6 +141,12 @@ public class FunilService {
     public void delete(Long id) {
         Funil funilBanco = funilRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Funil com id " + id + " não encontrado"));
+        List<Long> etapaIds = etapaRepository.findByFunilId(id).stream().map(Etapa::getId).toList();
+        long oportunidadesAtivas = etapaIds.isEmpty() ? 0 : oportunidadeRepository.countPorEtapaIdIn(etapaIds);
+        if (oportunidadesAtivas > 0) {
+            throw new ConflictException("Não é possível excluir o funil: existem " + oportunidadesAtivas
+                    + " oportunidade(s) em suas etapas. Mova ou envie para a lixeira antes de excluir.");
+        }
         funilRepository.delete(funilBanco);
     }
 

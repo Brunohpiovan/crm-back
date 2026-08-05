@@ -7,4 +7,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface WhatsappWebhookEventoRepository extends JpaRepository<WhatsappWebhookEvento, Long> {
     boolean existsByMessageSid(String messageSid);
+
+    void deleteByMessageSid(String messageSid);
 }

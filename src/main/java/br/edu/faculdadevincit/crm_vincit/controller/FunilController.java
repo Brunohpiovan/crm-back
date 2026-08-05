@@ -122,11 +122,12 @@ public class FunilController {
         return ResponseEntity.ok(funil);
     }
 
-    @Operation(summary = "Excluir um funil", description = "Requer JWT. Remove o funil e, em cascata, todas as suas etapas e oportunidades associadas.")
+    @Operation(summary = "Excluir um funil", description = "Requer JWT. Remove o funil somente se nenhuma de suas etapas tiver oportunidades (mova ou envie para a lixeira antes).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Funil excluído com sucesso (resposta sem corpo)"),
             @ApiResponse(responseCode = "400", description = "Funil não encontrado para o id informado (resposta em texto puro, não JSON estruturado)",
-                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil com id 1 não encontrado")))
+                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil com id 1 não encontrado"))),
+            @ApiResponse(responseCode = "409", description = "Funil possui etapas com oportunidades e não pode ser excluído")
     })
     @DeleteMapping(value = "/{id}")
     public ResponseEntity<?> delete(@Parameter(description = "Id do funil", required = true) @PathVariable Long id) {

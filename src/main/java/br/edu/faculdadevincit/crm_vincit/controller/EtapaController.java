@@ -87,11 +87,12 @@ public class EtapaController {
         return ResponseEntity.ok().build();
     }
 
-    @Operation(summary = "Excluir uma etapa", description = "Requer JWT. Remove a etapa e, em cascata, as oportunidades nela contidas. Após a exclusão, o backend publica o id da etapa removida no canal WebSocket /topic/deleteetapa.")
+    @Operation(summary = "Excluir uma etapa", description = "Requer JWT. Remove a etapa somente se ela não tiver oportunidades (mova ou envie para a lixeira antes). Após a exclusão, o backend publica o id da etapa removida no canal WebSocket /topic/deleteetapa.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Etapa excluída com sucesso (resposta sem corpo)"),
             @ApiResponse(responseCode = "400", description = "Etapa não encontrada para o id informado (resposta em texto puro, não JSON estruturado)",
-                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Etapa com id 1 nao encontrada")))
+                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Etapa com id 1 nao encontrada"))),
+            @ApiResponse(responseCode = "409", description = "Etapa possui oportunidades e não pode ser excluída")
     })
     @DeleteMapping(value = "/{id}")
     public ResponseEntity<?> delete(@Parameter(description = "Id da etapa", required = true) @PathVariable Long id) {
