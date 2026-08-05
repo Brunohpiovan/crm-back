@@ -195,7 +195,10 @@ public class ProtocoloService {
         Optional<Protocolo> protocolo = protocoloRepository.findById(id);
         if (protocolo.isPresent()) {
             Protocolo p = protocolo.get();
-            if (!p.getAdmin().getLogin().equals(authenticatedUsername) && !p.getParticipante().getLogin().equals(authenticatedUsername)) {
+            boolean isAdminAtual = p.getAdmin().getLogin().equals(authenticatedUsername);
+            boolean isParticipante = authenticatedUsername.equals(p.getParticipante().getLogin());
+            boolean isAdminAnterior = p.getAdminAnterior() != null && p.getAdminAnterior().getLogin().equals(authenticatedUsername);
+            if (!isAdminAtual && !isParticipante && !isAdminAnterior) {
                 throw new RuntimeException("Usuário não autorizado a acessar este protocolo.");
             }
             return new ProtocoloMoveDTO(p);

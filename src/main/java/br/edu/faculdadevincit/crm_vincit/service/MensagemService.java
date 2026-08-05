@@ -91,6 +91,14 @@ public class MensagemService{
         return lista;
     }
 
+    private boolean autorizadoParaProtocolo(Protocolo protocolo, Usuario usuario) {
+        boolean isAdminAtual = protocolo.getAdmin().getLogin().equals(usuario.getLogin());
+        boolean isParticipante = usuario.getLogin().equals(protocolo.getParticipante().getLogin());
+        boolean isAdminAnterior = protocolo.getAdminAnterior() != null
+                && protocolo.getAdminAnterior().getLogin().equals(usuario.getLogin());
+        return isAdminAtual || isParticipante || isAdminAnterior;
+    }
+
     public List<MensagemResponseDTO> getMessagesForProtocolLimit(Long protocoloId, int offset, int limit) {
         Protocolo protocolo = protocoloRepository.findById(protocoloId)
                 .orElseThrow(() -> new RuntimeException("Protocolo não encontrado"));
@@ -100,8 +108,7 @@ public class MensagemService{
         Usuario usuario = (Usuario) usuarioRepository.findByLogin(authenticatedUsername)
                 .orElseThrow(() -> new RuntimeException("Admin não encontrado"));
 
-        if (!protocolo.getAdmin().getLogin().equals(usuario.getLogin()) &&
-                !protocolo.getParticipante().getLogin().equals(usuario.getLogin())) {
+        if (!autorizadoParaProtocolo(protocolo, usuario)) {
             throw new RuntimeException("Usuário não autorizado a acessar este protocolo.");
         }
 
@@ -124,7 +131,7 @@ public class MensagemService{
         String authenticatedUsername = authentication.getName();
         Usuario usuario = (Usuario) usuarioRepository.findByLogin(authenticatedUsername)
                 .orElseThrow(() -> new RuntimeException("Admin não encontrado"));
-        if(!protocolo.getAdmin().getLogin().equals(usuario.getLogin()) && !protocolo.getParticipante().getLogin().equals(usuario.getLogin())){
+        if (!autorizadoParaProtocolo(protocolo, usuario)) {
             throw new RuntimeException("Usuário não autorizado a acessar este protocolo.");
         }
 

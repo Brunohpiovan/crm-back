@@ -27,7 +27,7 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
     @Query("SELECT p FROM Protocolo p JOIN FETCH p.admin JOIN FETCH p.participante LEFT JOIN FETCH p.adminAnterior WHERE ((p.admin.celular = :celular1 AND p.participante.celular = :celular2) OR (p.admin.celular = :celular2 AND p.participante.celular = :celular1)) AND p.status = :status")
     Optional<Protocolo> findByAdminCelularAndParticipanteCelularAndStatus(@Param("celular1") String celular1, @Param("celular2") String celular2, @Param("status") StatusProtocolo status);
 
-    @Query("SELECT p FROM Protocolo p JOIN FETCH p.admin JOIN FETCH p.participante LEFT JOIN FETCH p.adminAnterior WHERE (p.admin.login = :login OR p.participante.login = :login)")
+    @Query("SELECT p FROM Protocolo p JOIN FETCH p.admin JOIN FETCH p.participante LEFT JOIN FETCH p.adminAnterior WHERE (p.admin.login = :login OR p.participante.login = :login OR p.adminAnterior.login = :login)")
     List<Protocolo> findByAdminLoginOrParticipanteLogin(@Param("login") String login);
 
     @Query("""
@@ -39,7 +39,7 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
 
     @Query(value = """
     SELECT p FROM Protocolo p JOIN FETCH p.admin JOIN FETCH p.participante LEFT JOIN FETCH p.adminAnterior
-    WHERE (p.admin.login = :login OR p.participante.login = :login)
+    WHERE (p.admin.login = :login OR p.participante.login = :login OR p.adminAnterior.login = :login)
       AND (:search IS NULL
            OR CAST(p.id AS string) LIKE :search
            OR LOWER(p.admin.nome) LIKE :search
@@ -47,7 +47,7 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
     """,
     countQuery = """
     SELECT COUNT(p) FROM Protocolo p
-    WHERE (p.admin.login = :login OR p.participante.login = :login)
+    WHERE (p.admin.login = :login OR p.participante.login = :login OR p.adminAnterior.login = :login)
       AND (:search IS NULL
            OR CAST(p.id AS string) LIKE :search
            OR LOWER(p.admin.nome) LIKE :search
