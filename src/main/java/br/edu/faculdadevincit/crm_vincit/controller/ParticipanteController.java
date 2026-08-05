@@ -16,7 +16,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -36,6 +40,13 @@ public class ParticipanteController {
     @GetMapping
     public List<ParticipanteDTO> findAll() {
         return participanteService.findAll();
+    }
+
+    @Operation(summary = "Listar participantes (paginado)", description = "Requer JWT. Mesma listagem de GET /participante, porém paginada (parâmetros padrão do Spring Data: `page`, `size`, `sort`). Recomendado para telas novas — a tabela de participantes cresce com todo contato recebido via WhatsApp.")
+    @ApiResponse(responseCode = "200", description = "Página de participantes")
+    @GetMapping(value = "/paginado")
+    public Page<ParticipanteDTO> findAllPaginado(@ParameterObject @PageableDefault(size = 20) Pageable pageable) {
+        return participanteService.findAllPaginado(pageable);
     }
 
     @Operation(summary = "Listar participantes sem protocolo aberto com outro administrador", description = "Requer JWT. Retorna os participantes disponíveis para abertura de um novo protocolo com o admin `id` (exclui participantes que já possuem protocolo ABERTO com outro administrador).")

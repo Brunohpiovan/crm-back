@@ -23,7 +23,9 @@ import java.util.List;
 
 import static org.hamcrest.Matchers.containsStringIgnoringCase;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -91,5 +93,19 @@ class MensagemControllerTest {
                 .andExpect(jsonPath("$[0].conteudo").value("Olá, preciso de ajuda"))
                 .andExpect(jsonPath("$[0].sender.senha").doesNotExist())
                 .andExpect(jsonPath("$[0].protocolo.admin").doesNotExist());
+    }
+
+    /**
+     * Item de alta prioridade da auditoria: limit sem teto máximo permitia pedir qualquer
+     * quantidade de mensagens por página. Agora é clampado em 100 (mesmo padrão do Dashboard).
+     */
+    @Test
+    void getMessagesLimit_limiteAcimaDoMaximo_ehClampadoAntesDeChamarOServico() throws Exception {
+        when(mensagemService.getMessagesForProtocolLimit(eq(10L), eq(0), anyInt())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/messages/10").param("limit", "1000000").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        verify(mensagemService).getMessagesForProtocolLimit(10L, 0, 100);
     }
 }
