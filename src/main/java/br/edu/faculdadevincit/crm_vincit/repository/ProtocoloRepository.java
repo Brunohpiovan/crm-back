@@ -53,7 +53,7 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
     long countEmRisco(@Param("filtro") DashboardFiltroRequest filtro, @Param("limiteRisco") LocalDateTime limiteRisco);
 
     @Query("""
-    SELECT AVG(FUNCTION('TIMESTAMPDIFF', MINUTE, p.dataCriacao, p.dataEncerramento)) FROM Protocolo p
+    SELECT AVG(CAST(FUNCTION('TIMESTAMPDIFF', MINUTE, p.dataCriacao, p.dataEncerramento) AS double)) FROM Protocolo p
     WHERE p.status = br.edu.faculdadevincit.crm_vincit.model.enums.StatusProtocolo.FECHADO
       AND p.dataCriacao BETWEEN :#{#filtro.startDate} AND :#{#filtro.endDate}
       AND (:#{#filtro.userId} IS NULL OR p.admin.id = :#{#filtro.userId})
@@ -62,7 +62,7 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
 
     @Query("""
     SELECT new br.edu.faculdadevincit.crm_vincit.model.dtos.DashboardRankingProtocoloRow(
-        u.id, u.nome, COUNT(p), AVG(FUNCTION('TIMESTAMPDIFF', MINUTE, p.dataCriacao, p.dataEncerramento)))
+        u.id, u.nome, COUNT(p), AVG(CAST(FUNCTION('TIMESTAMPDIFF', MINUTE, p.dataCriacao, p.dataEncerramento) AS double)))
     FROM Protocolo p JOIN p.admin u
     WHERE p.status = br.edu.faculdadevincit.crm_vincit.model.enums.StatusProtocolo.FECHADO
       AND p.dataCriacao BETWEEN :#{#filtro.startDate} AND :#{#filtro.endDate}

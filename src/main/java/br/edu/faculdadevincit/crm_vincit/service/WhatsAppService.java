@@ -256,8 +256,9 @@ public class WhatsAppService {
             savedMessage.forEach(mensagemNew ->
                     publicarNoWebSocket("/topic/messages/" + protocolo.getId(), new MensagemResponseDTO(mensagemNew)));
         } else {
-            Mensagem commun = mensagemService.sendMessagePublico(participante, body);
-            publicarNoWebSocket("/topic/messages/public", new MensagemResponseDTO(commun));
+            List<Mensagem> savedMessages = mensagemService.sendMessagePublico(participante, body, media);
+            savedMessages.forEach(mensagemNew ->
+                    publicarNoWebSocket("/topic/messages/public", new MensagemResponseDTO(mensagemNew)));
         }
     }
 

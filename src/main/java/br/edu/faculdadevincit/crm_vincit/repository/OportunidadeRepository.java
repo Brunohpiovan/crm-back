@@ -193,8 +193,8 @@ public interface OportunidadeRepository extends JpaRepository<Oportunidade, Long
     @Query("""
     SELECT new br.edu.faculdadevincit.crm_vincit.model.dtos.DashboardRankingOportunidadeRow(
         u.id, u.nome,
-        COUNT(CASE WHEN o.situacao = br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade.GANHO THEN o END),
-        COUNT(CASE WHEN o.situacao = br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade.PERDIDO THEN o END),
+        COUNT(CASE WHEN o.situacao = br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade.GANHO THEN o.id END),
+        COUNT(CASE WHEN o.situacao = br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade.PERDIDO THEN o.id END),
         COALESCE(SUM(CASE WHEN o.situacao = br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade.GANHO THEN o.valor END), 0))
     FROM Oportunidade o JOIN o.criador u
     WHERE o.situacao IN (br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade.GANHO, br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade.PERDIDO)

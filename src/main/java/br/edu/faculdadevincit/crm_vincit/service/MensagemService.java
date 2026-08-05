@@ -67,12 +67,28 @@ public class MensagemService{
         return message;
     }
 
-    public Mensagem sendMessagePublico(Participante participante, String body) {
-        Mensagem mensagem = new Mensagem();
-        mensagem.setSender(participante);
-        mensagem.setConteudo(body);
-        mensagem.setData_envio(LocalDateTime.now());
-        return mensagemRepository.save(mensagem);
+    public List<Mensagem> sendMessagePublico(Participante participante, String conteudo, String media) {
+        List<Mensagem> lista = new ArrayList<>();
+        if (conteudo == null || conteudo.isEmpty()) {
+            conteudo = null;
+        }
+
+        Mensagem message = criaMensagem(null, participante, conteudo != null ? conteudo : media);
+
+        if (conteudo != null && media != null) {
+            lista.add(mensagemRepository.save(criaMensagem(null, participante, media)));
+        }
+
+        if (conteudo != null) {
+            message.setConteudo(conteudo);
+        }
+
+        if (conteudo != null || media != null) {
+            message.setData_envio(LocalDateTime.now());
+            lista.add(mensagemRepository.save(message));
+        }
+
+        return lista;
     }
 
     public List<MensagemResponseDTO> getMessagesForProtocolLimit(Long protocoloId, int offset, int limit) {
