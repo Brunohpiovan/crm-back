@@ -9,9 +9,12 @@ import io.jsonwebtoken.io.IOException;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -29,6 +32,14 @@ public class EmailService {
     @Autowired
     private EmailRepository emailRepository;
 
+    /**
+     * Único efeito colateral deste método é o envio em si (sem persistência), então é seguro
+     * reexecutar o método inteiro em caso de falha transitória de rede/SMTP — diferente de
+     * {@link #enviarEmail(EmailRequestDTO)}, que também persiste um registro de histórico depois
+     * do envio e por isso não é retentado (reenviar arriscaria duplicar o e-mail sem motivo se a
+     * falha real estivesse só na gravação do histórico).
+     */
+    @Retryable(retryFor = MailException.class, maxAttempts = 3, backoff = @Backoff(delay = 500, multiplier = 2))
     public void sendEmail(String to, String subject, String text) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(to.toLowerCase());

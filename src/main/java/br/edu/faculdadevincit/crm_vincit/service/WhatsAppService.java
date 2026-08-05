@@ -11,7 +11,8 @@ import br.edu.faculdadevincit.crm_vincit.repository.ProtocoloRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.WhatsappWebhookEventoRepository;
 import br.edu.faculdadevincit.crm_vincit.service.exceptions.AccessDeniedException;
 import br.edu.faculdadevincit.crm_vincit.service.exceptions.IntegrationException;
-import com.twilio.Twilio;
+import com.twilio.exception.ApiConnectionException;
+import com.twilio.http.TwilioRestClient;
 import com.twilio.rest.api.v2010.account.Message;
 import com.twilio.security.RequestValidator;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
@@ -71,9 +74,16 @@ public class WhatsAppService {
     @Autowired
     private WhatsappWebhookEventoRepository whatsappWebhookEventoRepository;
 
-    public Message sendWhatsAppMessage(MensagemRequest mensagemRequest) {
-        Twilio.init(accountSid, authToken);
+    @Autowired
+    private TwilioRestClient twilioRestClient;
 
+    /**
+     * Retry só em falha de conectividade (ApiConnectionException) — não em ApiException, que
+     * representa uma resposta de erro válida da Twilio (ex.: número inválido) e não se resolveria
+     * tentando de novo.
+     */
+    @Retryable(retryFor = ApiConnectionException.class, maxAttempts = 3, backoff = @Backoff(delay = 500, multiplier = 2))
+    public Message sendWhatsAppMessage(MensagemRequest mensagemRequest) {
         String to = mensagemRequest.getTo();
         String media = mensagemRequest.getMedia();
 
@@ -101,14 +111,14 @@ public class WhatsAppService {
                             messageBody
                     )
                     .setMediaUrl(Arrays.asList(URI.create(media)))
-                    .create();
+                    .create(twilioRestClient);
             return message;
         } else {
             return Message.creator(
                     new com.twilio.type.PhoneNumber(to),
                     new com.twilio.type.PhoneNumber("whatsapp:" + twilioNumber),
                     mensagemRequest.getMessage()
-            ).create();
+            ).create(twilioRestClient);
         }
     }
 
