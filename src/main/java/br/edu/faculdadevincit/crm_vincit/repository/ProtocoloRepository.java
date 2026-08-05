@@ -47,7 +47,8 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
     """,
     countQuery = """
     SELECT COUNT(p) FROM Protocolo p
-    WHERE (p.admin.login = :login OR p.participante.login = :login OR p.adminAnterior.login = :login)
+    LEFT JOIN p.adminAnterior adminAnterior
+    WHERE (p.admin.login = :login OR p.participante.login = :login OR adminAnterior.login = :login)
       AND (:search IS NULL
            OR CAST(p.id AS string) LIKE :search
            OR LOWER(p.admin.nome) LIKE :search
