@@ -7,12 +7,15 @@ import br.edu.faculdadevincit.crm_vincit.model.dtos.ParticipanteUpdateRequest;
 import br.edu.faculdadevincit.crm_vincit.model.enums.StatusProtocolo;
 import br.edu.faculdadevincit.crm_vincit.model.enums.TipoParticipante;
 import br.edu.faculdadevincit.crm_vincit.repository.ParticipanteRepository;
+import br.edu.faculdadevincit.crm_vincit.repository.ProtocoloRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class ParticipanteService {
@@ -20,11 +23,15 @@ public class ParticipanteService {
     @Autowired
     private ParticipanteRepository participanteRepository;
 
+    @Autowired
+    private ProtocoloRepository protocoloRepository;
+
     public List<ParticipanteDTO> findAllFilter(Long id){
         List<Participante> participantes = participanteRepository.findAllWithoutOpenProtocoloFromOtherAdmins(id);
+        Set<Long> comProtocoloAbertoComigo = new HashSet<>(protocoloRepository.findParticipanteIdsComProtocoloAbertoPorAdmin(id));
 
         return participantes.stream()
-                .map(ParticipanteDTO::new)
+                .map(p -> new ParticipanteDTO(p, comProtocoloAbertoComigo.contains(p.getId())))
                 .toList();
     }
 

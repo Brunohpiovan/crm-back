@@ -30,6 +30,13 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
     @Query("SELECT p FROM Protocolo p JOIN FETCH p.admin JOIN FETCH p.participante LEFT JOIN FETCH p.adminAnterior WHERE (p.admin.login = :login OR p.participante.login = :login)")
     List<Protocolo> findByAdminLoginOrParticipanteLogin(@Param("login") String login);
 
+    @Query("""
+    SELECT p.participante.id FROM Protocolo p
+    WHERE p.status = br.edu.faculdadevincit.crm_vincit.model.enums.StatusProtocolo.ABERTO
+      AND p.admin.id = :adminId
+    """)
+    List<Long> findParticipanteIdsComProtocoloAbertoPorAdmin(@Param("adminId") Long adminId);
+
     @Query(value = """
     SELECT p FROM Protocolo p JOIN FETCH p.admin JOIN FETCH p.participante LEFT JOIN FETCH p.adminAnterior
     WHERE (p.admin.login = :login OR p.participante.login = :login)
