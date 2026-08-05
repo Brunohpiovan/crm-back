@@ -218,7 +218,7 @@ public class ProtocoloService {
         Protocolo protocoloSalvo = protocoloRepository.save(protocolo);
 
         ProtocoloMoveDTO dto = new ProtocoloMoveDTO(protocoloSalvo);
-        ParticipanteDTO participanteDTO = new ParticipanteDTO(protocoloSalvo.getParticipante());
+        ParticipanteDTO participanteDTO = new ParticipanteDTO(protocoloSalvo.getParticipante(), true);
         ProtocoloNotificacao2DTO notify = new ProtocoloNotificacao2DTO(dto,participanteDTO);
         publishAfterCommit(() -> messagingTemplate.convertAndSend("/topic/protocolo/aberto/" + usuario_adm.getId(), notify));
         return dto;
