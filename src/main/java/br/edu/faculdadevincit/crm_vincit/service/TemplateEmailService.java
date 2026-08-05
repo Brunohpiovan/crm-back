@@ -1,5 +1,6 @@
 package br.edu.faculdadevincit.crm_vincit.service;
 
+import br.edu.faculdadevincit.crm_vincit.config.CacheConfig;
 import br.edu.faculdadevincit.crm_vincit.model.TemplateEmail;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EmailTemplateRequestDto;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.TemplateAllDTO;
@@ -8,6 +9,8 @@ import br.edu.faculdadevincit.crm_vincit.model.enums.Situacao;
 import br.edu.faculdadevincit.crm_vincit.repository.TemplateEmailRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -28,6 +31,12 @@ public class TemplateEmailService {
     @Value("${aws.s3.bucket-name}")
     private String bucketName;
 
+    /**
+     * Cacheado (CacheConfig.TEMPLATES_CACHE, TTL 5min): templates de e-mail mudam raramente. A
+     * lista retornada é compartilhada entre requisições enquanto o cache estiver quente — não
+     * deve ser mutada pelo chamador.
+     */
+    @Cacheable(CacheConfig.TEMPLATES_CACHE)
     public List<TemplateAllDTO> findAll() {
         return templateEmailRepository.findAllOrdered()
                 .stream()
@@ -43,6 +52,7 @@ public class TemplateEmailService {
     }
 
 
+    @CacheEvict(value = CacheConfig.TEMPLATES_CACHE, allEntries = true)
     public void create(EmailTemplateRequestDto dto) {
         TemplateEmail templateEmail = new TemplateEmail();
         templateEmail.setNome(dto.getNome());
@@ -68,6 +78,7 @@ public class TemplateEmailService {
         templateEmailRepository.save(templateEmail);
     }
 
+    @CacheEvict(value = CacheConfig.TEMPLATES_CACHE, allEntries = true)
     public void update(Long id, EmailTemplateRequestDto dto) {
         TemplateEmail templateEmailBanco = templateEmailRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Template não encontrado"));
@@ -112,6 +123,7 @@ public class TemplateEmailService {
     }
     @Value("${aws.s3.base-url}")
     private String baseUrl;
+    @CacheEvict(value = CacheConfig.TEMPLATES_CACHE, allEntries = true)
     public void delete(Long id){
         TemplateEmail templateEmailBanco = templateEmailRepository.findById(id).orElseThrow(()->new RuntimeException("Template nao encontrada"));
         templateEmailRepository.delete(templateEmailBanco);
