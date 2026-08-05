@@ -12,6 +12,8 @@ import br.edu.faculdadevincit.crm_vincit.repository.ParticipanteRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.ProtocoloRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
@@ -169,6 +171,22 @@ public class ProtocoloService {
         } else {
             return null;
         }
+    }
+
+    public Page<ProtocoloMoveDTO> getProtocolsPaginado(Long id_usuario, String search, Pageable pageable) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String authenticatedUsername = authentication.getName();
+        Usuario usuario = usuarioRepository.findById(id_usuario).orElseThrow(() ->
+                new UsernameNotFoundException("Usuário não encontrado"));
+        if (!usuario.getLogin().equals(authenticatedUsername)) {
+            throw new br.edu.faculdadevincit.crm_vincit.service.exceptions.AccessDeniedException("Você não tem permissão para acessar este usuário.");
+        }
+        String termoBusca = (search == null || search.isBlank())
+                ? null
+                : "%" + search.trim().toLowerCase() + "%";
+        return protocoloRepository
+                .findByAdminLoginOrParticipanteLoginPaginado(usuario.getLogin(), termoBusca, pageable)
+                .map(ProtocoloMoveDTO::new);
     }
 
     public ProtocoloMoveDTO findById(Long id) {
