@@ -209,8 +209,10 @@ public class DashboardService {
     }
 
     private DashboardSummaryResponse montarSummary(DashboardFiltroRequest filtro) {
+        DashboardFiltroRequest filtroAnterior = filtroPeriodoAnterior(filtro);
+
         BigDecimal valorAtual = oportunidadeRepository.sumValorPorSituacao(filtro, SituacaoOportunidade.ABERTO);
-        BigDecimal valorAnterior = oportunidadeRepository.sumValorPorSituacao(filtroPeriodoAnterior(filtro), SituacaoOportunidade.ABERTO);
+        BigDecimal valorAnterior = oportunidadeRepository.sumValorPorSituacao(filtroAnterior, SituacaoOportunidade.ABERTO);
         Double variacaoPercentual = calcularVariacaoPercentual(valorAtual, valorAnterior);
 
         long oportunidadesAbertas = oportunidadeRepository.countPorSituacao(filtro, SituacaoOportunidade.ABERTO);
@@ -222,9 +224,11 @@ public class DashboardService {
         LocalDateTime limiteRisco = LocalDateTime.now().minusHours(protocoloRiscoHoras);
         long protocolosEmRisco = protocoloRepository.countEmRisco(filtro, limiteRisco);
         Double tempoMedioAtendimentoMinutos = protocoloRepository.avgTempoAtendimentoMinutos(filtro);
+        Double tempoMedioAtendimentoAnteriorMinutos = protocoloRepository.avgTempoAtendimentoMinutos(filtroAnterior);
 
         return new DashboardSummaryResponse(valorAtual, variacaoPercentual, taxaConversao, protocolosAbertos,
-                protocolosEmRisco, tempoMedioAtendimentoMinutos, oportunidadesAbertas, oportunidadesGanhas, oportunidadesPerdidas);
+                protocolosEmRisco, tempoMedioAtendimentoMinutos, tempoMedioAtendimentoAnteriorMinutos,
+                oportunidadesAbertas, oportunidadesGanhas, oportunidadesPerdidas);
     }
 
     private DashboardFiltroRequest filtroPeriodoAnterior(DashboardFiltroRequest filtro) {
@@ -381,7 +385,7 @@ public class DashboardService {
     }
 
     private DashboardResponse dashboardVazio() {
-        DashboardSummaryResponse summary = new DashboardSummaryResponse(BigDecimal.ZERO, null, 0.0, 0L, 0L, null, 0L, 0L, 0L);
+        DashboardSummaryResponse summary = new DashboardSummaryResponse(BigDecimal.ZERO, null, 0.0, 0L, 0L, null, null, 0L, 0L, 0L);
         DashboardCadenciaResponse cadencias = new DashboardCadenciaResponse(0L, 0L, 0L, 0L, null);
         return new DashboardResponse(summary, List.of(), List.of(), List.of(), List.of(), cadencias);
     }

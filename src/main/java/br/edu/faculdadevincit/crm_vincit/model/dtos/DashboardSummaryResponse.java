@@ -12,6 +12,7 @@ public record DashboardSummaryResponse(
         @Schema(description = "Quantidade de protocolos com status ABERTO no período") Long protocolosAbertos,
         @Schema(description = "Quantidade de protocolos ABERTO cuja dataCriacao já ultrapassou o limite de horas configurado (dashboard.protocolo.risco-horas)") Long protocolosEmRisco,
         @Schema(description = "Tempo médio, em minutos, entre dataCriacao e dataEncerramento dos protocolos FECHADO no período (null se não houve protocolos fechados)") Double tempoMedioAtendimentoMinutos,
+        @Schema(description = "Mesmo cálculo de tempoMedioAtendimentoMinutos, mas para o período anterior de mesma duração — usado pelo front para desenhar a tendência do card (null se não houve protocolos fechados no período anterior)") Double tempoMedioAtendimentoAnteriorMinutos,
         @Schema(description = "Quantidade de oportunidades com situação ABERTO no período") Long oportunidadesAbertas,
         @Schema(description = "Quantidade de oportunidades com situação GANHO no período") Long oportunidadesGanhas,
         @Schema(description = "Quantidade de oportunidades com situação PERDIDO no período") Long oportunidadesPerdidas
