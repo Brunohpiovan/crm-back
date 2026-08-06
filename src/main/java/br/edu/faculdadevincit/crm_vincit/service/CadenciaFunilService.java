@@ -13,6 +13,7 @@ import br.edu.faculdadevincit.crm_vincit.repository.OportunidadeRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.SchedulerLockRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
@@ -29,6 +31,12 @@ public class CadenciaFunilService {
 
     private static final String SCHEDULER_LOCK_NOME = "movimentacao_cadencia";
     private static final long SCHEDULER_LOCK_OBSOLESCENCIA_MINUTOS = 5;
+
+    // horarioMovimentacao é configurado pelo usuário pensando em horário de Brasília. Comparado
+    // explicitamente nesse fuso (em vez do default da JVM) porque em produção (Railway) o
+    // container roda em UTC - sem isso, uma cadência configurada para "14:00" só disparava às
+    // 17:00 (UTC), 3h depois do esperado.
+    private static final ZoneId FUSO_HORARIO_MOVIMENTACAO = ZoneId.of("America/Sao_Paulo");
 
     @Autowired
     private CadenciaFunilRepository cadenciaFunilRepository;
@@ -50,6 +58,14 @@ public class CadenciaFunilService {
 
     @Autowired
     private LogMovimentacaoCadenciaRepository logMovimentacaoCadenciaRepository;
+
+    // Auto-injeção do proxy do Spring: moverOportunidadeIsolada só roda numa transação própria
+    // (ver Javadoc do método) se for chamado através do proxy. Chamar via "this" dentro da própria
+    // classe pula o proxy e o @Transactional não tem nenhum efeito - era exatamente por isso que
+    // toda movimentação vinha falhando com LazyInitializationException.
+    @Lazy
+    @Autowired
+    private CadenciaFunilService self;
 
     /**
      * Ponto de entrada chamado pelo scheduler. Não é transacional: o lock é adquirido/liberado em
@@ -75,7 +91,7 @@ public class CadenciaFunilService {
 
     private void executarCadenciasDoMinuto() {
         List<CadenciaFunil> cadencias = cadenciaFunilRepository.findAllBySituacaoWithDetails(Situacao.ATIVA);
-        LocalTime agora = LocalTime.now().truncatedTo(ChronoUnit.MINUTES);
+        LocalTime agora = LocalTime.now(FUSO_HORARIO_MOVIMENTACAO).truncatedTo(ChronoUnit.MINUTES);
 
         for (CadenciaFunil cadencia : cadencias) {
             if (cadencia.getHorarioMovimentacao().equals(agora)) {
@@ -97,7 +113,7 @@ public class CadenciaFunilService {
         int falhas = 0;
         for (Oportunidade oportunidade : oportunidades) {
             try {
-                boolean movida = moverOportunidadeIsolada(oportunidade.getId(), etapaDestinoId);
+                boolean movida = self.moverOportunidadeIsolada(oportunidade.getId(), etapaDestinoId);
                 if (movida) {
                     logMovimentacaoCadenciaRepository.save(new LogMovimentacaoCadencia(
                             cadencia.getId(), oportunidade.getId(), etapaOrigemId, etapaDestinoId));

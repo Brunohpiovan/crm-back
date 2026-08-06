@@ -44,6 +44,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -58,6 +59,10 @@ public class DashboardService {
     private static final int RANKING_PAGE_SIZE_MAXIMO = 100;
     private static final List<Long> USUARIO_IDS_DUMMY_NATIVE_QUERY = List.of(-1L);
     private static final List<String> ORIGEM_DUMMY_NATIVE_QUERY = List.of("__NENHUMA__");
+
+    // horarioMovimentacao (CadenciaFunil) é configurado pensando em horário de Brasília - ver
+    // mesma constante em CadenciaFunilService, que dispara a movimentação de fato.
+    private static final ZoneId FUSO_HORARIO_MOVIMENTACAO = ZoneId.of("America/Sao_Paulo");
 
     @Autowired
     private ProtocoloRepository protocoloRepository;
@@ -386,7 +391,7 @@ public class DashboardService {
     }
 
     private LocalDateTime calcularProximaExecucao(List<CadenciaFunil> cadenciasAtivas) {
-        LocalDateTime agora = LocalDateTime.now();
+        LocalDateTime agora = LocalDateTime.now(FUSO_HORARIO_MOVIMENTACAO);
         LocalDate hoje = agora.toLocalDate();
         LocalTime horaAtual = agora.toLocalTime();
 

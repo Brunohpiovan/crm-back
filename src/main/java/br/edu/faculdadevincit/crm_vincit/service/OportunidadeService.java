@@ -16,6 +16,7 @@ import br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade;
 import br.edu.faculdadevincit.crm_vincit.model.enums.TipoParticipante;
 import br.edu.faculdadevincit.crm_vincit.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -64,6 +65,13 @@ public class OportunidadeService {
     @Autowired
     private TagRepository tagRepository;
 
+    // Auto-injeção do proxy do Spring: criarComAnexoResolvido/atualizarComAnexoResolvido só rodam
+    // numa transação de verdade se forem chamados através do proxy. Chamar via "this" dentro da
+    // própria classe (create/update abaixo) pula o proxy e o @Transactional não tem nenhum efeito.
+    @Lazy
+    @Autowired
+    private OportunidadeService self;
+
     public OportunidadeDTO findByClienteAndCriadorNull(Long clienteId) {
         return oportunidadeRepository.findByClienteIdAndCriadorIsNull(clienteId)
                 .map(this::toDto)
@@ -90,7 +98,7 @@ public class OportunidadeService {
             validarArquivo(file);
             urlAnexo = uploadArquivo(file);
         }
-        return criarComAnexoResolvido(request, urlAnexo);
+        return self.criarComAnexoResolvido(request, urlAnexo);
     }
 
     @Transactional
@@ -183,7 +191,7 @@ public class OportunidadeService {
         }
         String urlAnexoAtual = oportunidadeRepository.findUrlAnexoById(id).orElse(null);
         String urlAnexoFinal = resolveAnexo(urlAnexoAtual, request.urlAnexo(), file);
-        return atualizarComAnexoResolvido(id, request, urlAnexoFinal);
+        return self.atualizarComAnexoResolvido(id, request, urlAnexoFinal);
     }
 
     @Transactional
@@ -362,6 +370,27 @@ public class OportunidadeService {
         Etapa etapa = oportunidadeBanco.getEtapa();
         BigDecimal valor = oportunidadeBanco.getValor();
         oportunidadeRepository.delete(oportunidadeBanco);
+        if (etapa != null) {
+            etapaService.updateSubValor(etapa.getId(), valor);
+        }
+        afterCommit(() -> messagingTemplate.convertAndSend("/topic/deletedoportunidade", id));
+    }
+
+    /**
+     * Soft delete: marca a oportunidade como LIXEIRA em vez de apagar a linha. O board (GET
+     * /funil/filtro) já filtra por situação e nunca inclui LIXEIRA por padrão, então a
+     * oportunidade some da tela como num delete de verdade - mas sem esbarrar na FK de
+     * log_movimentacao_cadencia (a oportunidade continua existindo, só a exclusão física de
+     * verdade colide com o histórico de movimentação por cadência).
+     */
+    @Transactional
+    public void moverParaLixeira(Long id) {
+        Oportunidade oportunidadeBanco = oportunidadeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Oportunidade com id " + id + " nao encontrada"));
+        Etapa etapa = oportunidadeBanco.getEtapa();
+        BigDecimal valor = oportunidadeBanco.getValor();
+        oportunidadeBanco.setSituacao(SituacaoOportunidade.LIXEIRA);
+        oportunidadeRepository.save(oportunidadeBanco);
         if (etapa != null) {
             etapaService.updateSubValor(etapa.getId(), valor);
         }
