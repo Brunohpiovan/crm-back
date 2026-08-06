@@ -5,27 +5,32 @@ import br.edu.faculdadevincit.crm_vincit.model.Usuario;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.EmailRequestDTO;
 import br.edu.faculdadevincit.crm_vincit.repository.EmailRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.UsuarioRepository;
-import io.jsonwebtoken.io.IOException;
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
+import com.resend.Resend;
+import com.resend.core.exception.ResendException;
+import com.resend.services.emails.model.Attachment;
+import com.resend.services.emails.model.CreateEmailOptions;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.mail.MailException;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.UnsupportedEncodingException;
+import java.io.IOException;
 import java.time.LocalDateTime;
-
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
 
 @Service
 public class EmailService {
+
     @Autowired
-    private JavaMailSender mailSender;
+    private Resend resend;
+
+    @Value("${resend.from}")
+    private String remetentePadrao;
+
     @Autowired
     private UsuarioRepository usuarioRepository;
 
@@ -34,40 +39,49 @@ public class EmailService {
 
     /**
      * Único efeito colateral deste método é o envio em si (sem persistência), então é seguro
-     * reexecutar o método inteiro em caso de falha transitória de rede/SMTP — diferente de
+     * reexecutar o método inteiro em caso de falha transitória de rede/API do Resend — diferente de
      * {@link #enviarEmail(EmailRequestDTO)}, que também persiste um registro de histórico depois
      * do envio e por isso não é retentado (reenviar arriscaria duplicar o e-mail sem motivo se a
      * falha real estivesse só na gravação do histórico).
      */
-    @Retryable(retryFor = MailException.class, maxAttempts = 3, backoff = @Backoff(delay = 500, multiplier = 2))
-    public void sendEmail(String to, String subject, String text) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(to.toLowerCase());
-        message.setSubject(subject);
-        message.setText(text);
-        mailSender.send(message);
+    @Retryable(retryFor = ResendException.class, maxAttempts = 3, backoff = @Backoff(delay = 500, multiplier = 2))
+    public void sendEmail(String to, String subject, String text) throws ResendException {
+        CreateEmailOptions params = CreateEmailOptions.builder()
+                .from(remetentePadrao)
+                .to(to.toLowerCase())
+                .subject(subject)
+                .text(text)
+                .build();
+        resend.emails().send(params);
     }
 
-    public void enviarEmail(EmailRequestDTO email) throws MessagingException, UnsupportedEncodingException {
+    public void enviarEmail(EmailRequestDTO email) throws ResendException {
         Usuario remetente = usuarioRepository.findById(email.getId_remetente())
                 .orElseThrow(() -> new RuntimeException("Remetente não encontrado"));
 
-        MimeMessage mensagem = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(mensagem, true, "UTF-8");
-        helper.setTo(email.getDestinatario().toLowerCase());
-        helper.setSubject(email.getAssunto());
-        helper.setText(email.getCorpo(), true);
-        helper.setFrom("sistema1@faculdadevincit.edu.br", "Faculdade Vincit");
+        CreateEmailOptions.Builder params = CreateEmailOptions.builder()
+                .from(remetentePadrao)
+                .to(email.getDestinatario().toLowerCase())
+                .subject(email.getAssunto())
+                .html(email.getCorpo());
+
         if (email.getAnexos() != null && !email.getAnexos().isEmpty()) {
+            List<Attachment> attachments = new ArrayList<>();
             for (MultipartFile anexo : email.getAnexos()) {
                 try {
-                    helper.addAttachment(anexo.getOriginalFilename(), anexo);
+                    String conteudoBase64 = Base64.getEncoder().encodeToString(anexo.getBytes());
+                    attachments.add(Attachment.builder()
+                            .fileName(anexo.getOriginalFilename())
+                            .content(conteudoBase64)
+                            .build());
                 } catch (IOException e) {
                     throw new RuntimeException("Erro ao anexar arquivo: " + anexo.getOriginalFilename(), e);
                 }
             }
+            params.attachments(attachments);
         }
-        mailSender.send(mensagem);
+
+        resend.emails().send(params.build());
         Email newEmail = new Email(email, remetente);
         newEmail.setCriadoEm(LocalDateTime.now());
         emailRepository.save(newEmail);
