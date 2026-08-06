@@ -129,8 +129,30 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
                                                       @Param("semRestricaoUsuario") boolean semRestricaoUsuario,
                                                       @Param("usuarioIds") List<Long> usuarioIds);
 
+    /**
+     * Mesmo padrão nativo de countAbertosPorDia/countFechadosPorDia (ver comentário acima):
+     * tempo médio de atendimento dos protocolos FECHADO, agrupado pelo dia de encerramento.
+     * Usado para o mini-gráfico do card "Tempo médio" no dashboard.
+     */
+    @Query(value = """
+    SELECT DATE(data_encerramento) AS dia, AVG(TIMESTAMPDIFF(MINUTE, data_criacao, data_encerramento)) AS tempoMedioMinutos
+    FROM protocolo
+    WHERE status = 'FECHADO'
+      AND data_encerramento BETWEEN :inicio AND :fim
+      AND (:semRestricaoUsuario = TRUE OR admin_id IN (:usuarioIds))
+    GROUP BY DATE(data_encerramento)
+    """, nativeQuery = true)
+    List<DiaTempoMedioProjection> avgTempoAtendimentoPorDia(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim,
+                                                              @Param("semRestricaoUsuario") boolean semRestricaoUsuario,
+                                                              @Param("usuarioIds") List<Long> usuarioIds);
+
     interface DiaContagemProjection {
         LocalDate getDia();
         Long getQuantidade();
+    }
+
+    interface DiaTempoMedioProjection {
+        LocalDate getDia();
+        Double getTempoMedioMinutos();
     }
 }

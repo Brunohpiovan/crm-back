@@ -14,6 +14,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -214,5 +215,43 @@ public interface OportunidadeRepository extends JpaRepository<Oportunidade, Long
       AND o.situacao <> br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade.LIXEIRA
     """)
     long countPorEtapaIdIn(@Param("etapaIds") List<Long> etapaIds);
+
+    /**
+     * Nativa, mesmo motivo/padrão das queries diárias de ProtocoloRepository (GROUP BY DATE(...),
+     * ver DASHBOARD.md §5): JPQL não trunca datetime->date de forma portável e segura para
+     * projeção em record. Filtros espelham sumValorPorSituacao (pipeline/responsável/origem/tag),
+     * com o mesmo padrão flag+lista-dummy para filtros de coleção opcionais (IN () é erro de
+     * sintaxe em SQL nativo no MySQL quando a coleção está vazia). Usado para o mini-gráfico do
+     * card "Valor em negociação" no dashboard — é um proxy de atividade (valor criado por dia),
+     * não uma reconstrução histórica do saldo total em aberto (o schema não guarda isso).
+     */
+    @Query(value = """
+    SELECT DATE(o.data_criacao) AS dia, COALESCE(SUM(o.valor), 0) AS valor
+    FROM oportunidade o
+    JOIN etapa e ON e.id = o.card_id
+    WHERE o.situacao = 'ABERTO'
+      AND o.data_criacao BETWEEN :inicio AND :fim
+      AND e.funil_id IN (:funilIds)
+      AND (:pipelineId IS NULL OR e.funil_id = :pipelineId)
+      AND (:semRestricaoUsuario = TRUE OR o.criador_id IN (:usuarioIds))
+      AND (:semRestricaoOrigem = TRUE OR o.origem IN (:origens))
+      AND (:semRestricaoTag = TRUE OR EXISTS (
+            SELECT 1 FROM oportunidade_tag ot WHERE ot.oportunidade_id = o.id AND ot.tag_id IN (:tagIds)
+          ))
+    GROUP BY DATE(o.data_criacao)
+    """, nativeQuery = true)
+    List<DiaValorProjection> sumValorAbertoPorDia(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim,
+                                                    @Param("funilIds") List<Long> funilIds, @Param("pipelineId") Long pipelineId,
+                                                    @Param("semRestricaoUsuario") boolean semRestricaoUsuario,
+                                                    @Param("usuarioIds") List<Long> usuarioIds,
+                                                    @Param("semRestricaoOrigem") boolean semRestricaoOrigem,
+                                                    @Param("origens") List<String> origens,
+                                                    @Param("semRestricaoTag") boolean semRestricaoTag,
+                                                    @Param("tagIds") List<Long> tagIds);
+
+    interface DiaValorProjection {
+        LocalDate getDia();
+        BigDecimal getValor();
+    }
 
 }

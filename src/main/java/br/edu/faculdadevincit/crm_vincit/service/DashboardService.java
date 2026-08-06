@@ -24,8 +24,10 @@ import br.edu.faculdadevincit.crm_vincit.repository.EquipeRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.FunilRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.LogMovimentacaoCadenciaRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.OportunidadeRepository;
+import br.edu.faculdadevincit.crm_vincit.repository.OportunidadeRepository.DiaValorProjection;
 import br.edu.faculdadevincit.crm_vincit.repository.ProtocoloRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.ProtocoloRepository.DiaContagemProjection;
+import br.edu.faculdadevincit.crm_vincit.repository.ProtocoloRepository.DiaTempoMedioProjection;
 import br.edu.faculdadevincit.crm_vincit.repository.UsuarioRepository;
 import br.edu.faculdadevincit.crm_vincit.service.exceptions.AccessDeniedException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,6 +57,7 @@ public class DashboardService {
     private static final int PERIODO_PADRAO_DIAS = 30;
     private static final int RANKING_PAGE_SIZE_MAXIMO = 100;
     private static final List<Long> USUARIO_IDS_DUMMY_NATIVE_QUERY = List.of(-1L);
+    private static final List<String> ORIGEM_DUMMY_NATIVE_QUERY = List.of("__NENHUMA__");
 
     @Autowired
     private ProtocoloRepository protocoloRepository;
@@ -289,16 +292,35 @@ public class DashboardService {
         boolean semRestricaoUsuario = filtro.getUserIds().isEmpty();
         List<Long> usuarioIdsParaQueryNativa = semRestricaoUsuario ? USUARIO_IDS_DUMMY_NATIVE_QUERY : filtro.getUserIds();
 
+        boolean semRestricaoOrigem = filtro.getOrigin().isEmpty();
+        List<String> origensParaQueryNativa = semRestricaoOrigem
+                ? ORIGEM_DUMMY_NATIVE_QUERY
+                : filtro.getOrigin().stream().map(Enum::name).toList();
+
+        boolean semRestricaoTag = filtro.getTagIds().isEmpty();
+        List<Long> tagIdsParaQueryNativa = semRestricaoTag ? USUARIO_IDS_DUMMY_NATIVE_QUERY : filtro.getTagIds();
+
         Map<LocalDate, Long> abertosPorDia = mapaPorDia(
                 protocoloRepository.countAbertosPorDia(filtro.getStartDate(), filtro.getEndDate(), semRestricaoUsuario, usuarioIdsParaQueryNativa));
         Map<LocalDate, Long> fechadosPorDia = mapaPorDia(
                 protocoloRepository.countFechadosPorDia(filtro.getStartDate(), filtro.getEndDate(), semRestricaoUsuario, usuarioIdsParaQueryNativa));
+        Map<LocalDate, Double> tempoMedioPorDia = protocoloRepository
+                .avgTempoAtendimentoPorDia(filtro.getStartDate(), filtro.getEndDate(), semRestricaoUsuario, usuarioIdsParaQueryNativa)
+                .stream()
+                .collect(Collectors.toMap(DiaTempoMedioProjection::getDia, DiaTempoMedioProjection::getTempoMedioMinutos));
+        Map<LocalDate, BigDecimal> valorPorDia = oportunidadeRepository
+                .sumValorAbertoPorDia(filtro.getStartDate(), filtro.getEndDate(), filtro.getFunilIdsPermitidos(), filtro.getPipelineId(),
+                        semRestricaoUsuario, usuarioIdsParaQueryNativa, semRestricaoOrigem, origensParaQueryNativa,
+                        semRestricaoTag, tagIdsParaQueryNativa)
+                .stream()
+                .collect(Collectors.toMap(DiaValorProjection::getDia, DiaValorProjection::getValor));
 
         List<DashboardSerieDiariaResponse> serie = new ArrayList<>();
         LocalDate dia = filtro.getStartDate().toLocalDate();
         LocalDate ultimoDia = filtro.getEndDate().toLocalDate();
         while (!dia.isAfter(ultimoDia)) {
-            serie.add(new DashboardSerieDiariaResponse(dia, abertosPorDia.getOrDefault(dia, 0L), fechadosPorDia.getOrDefault(dia, 0L)));
+            serie.add(new DashboardSerieDiariaResponse(dia, abertosPorDia.getOrDefault(dia, 0L), fechadosPorDia.getOrDefault(dia, 0L),
+                    valorPorDia.getOrDefault(dia, BigDecimal.ZERO), tempoMedioPorDia.get(dia)));
             dia = dia.plusDays(1);
         }
         return serie;
