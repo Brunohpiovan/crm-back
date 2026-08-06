@@ -7,9 +7,12 @@ import br.edu.faculdadevincit.crm_vincit.model.dtos.EmailDTO;
 import br.edu.faculdadevincit.crm_vincit.repository.PasswordResetTokenRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.UsuarioRepository;
 import br.edu.faculdadevincit.crm_vincit.service.exceptions.InvalidEmailException;
-import br.edu.faculdadevincit.crm_vincit.service.exceptions.UserNotFoundException;
+import br.edu.faculdadevincit.crm_vincit.service.exceptions.TooManyRequestsException;
+import com.resend.core.exception.ResendException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import java.net.URLDecoder;
@@ -17,10 +20,19 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.Optional;
 
 @Service
 public class PasswordSendService {
     private static final int TOKEN_VALIDITY_MINUTES = 30;
+
+    /**
+     * Mesma resposta independentemente de o e-mail existir ou não no sistema: revelar a
+     * diferença permitiria enumerar quais e-mails estão cadastrados (respondendo, por exemplo,
+     * com um erro só para e-mails inexistentes).
+     */
+    private static final String GENERIC_RESPONSE_MESSAGE =
+            "Se o e-mail informado estiver cadastrado, você receberá instruções de recuperação de senha em instantes.";
 
     @Autowired
     private EmailService emailService;
@@ -31,17 +43,31 @@ public class PasswordSendService {
     @Autowired
     private PasswordResetTokenRepository passwordResetTokenRepository;
 
+    @Autowired
+    private ClientInfoService clientInfoService;
+
+    @Autowired
+    private PasswordRecoveryRateLimiter rateLimiter;
+
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
-    public ApiResponse SendEmailRecovery(EmailDTO mail) {
-        String email = mail.email();
-        try {
-            String decodedEmail = URLDecoder.decode(email, StandardCharsets.UTF_8).trim();
-            if (decodedEmail.isEmpty()) {
-                throw new InvalidEmailException("Endereço de e-mail inválido.");
-            }
-            Usuario user = (Usuario) usuarioRepository.findByLogin(decodedEmail).orElseThrow(() ->new UserNotFoundException("Usuário não encontrado."));
+    @Value("${app.frontend.reset-password-path}")
+    private String resetPasswordPath;
+
+    public ApiResponse SendEmailRecovery(EmailDTO mail, HttpServletRequest request) throws ResendException {
+        if (!rateLimiter.tryAcquire(clientInfoService.getClientIp(request))) {
+            throw new TooManyRequestsException("Muitas solicitações. Tente novamente mais tarde.");
+        }
+
+        String decodedEmail = URLDecoder.decode(mail.email(), StandardCharsets.UTF_8).trim();
+        if (decodedEmail.isEmpty()) {
+            throw new InvalidEmailException("Endereço de e-mail inválido.");
+        }
+
+        Optional<UserDetails> userOpt = usuarioRepository.findByLogin(decodedEmail);
+        if (userOpt.isPresent()) {
+            Usuario user = (Usuario) userOpt.get();
 
             String token = generateSecureToken();
             PasswordResetToken resetToken = new PasswordResetToken();
@@ -52,7 +78,7 @@ public class PasswordSendService {
             resetToken.setUsado(false);
             passwordResetTokenRepository.save(resetToken);
 
-            String recoveryUrl = frontendUrl + "/change-password?token=" + token;
+            String recoveryUrl = frontendUrl + resetPasswordPath + "?token=" + token;
             String recoveryMessage = "Olá, \n\n"
                     + "Recebemos uma solicitação para recuperar sua senha em nosso sistema. Para continuar, "
                     + "clique no link abaixo e siga as instruções para criar uma nova senha:\n\n"
@@ -63,10 +89,9 @@ public class PasswordSendService {
                     + "Atenciosamente,\n"
                     + "Equipe VINCIT\n";
             emailService.sendEmail(decodedEmail, "Recuperação de Senha - crm_vincit", recoveryMessage);
-            return new ApiResponse("Instruções de recuperação de senha enviadas para seu e-mail.");
-        } catch (UserNotFoundException ex) {
-            throw new UserNotFoundException(ex.getMessage());
         }
+
+        return new ApiResponse(GENERIC_RESPONSE_MESSAGE);
     }
 
     private String generateSecureToken() {
