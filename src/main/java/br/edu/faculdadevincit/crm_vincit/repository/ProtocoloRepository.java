@@ -30,6 +30,11 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
     @Query("SELECT p FROM Protocolo p JOIN FETCH p.admin JOIN FETCH p.participante LEFT JOIN FETCH p.adminAnterior WHERE (p.admin.login = :login OR p.participante.login = :login OR p.adminAnterior.login = :login)")
     List<Protocolo> findByAdminLoginOrParticipanteLogin(@Param("login") String login);
 
+    // Sem filtro de dono - usado quando quem lista é ROLE_ADMIN, que enxerga todos os protocolos
+    // do sistema (não só os que administra/participa pessoalmente).
+    @Query("SELECT p FROM Protocolo p JOIN FETCH p.admin JOIN FETCH p.participante LEFT JOIN FETCH p.adminAnterior")
+    List<Protocolo> findAllComRelacionamentos();
+
     @Query("""
     SELECT p.participante.id FROM Protocolo p
     WHERE p.status = br.edu.faculdadevincit.crm_vincit.model.enums.StatusProtocolo.ABERTO
@@ -55,6 +60,24 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
            OR LOWER(p.participante.nome) LIKE :search)
     """)
     Page<Protocolo> findByAdminLoginOrParticipanteLoginPaginado(@Param("login") String login, @Param("search") String search, Pageable pageable);
+
+    // Mesma busca da query acima, mas sem restringir por dono - usado quando quem lista é
+    // ROLE_ADMIN.
+    @Query(value = """
+    SELECT p FROM Protocolo p JOIN FETCH p.admin JOIN FETCH p.participante LEFT JOIN FETCH p.adminAnterior
+    WHERE (:search IS NULL
+           OR CAST(p.id AS string) LIKE :search
+           OR LOWER(p.admin.nome) LIKE :search
+           OR LOWER(p.participante.nome) LIKE :search)
+    """,
+    countQuery = """
+    SELECT COUNT(p) FROM Protocolo p
+    WHERE (:search IS NULL
+           OR CAST(p.id AS string) LIKE :search
+           OR LOWER(p.admin.nome) LIKE :search
+           OR LOWER(p.participante.nome) LIKE :search)
+    """)
+    Page<Protocolo> findAllPaginado(@Param("search") String search, Pageable pageable);
 
     @Query("SELECT p FROM Protocolo p JOIN FETCH p.admin JOIN FETCH p.participante LEFT JOIN FETCH p.adminAnterior WHERE (p.participante.celular = :celular) AND p.status = :status")
     Optional<Protocolo> findByCelularAndStatus(@Param("celular") String celular, @Param("status") StatusProtocolo status);
