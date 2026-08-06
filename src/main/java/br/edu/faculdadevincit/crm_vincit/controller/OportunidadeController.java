@@ -134,4 +134,30 @@ public class OportunidadeController {
         oportunidadeService.delete(id);
         return ResponseEntity.ok().build();
     }
+
+    @Operation(summary = "Mover uma oportunidade para a lixeira",
+            description = "Requer JWT. Soft delete: marca a oportunidade com situação LIXEIRA e desconta seu valor do total acumulado da etapa em que estava, sem apagar a linha do banco (o board não lista oportunidades LIXEIRA por padrão, então ela some da tela). Após a operação, o backend publica o id da oportunidade no canal WebSocket /topic/deletedoportunidade, para atualização em tempo real de outros clientes conectados.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Oportunidade movida para a lixeira com sucesso (resposta sem corpo)"),
+            @ApiResponse(responseCode = "400", description = "Oportunidade não encontrada para o id informado (resposta em texto puro, não JSON estruturado)",
+                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Oportunidade com id 1 nao encontrada")))
+    })
+    @PutMapping(value = "/{id}/lixeira")
+    public ResponseEntity<?> moverParaLixeira(@Parameter(description = "Id da oportunidade", required = true) @PathVariable Long id) {
+        oportunidadeService.moverParaLixeira(id);
+        return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "Restaurar uma oportunidade da lixeira",
+            description = "Requer JWT. Marca a oportunidade novamente como ABERTO e devolve seu valor ao total acumulado da etapa em que estava. Após a operação, o backend publica a oportunidade no canal WebSocket /topic/newoportunidade, para que volte a aparecer em tempo real no board de outros clientes conectados.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Oportunidade restaurada com sucesso (resposta sem corpo)"),
+            @ApiResponse(responseCode = "400", description = "Oportunidade não encontrada para o id informado (resposta em texto puro, não JSON estruturado)",
+                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Oportunidade com id 1 nao encontrada")))
+    })
+    @PutMapping(value = "/{id}/restaurar")
+    public ResponseEntity<?> restaurar(@Parameter(description = "Id da oportunidade", required = true) @PathVariable Long id) {
+        oportunidadeService.restaurar(id);
+        return ResponseEntity.ok().build();
+    }
 }

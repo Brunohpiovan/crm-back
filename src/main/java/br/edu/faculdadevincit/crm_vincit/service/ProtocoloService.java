@@ -166,16 +166,26 @@ public class ProtocoloService {
     }
 
 
+    private boolean isAdmin(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+    }
+
     public List<ProtocoloMoveDTO> getProtocols(Long id_usuario) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String authenticatedUsername = authentication.getName();
+        boolean isAdmin = isAdmin(authentication);
         Usuario usuario = usuarioRepository.findById(id_usuario).orElseThrow(() ->
                 new UsernameNotFoundException("Usuário não encontrado"));
-        if (!usuario.getLogin().equals(authenticatedUsername)) {
+        if (!isAdmin && !usuario.getLogin().equals(authenticatedUsername)) {
             throw new br.edu.faculdadevincit.crm_vincit.service.exceptions.AccessDeniedException("Você não tem permissão para acessar este usuário.");
         }
-        String login = usuario.getLogin();
-        List<Protocolo> protocolos = protocoloRepository.findByAdminLoginOrParticipanteLogin(login);
+        // ROLE_ADMIN enxerga todos os protocolos do sistema, não só os que administra/participa
+        // pessoalmente (o campo "admin" do protocolo é o atendente responsável pelo chat, um
+        // conceito diferente do cargo/autoridade ROLE_ADMIN do usuário autenticado).
+        List<Protocolo> protocolos = isAdmin
+                ? protocoloRepository.findAllComRelacionamentos()
+                : protocoloRepository.findByAdminLoginOrParticipanteLogin(usuario.getLogin());
         if (!protocolos.isEmpty()) {
             return protocolos.stream().map(ProtocoloMoveDTO::new).collect(Collectors.toList());
         } else {
@@ -186,29 +196,32 @@ public class ProtocoloService {
     public Page<ProtocoloMoveDTO> getProtocolsPaginado(Long id_usuario, String search, Pageable pageable) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String authenticatedUsername = authentication.getName();
+        boolean isAdmin = isAdmin(authentication);
         Usuario usuario = usuarioRepository.findById(id_usuario).orElseThrow(() ->
                 new UsernameNotFoundException("Usuário não encontrado"));
-        if (!usuario.getLogin().equals(authenticatedUsername)) {
+        if (!isAdmin && !usuario.getLogin().equals(authenticatedUsername)) {
             throw new br.edu.faculdadevincit.crm_vincit.service.exceptions.AccessDeniedException("Você não tem permissão para acessar este usuário.");
         }
         String termoBusca = (search == null || search.isBlank())
                 ? null
                 : "%" + search.trim().toLowerCase() + "%";
-        return protocoloRepository
-                .findByAdminLoginOrParticipanteLoginPaginado(usuario.getLogin(), termoBusca, pageable)
-                .map(ProtocoloMoveDTO::new);
+        Page<Protocolo> pagina = isAdmin
+                ? protocoloRepository.findAllPaginado(termoBusca, pageable)
+                : protocoloRepository.findByAdminLoginOrParticipanteLoginPaginado(usuario.getLogin(), termoBusca, pageable);
+        return pagina.map(ProtocoloMoveDTO::new);
     }
 
     public ProtocoloMoveDTO findById(Long id) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String authenticatedUsername = authentication.getName();
+        boolean isAdmin = isAdmin(authentication);
         Optional<Protocolo> protocolo = protocoloRepository.findById(id);
         if (protocolo.isPresent()) {
             Protocolo p = protocolo.get();
             boolean isAdminAtual = p.getAdmin().getLogin().equals(authenticatedUsername);
             boolean isParticipante = authenticatedUsername.equals(p.getParticipante().getLogin());
             boolean isAdminAnterior = p.getAdminAnterior() != null && p.getAdminAnterior().getLogin().equals(authenticatedUsername);
-            if (!isAdminAtual && !isParticipante && !isAdminAnterior) {
+            if (!isAdmin && !isAdminAtual && !isParticipante && !isAdminAnterior) {
                 throw new RuntimeException("Usuário não autorizado a acessar este protocolo.");
             }
             return new ProtocoloMoveDTO(p);
