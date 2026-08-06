@@ -397,6 +397,26 @@ public class OportunidadeService {
         afterCommit(() -> messagingTemplate.convertAndSend("/topic/deletedoportunidade", id));
     }
 
+    /**
+     * Desfaz {@link #moverParaLixeira}: volta a oportunidade para ABERTO e devolve seu valor ao
+     * total da etapa. Publica em /topic/newoportunidade (não /topic/updateOportunidade) porque,
+     * do ponto de vista de quem está com o board filtrado para as situações padrão, a
+     * oportunidade está "aparecendo" de novo, não só sendo atualizada.
+     */
+    @Transactional
+    public void restaurar(Long id) {
+        Oportunidade oportunidadeBanco = oportunidadeRepository.findByIdWithDetails(id)
+                .orElseThrow(() -> new RuntimeException("Oportunidade com id " + id + " nao encontrada"));
+        Etapa etapa = oportunidadeBanco.getEtapa();
+        oportunidadeBanco.setSituacao(SituacaoOportunidade.ABERTO);
+        oportunidadeRepository.save(oportunidadeBanco);
+        if (etapa != null) {
+            etapaService.updateAddValor(etapa.getId(), oportunidadeBanco.getValor());
+        }
+        OportunidadeDTO dto = toDto(oportunidadeBanco);
+        afterCommit(() -> messagingTemplate.convertAndSend("/topic/newoportunidade", dto));
+    }
+
     private Participante preencheCliente(Participante participanteBanco, OportunidadeClienteRequest cliente) {
         participanteBanco.setNome(cliente.nome());
         participanteBanco.setLogin(cliente.login());

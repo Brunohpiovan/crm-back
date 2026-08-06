@@ -147,4 +147,17 @@ public class OportunidadeController {
         oportunidadeService.moverParaLixeira(id);
         return ResponseEntity.ok().build();
     }
+
+    @Operation(summary = "Restaurar uma oportunidade da lixeira",
+            description = "Requer JWT. Marca a oportunidade novamente como ABERTO e devolve seu valor ao total acumulado da etapa em que estava. Após a operação, o backend publica a oportunidade no canal WebSocket /topic/newoportunidade, para que volte a aparecer em tempo real no board de outros clientes conectados.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Oportunidade restaurada com sucesso (resposta sem corpo)"),
+            @ApiResponse(responseCode = "400", description = "Oportunidade não encontrada para o id informado (resposta em texto puro, não JSON estruturado)",
+                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Oportunidade com id 1 nao encontrada")))
+    })
+    @PutMapping(value = "/{id}/restaurar")
+    public ResponseEntity<?> restaurar(@Parameter(description = "Id da oportunidade", required = true) @PathVariable Long id) {
+        oportunidadeService.restaurar(id);
+        return ResponseEntity.ok().build();
+    }
 }
