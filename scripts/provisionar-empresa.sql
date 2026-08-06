@@ -31,10 +31,11 @@ INSERT INTO empresa (
 SET @empresa_id = LAST_INSERT_ID();
 
 INSERT INTO usuario (
-  empresa_id, nome, login, senha, rg, cpf, data_nascimento, celular, cargo,
+  public_id, empresa_id, nome, login, senha, rg, cpf, data_nascimento, celular, cargo,
   endereco, numero_residencial, complemento, bairro, uf, cidade, cep,
   observacoes, url_picture, bloqueado, criado_em, atualizado_em
 ) VALUES (
+  UUID(),
   @empresa_id,
   '<Nome do Administrador>',
   '<admin@empresa.com>',        -- login: único dentro desta empresa (pode repetir entre empresas diferentes)
@@ -61,10 +62,11 @@ INSERT INTO usuario (
 -- um Participante (tipo FUNCIONARIO) — usado no chat interno. Reproduzido aqui pra não deixar o
 -- admin provisionado manualmente faltando dos contatos do chat interno.
 INSERT INTO participante (
-  empresa_id, nome, login, rg, cpf, data_nascimento, celular,
+  public_id, empresa_id, nome, login, rg, cpf, data_nascimento, celular,
   endereco, numero_residencial, complemento, bairro, uf, cidade, observacoes,
   tipo_participante, url_picture, criado_em, atualizado_em
 ) VALUES (
+  UUID(),
   @empresa_id,
   '<Nome do Administrador>',
   '<admin@empresa.com>',
