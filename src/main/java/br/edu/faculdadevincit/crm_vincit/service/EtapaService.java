@@ -51,12 +51,12 @@ public class EtapaService {
     }
 
 
-    public EtapaDto findById(Long id) {
-        Etapa etapa = etapaRepository.findById(id)
+    public EtapaDto findById(String id) {
+        Etapa etapa = etapaRepository.findByPublicId(id)
                 .orElseThrow(() -> new RuntimeException("Etapa com id " + id + " não encontrado"));
 
         List<OportunidadeDTO> oportunidades =
-                carregarOportunidadesPorEtapa(List.of(id)).getOrDefault(id, List.of());
+                carregarOportunidadesPorEtapa(List.of(etapa.getId())).getOrDefault(etapa.getId(), List.of());
 
         return new EtapaDto(etapa, oportunidades);
     }
@@ -96,13 +96,12 @@ public class EtapaService {
 
 
     public EtapaDto create(EtapaCreateRequest etapaCreateRequest) {
-        Long funilId = etapaCreateRequest.funil().getId();
-        boolean exists = etapaRepository.existsByNomeAndFunilId(etapaCreateRequest.nome(), funilId);
+        Funil funil = funilRepository.findByPublicId(etapaCreateRequest.funil().getId())
+                .orElseThrow(() -> new RuntimeException("Funil não encontrado"));
+        boolean exists = etapaRepository.existsByNomeAndFunilId(etapaCreateRequest.nome(), funil.getId());
         if (exists) {
             throw new RuntimeException("Já existe um etapa com o mesmo nome neste funil.");
         }
-        Funil funil = funilRepository.findById(funilId)
-                .orElseThrow(() -> new RuntimeException("Funil não encontrado"));
         Etapa etapa = new Etapa();
         etapa.setNome(etapaCreateRequest.nome());
         etapa.setFunil(funil);
@@ -145,37 +144,41 @@ public class EtapaService {
     }
 
 
-    public void update(Long id, EtapaUpdateDTO etapa) {
-        boolean exists = etapaRepository.existsByNomeAndFunilId(etapa.getNome(), etapa.getFunil().getId());
+    public void update(String id, EtapaUpdateDTO etapa) {
+        Funil funilFiltro = funilRepository.findByPublicId(etapa.getFunil().getId())
+                .orElseThrow(() -> new RuntimeException("Funil nao encontrado"));
+        boolean exists = etapaRepository.existsByNomeAndFunilId(etapa.getNome(), funilFiltro.getId());
         if (exists) {
             throw new RuntimeException("Já existe um etapa com o mesmo nome neste funil.");
         }
-        Etapa etapaBanco = etapaRepository.findById(id).orElseThrow(()-> new RuntimeException("Etapa com id "+id+" nao encontrada"));
+        Etapa etapaBanco = etapaRepository.findByPublicId(id).orElseThrow(()-> new RuntimeException("Etapa com id "+id+" nao encontrada"));
         Etapa savedEtapa = etapaRepository.save(preencheEtapa(etapaBanco, etapa));
         EtapaUpdate2DTO dto = new EtapaUpdate2DTO(savedEtapa);
         messagingTemplate.convertAndSend("/topic/updateEtapa", dto);
     }
 
-    public void delete(Long id) {
-        Etapa etapaBanco = etapaRepository.findById(id).orElseThrow(()-> new RuntimeException("Etapa com id "+id+" nao encontrada"));
-        long oportunidadesAtivas = oportunidadeRepository.countPorEtapaIdIn(List.of(id));
+    public void delete(String id) {
+        Etapa etapaBanco = etapaRepository.findByPublicId(id).orElseThrow(()-> new RuntimeException("Etapa com id "+id+" nao encontrada"));
+        long oportunidadesAtivas = oportunidadeRepository.countPorEtapaIdIn(List.of(etapaBanco.getId()));
         if (oportunidadesAtivas > 0) {
             throw new ConflictException("Não é possível excluir a etapa: existem " + oportunidadesAtivas
                     + " oportunidade(s) nela. Mova ou envie para a lixeira antes de excluir.");
         }
         etapaRepository.delete(etapaBanco);
-        messagingTemplate.convertAndSend("/topic/deleteetapa", etapaBanco.getId());
+        messagingTemplate.convertAndSend("/topic/deleteetapa", etapaBanco.getPublicId());
     }
 
-    public List<EtapaFunilDTO> findByFunilId(Long funilId) {
-        List<Etapa> etapas = etapaRepository.findByFunilId(funilId);
-        return etapas.stream().map(EtapaFunilDTO::new).collect(Collectors.toList());
+    public List<EtapaFunilDTO> findByFunilId(String funilId) {
+        return funilRepository.findByPublicId(funilId)
+                .map(funil -> etapaRepository.findByFunilId(funil.getId()))
+                .orElseGet(List::of)
+                .stream().map(EtapaFunilDTO::new).collect(Collectors.toList());
     }
 
     public Etapa preencheEtapa(Etapa etapaBanco, EtapaUpdateDTO newEtapa){
         etapaBanco.setNome(newEtapa.getNome());
         if (newEtapa.getFunil() != null) {
-            Funil funil = funilRepository.findById(newEtapa.getFunil().getId()).orElseThrow(()->new RuntimeException("Funil nao encontrado"));
+            Funil funil = funilRepository.findByPublicId(newEtapa.getFunil().getId()).orElseThrow(()->new RuntimeException("Funil nao encontrado"));
             etapaBanco.setFunil(funil);
         }
         etapaBanco.setAtualizadoEm(LocalDateTime.now());

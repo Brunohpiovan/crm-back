@@ -55,7 +55,7 @@ public class TagController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Tag nao encontrada")))
     })
     @GetMapping(value = "/{id}")
-    public ResponseEntity<TagDTO> findById(@Parameter(description = "Id da tag", required = true) @PathVariable Long id){
+    public ResponseEntity<TagDTO> findById(@Parameter(description = "Id da tag", required = true) @PathVariable String id){
         return ResponseEntity.ok(tagService.findById(id));
     }
 
@@ -84,7 +84,7 @@ public class TagController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Tag nao encontrada")))
     })
     @DeleteMapping(value = "/{id}")
-    public ResponseEntity<?> delete(@Parameter(description = "Id da tag", required = true) @PathVariable Long id) {
+    public ResponseEntity<?> delete(@Parameter(description = "Id da tag", required = true) @PathVariable String id) {
         tagService.delete(id);
         return ResponseEntity.ok(Map.of("message", "Tag apagada com sucesso"));
     }
@@ -101,7 +101,7 @@ public class TagController {
                     })
     })
     @PutMapping(value = "/{id}")
-    public ResponseEntity<?> update(@Parameter(description = "Id da tag", required = true) @PathVariable Long id, @RequestBody @Valid TagRequestDTO tag) {
+    public ResponseEntity<?> update(@Parameter(description = "Id da tag", required = true) @PathVariable String id, @RequestBody @Valid TagRequestDTO tag) {
         tagService.update(id, tag);
         return ResponseEntity.ok().build();
     }

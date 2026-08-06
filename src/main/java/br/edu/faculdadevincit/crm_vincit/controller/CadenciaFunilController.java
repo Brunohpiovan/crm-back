@@ -50,7 +50,7 @@ public class CadenciaFunilController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Cadencia de Funil nao encontrada")))
     })
     @GetMapping(value = "/{id}")
-    public ResponseEntity<?> findById(@Parameter(description = "Id da cadência de funil", required = true) @PathVariable Long id){
+    public ResponseEntity<?> findById(@Parameter(description = "Id da cadência de funil", required = true) @PathVariable String id){
         return ResponseEntity.ok(cadenciaFunilService.findById(id));
     }
 
@@ -75,7 +75,7 @@ public class CadenciaFunilController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Tag nao encontrada")))
     })
     @DeleteMapping(value = "/{id}")
-    public ResponseEntity<?> delete(@Parameter(description = "Id da cadência de funil", required = true) @PathVariable Long id) {
+    public ResponseEntity<?> delete(@Parameter(description = "Id da cadência de funil", required = true) @PathVariable String id) {
         cadenciaFunilService.delete(id);
         return ResponseEntity.ok(Map.of("message", "Cadencia apagada com sucesso"));
     }
@@ -94,7 +94,7 @@ public class CadenciaFunilController {
                     })
     })
     @PutMapping(value = "/{id}")
-    public ResponseEntity<?> update(@Parameter(description = "Id da cadência de funil", required = true) @PathVariable Long id, @RequestBody @Valid CadenciaFunilRequestDto cadenciaFunil) {
+    public ResponseEntity<?> update(@Parameter(description = "Id da cadência de funil", required = true) @PathVariable String id, @RequestBody @Valid CadenciaFunilRequestDto cadenciaFunil) {
         cadenciaFunilService.update(id, cadenciaFunil);
         return ResponseEntity.ok().build();
     }

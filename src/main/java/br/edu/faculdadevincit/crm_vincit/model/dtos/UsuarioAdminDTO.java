@@ -15,11 +15,11 @@ import lombok.Setter;
 @AllArgsConstructor
 public class UsuarioAdminDTO {
 
-    private Long id;
+    private String id;
     private String nome;
 
     public UsuarioAdminDTO(Usuario usuario){
-        this.id = usuario.getId();
+        this.id = usuario.getPublicId();
         this.nome = usuario.getNome();
     }
 }

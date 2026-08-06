@@ -15,13 +15,13 @@ import lombok.Setter;
 @AllArgsConstructor
 public class TagOportunidadeDTO {
 
-    private Long id;
+    private String id;
     private String nome;
     @Schema(description = "Cor de exibição da tag na interface")
     private Cor cor;
 
     public TagOportunidadeDTO(Tag tag){
-        this.id = tag.getId();
+        this.id = tag.getPublicId();
         this.nome = tag.getNome();
         this.cor = tag.getCor();
     }

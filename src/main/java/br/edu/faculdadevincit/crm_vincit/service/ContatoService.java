@@ -43,8 +43,8 @@ public class ContatoService {
 
         OportunidadeCreateRequest request = new OportunidadeCreateRequest(
                 contatoDTO.getNome(),
-                etapa.getId(),
-                usuario.getId(),
+                etapa.getPublicId(),
+                usuario.getPublicId(),
                 cliente,
                 BigDecimal.ZERO,
                 null,

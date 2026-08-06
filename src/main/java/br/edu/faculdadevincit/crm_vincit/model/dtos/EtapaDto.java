@@ -18,7 +18,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class EtapaDto {
-    private Long id;
+    private String id;
     private String nome;
     @Schema(description = "Campo não utilizado atualmente (sempre nulo nas respostas)")
     private String posicao;
@@ -29,7 +29,7 @@ public class EtapaDto {
     private BigDecimal valor_total;
 
     public EtapaDto(Etapa etapa) {
-        this.id = etapa.getId();
+        this.id = etapa.getPublicId();
         this.nome = etapa.getNome();
         this.funil = new FunilDtoCard(etapa.getFunil());
         //this.posicao = card.getPosicao();
@@ -41,7 +41,7 @@ public class EtapaDto {
     }
 
     public EtapaDto(Etapa etapa, List<OportunidadeDTO> oportunidades) {
-        this.id = etapa.getId();
+        this.id = etapa.getPublicId();
         this.nome = etapa.getNome();
         this.funil = new FunilDtoCard(etapa.getFunil());
         this.oportunidades = oportunidades != null ? oportunidades : new ArrayList<>();

@@ -49,7 +49,7 @@ public class OportunidadeController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Oportunidade com id 1 nao encontrada")))
     })
     @GetMapping(value = "/{id}")
-    public ResponseEntity<OportunidadeDTO> findById(@Parameter(description = "Id da oportunidade", required = true) @PathVariable Long id) {
+    public ResponseEntity<OportunidadeDTO> findById(@Parameter(description = "Id da oportunidade", required = true) @PathVariable String id) {
         return ResponseEntity.ok(oportunidadeService.findById(id));
     }
 
@@ -58,7 +58,7 @@ public class OportunidadeController {
     @ApiResponse(responseCode = "200", description = "Oportunidade encontrada, ou null se o cliente não possuir oportunidade sem criador",
             content = @Content(schema = @Schema(implementation = OportunidadeDTO.class)))
     @GetMapping(value = "/cliente/{id}")
-    public ResponseEntity<OportunidadeDTO> findByClienteAndCriadorNull(@Parameter(description = "Id do cliente/participante", required = true) @PathVariable Long id) {
+    public ResponseEntity<OportunidadeDTO> findByClienteAndCriadorNull(@Parameter(description = "Id do cliente/participante", required = true) @PathVariable String id) {
         return ResponseEntity.ok(oportunidadeService.findByClienteAndCriadorNull(id));
     }
 
@@ -97,7 +97,7 @@ public class OportunidadeController {
     })
     @PutMapping(value = "/{id}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     public ResponseEntity<OportunidadeDTO> update(
-            @Parameter(description = "Id da oportunidade a ser atualizada", required = true) @PathVariable Long id,
+            @Parameter(description = "Id da oportunidade a ser atualizada", required = true) @PathVariable String id,
             @Parameter(description = "Dados atualizados da oportunidade, em JSON", required = true) @RequestPart("oportunidade") @Valid OportunidadeUpdateRequest oportunidade,
             @Parameter(description = "Novo arquivo de imagem opcional para substituir o anexo atual (PNG, JPG, JPEG, WEBP ou GIF, até 100 MB)") @RequestPart(value = "file", required = false) MultipartFile file) {
 
@@ -130,7 +130,7 @@ public class OportunidadeController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Oportunidade com id 1 nao encontrada")))
     })
     @DeleteMapping(value = "/{id}")
-    public ResponseEntity<?> delete(@Parameter(description = "Id da oportunidade", required = true) @PathVariable Long id) {
+    public ResponseEntity<?> delete(@Parameter(description = "Id da oportunidade", required = true) @PathVariable String id) {
         oportunidadeService.delete(id);
         return ResponseEntity.ok().build();
     }
@@ -143,7 +143,7 @@ public class OportunidadeController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Oportunidade com id 1 nao encontrada")))
     })
     @PutMapping(value = "/{id}/lixeira")
-    public ResponseEntity<?> moverParaLixeira(@Parameter(description = "Id da oportunidade", required = true) @PathVariable Long id) {
+    public ResponseEntity<?> moverParaLixeira(@Parameter(description = "Id da oportunidade", required = true) @PathVariable String id) {
         oportunidadeService.moverParaLixeira(id);
         return ResponseEntity.ok().build();
     }
@@ -156,7 +156,7 @@ public class OportunidadeController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Oportunidade com id 1 nao encontrada")))
     })
     @PutMapping(value = "/{id}/restaurar")
-    public ResponseEntity<?> restaurar(@Parameter(description = "Id da oportunidade", required = true) @PathVariable Long id) {
+    public ResponseEntity<?> restaurar(@Parameter(description = "Id da oportunidade", required = true) @PathVariable String id) {
         oportunidadeService.restaurar(id);
         return ResponseEntity.ok().build();
     }

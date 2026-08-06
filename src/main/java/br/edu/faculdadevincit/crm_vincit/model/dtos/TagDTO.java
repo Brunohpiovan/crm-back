@@ -17,7 +17,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class TagDTO {
 
-    private Long id;
+    private String id;
 
     private String nome;
 
@@ -32,7 +32,7 @@ public class TagDTO {
 
 
     public TagDTO(Tag tag){
-        this.id = tag.getId();
+        this.id = tag.getPublicId();
         this.nome = tag.getNome();
         this.cor = tag.getCor();
         this.pertence = tag.getPertence();

@@ -24,7 +24,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class UsuarioResponseDto {
 
-    private Long id;
+    private String id;
     private String urlPicture;
     @NotNull(message = "O campo NOME é requerido.")
     @Size(min = 3, max = 100, message = "O nome deve ter entre 3 e 100 caracteres")
@@ -62,7 +62,7 @@ public class UsuarioResponseDto {
     private Boolean bloqueado;
 
     public UsuarioResponseDto(Usuario usuario){
-        this.id = usuario.getId();
+        this.id = usuario.getPublicId();
         this.nome = usuario.getNome();
         this.urlPicture=usuario.getUrlPicture();
         this.login = usuario.getLogin();

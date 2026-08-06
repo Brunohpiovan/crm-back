@@ -16,7 +16,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class ParticipanteDTO {
 
-    private Long id;
+    private String id;
     private String urlPicture;
     private String nome;
     private String login;
@@ -31,7 +31,7 @@ public class ParticipanteDTO {
     }
 
     public ParticipanteDTO(Participante participante, boolean openProtocol) {
-        this.id = participante.getId();
+        this.id = participante.getPublicId();
         this.nome = participante.getNome();
         this.login = participante.getLogin();
         this.celular = participante.getCelular();

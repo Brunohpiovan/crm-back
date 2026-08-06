@@ -7,9 +7,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface TagRepository extends JpaRepository<Tag, Long> {
+    Optional<Tag> findByPublicId(String publicId);
+
+    List<Tag> findAllByPublicIdIn(List<String> publicIds);
+
     boolean existsByNome(String nome);
 
     @Query("SELECT t FROM Tag t ORDER BY " +

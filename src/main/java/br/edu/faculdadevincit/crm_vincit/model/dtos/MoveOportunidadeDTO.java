@@ -16,10 +16,10 @@ import lombok.Setter;
 public class MoveOportunidadeDTO {
     @Schema(description = "Id da oportunidade a ser movida")
     @NotNull(message = "Informe a oportunidade")
-    private Long oportunidadeId;
+    private String oportunidadeId;
     @Schema(description = "Id da etapa de destino (pode ser a mesma etapa atual, para apenas reordenar)")
     @NotNull(message = "Informe a etapa")
-    private Long etapaId;
+    private String etapaId;
     @Schema(description = "Posição (0-based) que a oportunidade deve ocupar na lista de oportunidades da etapa de destino")
     @Min(value = 0, message = "O indice deve ser maior ou igual a zero")
     private int indice;

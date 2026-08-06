@@ -14,7 +14,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class ChatGrupoResponseDTO {
 
-    private Long id;
+    private String id;
     private String nome;
     @Schema(description = "URL pública do avatar do grupo no S3 (ou o avatar padrão, se o grupo não tiver um customizado).")
     private String avatarUrl;
@@ -25,7 +25,7 @@ public class ChatGrupoResponseDTO {
 
 
     public ChatGrupoResponseDTO(ChatGrupo chatGrupo){
-        this.id = chatGrupo.getId();;
+        this.id = chatGrupo.getPublicId();;
         this.nome = chatGrupo.getNome();;
         this.avatarUrl = chatGrupo.getAvatarUrl();;
         this.imagemFundoUrl = chatGrupo.getImagemFundoUrl();;

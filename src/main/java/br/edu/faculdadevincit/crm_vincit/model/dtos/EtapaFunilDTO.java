@@ -14,11 +14,11 @@ import lombok.Setter;
 @AllArgsConstructor
 public class EtapaFunilDTO {
 
-    private Long id;
+    private String id;
     private String nome;
 
     public EtapaFunilDTO(Etapa etapa) {
-        this.id = etapa.getId();
+        this.id = etapa.getPublicId();
         this.nome = etapa.getNome();
 
     }

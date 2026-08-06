@@ -37,13 +37,13 @@ public class ChatGrupoController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Id do grupo privado encontrado",
-                    content = @Content(schema = @Schema(implementation = Long.class))),
+                    content = @Content(schema = @Schema(implementation = String.class))),
             @ApiResponse(responseCode = "204", description = "Não existe grupo privado entre os dois usuários informados (ou algum dos usuários não existe)")
     })
     @GetMapping("/{idUsuario1}/{idUsuario2}")
     public ResponseEntity<?> getProtocoloByUsuario(
-            @Parameter(description = "Id do primeiro usuário", required = true) @PathVariable Long idUsuario1,
-            @Parameter(description = "Id do segundo usuário", required = true) @PathVariable Long idUsuario2) {
+            @Parameter(description = "Id do primeiro usuário", required = true) @PathVariable String idUsuario1,
+            @Parameter(description = "Id do segundo usuário", required = true) @PathVariable String idUsuario2) {
         return chatGrupoService.getGrupoByUsuario(idUsuario1, idUsuario2)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.noContent().build());
@@ -62,7 +62,7 @@ public class ChatGrupoController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Usuário não encontrado")))
     })
     @GetMapping("/{idUsuario}")
-    public ResponseEntity<?> getProtocoloByUsuarioAndPublic(@Parameter(description = "Id do usuário", required = true) @PathVariable Long idUsuario) {
+    public ResponseEntity<?> getProtocoloByUsuarioAndPublic(@Parameter(description = "Id do usuário", required = true) @PathVariable String idUsuario) {
         return chatGrupoService.getGrupoByUsuarioAndPublic(idUsuario)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.noContent().build());
@@ -80,7 +80,7 @@ public class ChatGrupoController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "grupo nao encontrado")))
     })
     @GetMapping("/id/{idUsuario}")
-    public ResponseEntity<?> findById(@Parameter(description = "Id do grupo", required = true) @PathVariable Long idUsuario){
+    public ResponseEntity<?> findById(@Parameter(description = "Id do grupo", required = true) @PathVariable String idUsuario){
         ChatGrupoResponseById grupo = chatGrupoService.findById(idUsuario);
         return ResponseEntity.ok(grupo);
     }
@@ -140,7 +140,7 @@ public class ChatGrupoController {
     })
     @PutMapping(value = "/{id}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     public ResponseEntity<?> update(
-            @Parameter(description = "Id do grupo a ser atualizado", required = true) @PathVariable Long id,
+            @Parameter(description = "Id do grupo a ser atualizado", required = true) @PathVariable String id,
             @Parameter(description = "Dados do grupo em JSON (parte multipart 'grupo')", required = true)
             @RequestPart("grupo") GrupoCreateDTO grupo,
             @Parameter(description = "Novo arquivo de imagem para o avatar do grupo (parte multipart opcional)")

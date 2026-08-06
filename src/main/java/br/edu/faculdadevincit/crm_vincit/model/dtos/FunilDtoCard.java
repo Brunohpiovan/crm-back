@@ -13,11 +13,11 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class FunilDtoCard {
-    private Long id;
+    private String id;
     private String nome;
 
     public FunilDtoCard(Funil funil) {
-        this.id = funil.getId();
+        this.id = funil.getPublicId();
         this.nome = funil.getNome();
     }
 }

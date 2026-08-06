@@ -15,7 +15,7 @@ import java.time.LocalTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CadenciaAllDTO {
-    private Long id;
+    private String id;
     private String nome;
     @Schema(description = "Nome do funil de origem, de onde as oportunidades elegíveis são movidas")
     private String funilOrigem;
@@ -33,7 +33,7 @@ public class CadenciaAllDTO {
     private Situacao situacao;
 
     public CadenciaAllDTO(CadenciaFunil cadenciaFunil) {
-        this.id = cadenciaFunil.getId();
+        this.id = cadenciaFunil.getPublicId();
         this.nome = cadenciaFunil.getNome();
         this.funilOrigem = cadenciaFunil.getFunilOrigem().getNome();
         this.etapaOrigem = cadenciaFunil.getEtapaOrigem().getNome();

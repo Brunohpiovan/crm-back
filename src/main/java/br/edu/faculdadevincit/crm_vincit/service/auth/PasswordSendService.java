@@ -12,7 +12,6 @@ import com.resend.core.exception.ResendException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import java.net.URLDecoder;
@@ -65,9 +64,12 @@ public class PasswordSendService {
             throw new InvalidEmailException("Endereço de e-mail inválido.");
         }
 
-        Optional<UserDetails> userOpt = usuarioRepository.findByLogin(decodedEmail);
+        // findByEmpresaCodigoAndLogin (nativa) de propósito: este fluxo é anterior a qualquer
+        // autenticação (TenantContext vazio), e login não é mais único globalmente — ver
+        // comentário do método no UsuarioRepository.
+        Optional<Usuario> userOpt = usuarioRepository.findByEmpresaCodigoAndLogin(mail.codigoEmpresa(), decodedEmail);
         if (userOpt.isPresent()) {
-            Usuario user = (Usuario) userOpt.get();
+            Usuario user = userOpt.get();
 
             String token = generateSecureToken();
             PasswordResetToken resetToken = new PasswordResetToken();

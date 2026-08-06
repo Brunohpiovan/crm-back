@@ -72,8 +72,10 @@ public class OportunidadeService {
     @Autowired
     private OportunidadeService self;
 
-    public OportunidadeDTO findByClienteAndCriadorNull(Long clienteId) {
-        return oportunidadeRepository.findByClienteIdAndCriadorIsNull(clienteId)
+    public OportunidadeDTO findByClienteAndCriadorNull(String clienteId) {
+        Participante cliente = participanteRepository.findByPublicId(clienteId)
+                .orElseThrow(() -> new RuntimeException("Cliente não encontrado"));
+        return oportunidadeRepository.findByClienteIdAndCriadorIsNull(cliente.getId())
                 .map(this::toDto)
                 .orElse(null);
     }
@@ -82,8 +84,8 @@ public class OportunidadeService {
         return oportunidadeRepository.findAllWithDetails(pageable).map(this::toDto);
     }
 
-    public OportunidadeDTO findById(Long id) {
-        Oportunidade oportunidade = oportunidadeRepository.findByIdWithDetails(id)
+    public OportunidadeDTO findById(String id) {
+        Oportunidade oportunidade = oportunidadeRepository.findByPublicIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Oportunidade com id " + id + " nao encontrada"));
         return toDto(oportunidade);
     }
@@ -103,9 +105,9 @@ public class OportunidadeService {
 
     @Transactional
     OportunidadeDTO criarComAnexoResolvido(OportunidadeCreateRequest request, String urlAnexo) {
-        Etapa etapa = etapaRepository.findById(request.etapaId())
+        Etapa etapa = etapaRepository.findByPublicId(request.etapaId())
                 .orElseThrow(() -> new RuntimeException("Etapa não encontrado"));
-        Usuario criador = usuarioRepository.findById(request.criadorId())
+        Usuario criador = usuarioRepository.findByPublicId(request.criadorId())
                 .orElseThrow(() -> new RuntimeException("Dono não encontrado"));
 
         List<Tag> tags = resolveTags(request.tagIds());
@@ -169,40 +171,38 @@ public class OportunidadeService {
         novo.setCelular(participante.getCelular());
         novo.setTipoParticipante(TipoParticipante.PARTICIPANTE);
         Participante salvo = participanteRepository.save(novo);
-        UsuarioContatoDto contatoDto = new UsuarioContatoDto(salvo.getId(), salvo.getNome(), salvo.getUrlPicture());
+        UsuarioContatoDto contatoDto = new UsuarioContatoDto(salvo.getPublicId(), salvo.getNome(), salvo.getUrlPicture());
         afterCommit(() -> messagingTemplate.convertAndSend("/topic/usuarios", contatoDto));
         return salvo;
     }
 
-    private List<Tag> resolveTags(List<Long> tagIds) {
+    private List<Tag> resolveTags(List<String> tagIds) {
         if (tagIds == null || tagIds.isEmpty()) {
             return new ArrayList<>();
         }
-        List<Tag> tags = tagRepository.findAllById(tagIds);
+        List<Tag> tags = tagRepository.findAllByPublicIdIn(tagIds);
         if (tags.size() != new HashSet<>(tagIds).size()) {
             throw new RuntimeException("Uma ou mais tags informadas não foram encontradas");
         }
         return tags;
     }
 
-    public OportunidadeDTO update(Long id, OportunidadeUpdateRequest request, MultipartFile file) {
-        if (!oportunidadeRepository.existsById(id)) {
-            throw new RuntimeException("Oportunidade com id " + id + " nao encontrada");
-        }
-        String urlAnexoAtual = oportunidadeRepository.findUrlAnexoById(id).orElse(null);
-        String urlAnexoFinal = resolveAnexo(urlAnexoAtual, request.urlAnexo(), file);
-        return self.atualizarComAnexoResolvido(id, request, urlAnexoFinal);
+    public OportunidadeDTO update(String id, OportunidadeUpdateRequest request, MultipartFile file) {
+        Oportunidade oportunidadeBanco = oportunidadeRepository.findByPublicId(id)
+                .orElseThrow(() -> new RuntimeException("Oportunidade com id " + id + " nao encontrada"));
+        String urlAnexoFinal = resolveAnexo(oportunidadeBanco.getUrl_anexo(), request.urlAnexo(), file);
+        return self.atualizarComAnexoResolvido(oportunidadeBanco.getId(), request, urlAnexoFinal);
     }
 
     @Transactional
     OportunidadeDTO atualizarComAnexoResolvido(Long id, OportunidadeUpdateRequest request, String urlAnexoFinal) {
         Oportunidade oportunidadeBanco = oportunidadeRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Oportunidade com id " + id + " nao encontrada"));
-        Etapa novaEtapa = etapaRepository.findById(request.etapaId())
+        Etapa novaEtapa = etapaRepository.findByPublicId(request.etapaId())
                 .orElseThrow(() -> new RuntimeException("Etapa não encontrado"));
-        Usuario criador = usuarioRepository.findById(request.criadorId())
+        Usuario criador = usuarioRepository.findByPublicId(request.criadorId())
                 .orElseThrow(() -> new RuntimeException("Dono não encontrado"));
-        Participante clienteBanco = participanteRepository.findById(request.cliente().id())
+        Participante clienteBanco = participanteRepository.findByPublicId(request.cliente().id())
                 .orElseThrow(() -> new RuntimeException("Cliente não encontrado"));
 
         Etapa etapaAntiga = oportunidadeBanco.getEtapa();
@@ -307,10 +307,12 @@ public class OportunidadeService {
     }
 
     @Transactional
-    public void movimentoOportunidade(Long oportunidadeId, Long etapaId, int novoIndice) {
-        Oportunidade oportunidade = oportunidadeRepository.findByIdWithDetails(oportunidadeId)
+    public void movimentoOportunidade(String oportunidadeId, String etapaId, int novoIndice) {
+        Oportunidade oportunidade = oportunidadeRepository.findByPublicIdWithDetails(oportunidadeId)
                 .orElseThrow(() -> new RuntimeException("Oportunidade não encontrada"));
-        movimentarOportunidadeCarregada(oportunidade, etapaId, novoIndice);
+        Etapa etapaDestino = etapaRepository.findByPublicId(etapaId)
+                .orElseThrow(() -> new RuntimeException("Etapa não encontrado"));
+        movimentarOportunidadeCarregada(oportunidade, etapaDestino.getId(), novoIndice);
     }
 
     /**
@@ -340,7 +342,7 @@ public class OportunidadeService {
             reorganizarIndices(novaEtapa.getId(), oportunidade, novoIndice);
         }
 
-        OportunidadeMovimentoDTO movimentoDto = new OportunidadeMovimentoDTO(oportunidade.getId(), etapaId);
+        OportunidadeMovimentoDTO movimentoDto = new OportunidadeMovimentoDTO(oportunidade.getPublicId(), oportunidade.getEtapa().getPublicId());
         afterCommit(() -> messagingTemplate.convertAndSend("/topic/movimentoOportunidade", movimentoDto));
     }
 
@@ -364,8 +366,8 @@ public class OportunidadeService {
     }
 
     @Transactional
-    public void delete(Long id) {
-        Oportunidade oportunidadeBanco = oportunidadeRepository.findById(id)
+    public void delete(String id) {
+        Oportunidade oportunidadeBanco = oportunidadeRepository.findByPublicId(id)
                 .orElseThrow(() -> new RuntimeException("Oportunidade com id " + id + " nao encontrada"));
         Etapa etapa = oportunidadeBanco.getEtapa();
         BigDecimal valor = oportunidadeBanco.getValor();
@@ -384,8 +386,8 @@ public class OportunidadeService {
      * verdade colide com o histórico de movimentação por cadência).
      */
     @Transactional
-    public void moverParaLixeira(Long id) {
-        Oportunidade oportunidadeBanco = oportunidadeRepository.findById(id)
+    public void moverParaLixeira(String id) {
+        Oportunidade oportunidadeBanco = oportunidadeRepository.findByPublicId(id)
                 .orElseThrow(() -> new RuntimeException("Oportunidade com id " + id + " nao encontrada"));
         Etapa etapa = oportunidadeBanco.getEtapa();
         BigDecimal valor = oportunidadeBanco.getValor();
@@ -404,8 +406,8 @@ public class OportunidadeService {
      * oportunidade está "aparecendo" de novo, não só sendo atualizada.
      */
     @Transactional
-    public void restaurar(Long id) {
-        Oportunidade oportunidadeBanco = oportunidadeRepository.findByIdWithDetails(id)
+    public void restaurar(String id) {
+        Oportunidade oportunidadeBanco = oportunidadeRepository.findByPublicIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Oportunidade com id " + id + " nao encontrada"));
         Etapa etapa = oportunidadeBanco.getEtapa();
         oportunidadeBanco.setSituacao(SituacaoOportunidade.ABERTO);

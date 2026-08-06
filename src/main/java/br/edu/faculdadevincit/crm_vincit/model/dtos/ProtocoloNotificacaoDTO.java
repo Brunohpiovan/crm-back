@@ -13,7 +13,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class ProtocoloNotificacaoDTO {
     @Schema(description = "Id do Participante do protocolo recém-aberto")
-    private Long participanteId;
+    private String participanteId;
     @Schema(description = "Id do Usuario (administrador) do protocolo recém-aberto")
-    private Long adminId;
+    private String adminId;
 }

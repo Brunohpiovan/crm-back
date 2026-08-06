@@ -19,6 +19,10 @@ import java.util.Optional;
 
 @Repository
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
+    Optional<Usuario> findByPublicId(String publicId);
+
+    List<Usuario> findAllByPublicIdIn(List<String> publicIds);
+
     Optional<UserDetails> findByLogin(String login);
 
     boolean existsByLoginIgnoreCase(String login);
@@ -26,8 +30,30 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     boolean existsByCpf(String cpf);
     boolean existsByCpfAndIdNot(String cpf, Long id);
 
+    /**
+     * Nativa de propósito: login/cpf são únicos por Empresa agora, e esta é a query usada
+     * ANTES de qualquer autenticação (AuthorizationService.loadUserByUsername) — o
+     * TenantContext ainda não foi populado nesse ponto (é o próprio login que descobre qual é
+     * a empresa, via codigoEmpresa), então uma query JPQL normal seria filtrada pelo
+     * TenantIdentifierResolver e nunca encontraria ninguém (ver @TenantId em Usuario). Nativa
+     * escapa desse filtro de propósito, não por descuido.
+     */
+    @Query(value = "SELECT u.* FROM usuario u JOIN empresa e ON e.id = u.empresa_id WHERE e.codigo = :codigoEmpresa AND u.login = :login", nativeQuery = true)
+    Optional<Usuario> findByEmpresaCodigoAndLogin(@Param("codigoEmpresa") String codigoEmpresa, @Param("login") String login);
+
+    /**
+     * Nativa de propósito, mesmo motivo de findByEmpresaCodigoAndLogin: usada em
+     * PasswordResetService.changePassord (POST /reset-password, permitAll), onde ainda não há
+     * TenantContext populado — a prova de identidade nesse fluxo é o próprio token opaco
+     * (PasswordResetToken), não uma sessão autenticada, então não dá pra confiar em nenhum
+     * tenant já resolvido. findById normal (via @TenantId) simplesmente não encontraria
+     * ninguém nesse ponto.
+     */
+    @Query(value = "SELECT * FROM usuario WHERE id = :id", nativeQuery = true)
+    Optional<Usuario> findByIdIgnorandoTenant(@Param("id") Long id);
+
     @Query("""
-    SELECT new br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioContatoDto(u.id, u.nome, u.urlPicture)
+    SELECT new br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioContatoDto(u.publicId, u.nome, u.urlPicture)
     FROM Usuario u
     WHERE u.cargo <> :cargo
     AND u.id NOT IN (
@@ -37,27 +63,27 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     List<UsuarioContatoDto> findDisponiveisParaFunil(@Param("funilId") Long funilId, @Param("cargo") UserRole cargo);
 
     @Query("""
-    SELECT new br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioAllDTO(u.id, u.nome, u.login, u.celular, u.cargo, u.bloqueado)
+    SELECT new br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioAllDTO(u.publicId, u.nome, u.login, u.celular, u.cargo, u.bloqueado)
     FROM Usuario u
     WHERE (:search IS NULL OR LOWER(u.nome) LIKE :search OR LOWER(u.login) LIKE :search)
     """)
     Page<UsuarioAllDTO> findAllPaginado(@Param("search") String search, Pageable pageable);
 
     @Query("""
-    SELECT new br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioAllDTO(u.id, u.nome, u.login, u.celular, u.cargo, u.bloqueado)
+    SELECT new br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioAllDTO(u.publicId, u.nome, u.login, u.celular, u.cargo, u.bloqueado)
     FROM Usuario u
     WHERE u.cargo = :cargo
     """)
     List<UsuarioAllDTO> findResumoByCargo(@Param("cargo") UserRole cargo);
 
     @Query("""
-    SELECT new br.edu.faculdadevincit.crm_vincit.model.dtos.CriadorDto(u.id, u.nome, u.login, u.celular, u.urlPicture)
+    SELECT new br.edu.faculdadevincit.crm_vincit.model.dtos.CriadorDto(u.publicId, u.nome, u.login, u.celular, u.urlPicture)
     FROM Usuario u
     """)
     List<CriadorDto> findAllCriadores();
 
     @Query("""
-    SELECT DISTINCT new br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioAllContactsDTO(u.id, u.nome, u.urlPicture)
+    SELECT DISTINCT new br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioAllContactsDTO(u.publicId, u.nome, u.urlPicture)
     FROM ChatGrupo g
     JOIN g.usuarios u
     WHERE g.privado = true
@@ -66,7 +92,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     List<UsuarioAllContactsDTO> findAllContactsWithPrivateGroups(@Param("userId") Long userId);
 
     @Query("""
-    SELECT new br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioAllContactsDTO(u.id, u.nome, u.urlPicture)
+    SELECT new br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioAllContactsDTO(u.publicId, u.nome, u.urlPicture)
     FROM Usuario u
     WHERE u.id != :userId
     AND u.id NOT IN (

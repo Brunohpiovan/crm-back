@@ -1,11 +1,13 @@
 package br.edu.faculdadevincit.crm_vincit.service;
 
+import br.edu.faculdadevincit.crm_vincit.infra.security.TenantContext;
 import br.edu.faculdadevincit.crm_vincit.model.*;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.CadenciaAllDTO;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.CadenciaFunilDto;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.CadenciaFunilRequestDto;
 import br.edu.faculdadevincit.crm_vincit.model.enums.Situacao;
 import br.edu.faculdadevincit.crm_vincit.repository.CadenciaFunilRepository;
+import br.edu.faculdadevincit.crm_vincit.repository.EmpresaRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.EtapaRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.FunilRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.LogMovimentacaoCadenciaRepository;
@@ -59,6 +61,9 @@ public class CadenciaFunilService {
     @Autowired
     private LogMovimentacaoCadenciaRepository logMovimentacaoCadenciaRepository;
 
+    @Autowired
+    private EmpresaRepository empresaRepository;
+
     // Auto-injeção do proxy do Spring: moverOportunidadeIsolada só roda numa transação própria
     // (ver Javadoc do método) se for chamado através do proxy. Chamar via "this" dentro da própria
     // classe pula o proxy e o @Transactional não tem nenhum efeito - era exatamente por isso que
@@ -83,7 +88,20 @@ public class CadenciaFunilService {
         }
 
         try {
-            executarCadenciasDoMinuto();
+            // Job roda fora de qualquer requisição HTTP (sem Usuario autenticado), então
+            // TenantContext não vem populado por nenhum filtro — precisa iterar cada Empresa e
+            // setar o tenant manualmente por rodada. Empresa em si não é @TenantId (é o próprio
+            // tenant), então findAll() aqui já é global de propósito.
+            for (Empresa empresa : empresaRepository.findAll()) {
+                TenantContext.set(empresa.getId());
+                try {
+                    executarCadenciasDoMinuto();
+                } catch (Exception e) {
+                    log.error("Falha ao processar cadencias da empresa {} ({}).", empresa.getId(), empresa.getCodigo(), e);
+                } finally {
+                    TenantContext.clear();
+                }
+            }
         } finally {
             schedulerLockRepository.liberar(SCHEDULER_LOCK_NOME);
         }
@@ -166,8 +184,8 @@ public class CadenciaFunilService {
                 .toList();
     }
 
-    public CadenciaFunilDto findById(Long id){
-        return new CadenciaFunilDto(cadenciaFunilRepository.findById(id).orElseThrow(()->new RuntimeException("Cadencia de Funil nao encontrada")));
+    public CadenciaFunilDto findById(String id){
+        return new CadenciaFunilDto(cadenciaFunilRepository.findByPublicId(id).orElseThrow(()->new RuntimeException("Cadencia de Funil nao encontrada")));
     }
 
     public void create(CadenciaFunilRequestDto cadenciaFunil){
@@ -178,10 +196,10 @@ public class CadenciaFunilService {
 
     private CadenciaFunil criaCadencia(CadenciaFunilRequestDto cadenciaFunil){
         CadenciaFunil cadencia = new CadenciaFunil();
-        cadencia.setFunilOrigem(funilRepository.findById(cadenciaFunil.getFunilOrigem()).orElseThrow(()->new RuntimeException("Funil de origem nao encontrado")));
-        cadencia.setFunilDestino(funilRepository.findById(cadenciaFunil.getFunilDestino()).orElseThrow(()->new RuntimeException("Funil de destino nao encontrado")));
-        cadencia.setEtapaOrigem(etapaRepository.findById(cadenciaFunil.getEtapaOrigem()).orElseThrow(()->new RuntimeException("Etapa de origem nao encontrada")));
-        cadencia.setEtapaDestino(etapaRepository.findById(cadenciaFunil.getEtapaDestino()).orElseThrow(()->new RuntimeException("Etapa de destino nao encontrada")));
+        cadencia.setFunilOrigem(funilRepository.findByPublicId(cadenciaFunil.getFunilOrigem()).orElseThrow(()->new RuntimeException("Funil de origem nao encontrado")));
+        cadencia.setFunilDestino(funilRepository.findByPublicId(cadenciaFunil.getFunilDestino()).orElseThrow(()->new RuntimeException("Funil de destino nao encontrado")));
+        cadencia.setEtapaOrigem(etapaRepository.findByPublicId(cadenciaFunil.getEtapaOrigem()).orElseThrow(()->new RuntimeException("Etapa de origem nao encontrada")));
+        cadencia.setEtapaDestino(etapaRepository.findByPublicId(cadenciaFunil.getEtapaDestino()).orElseThrow(()->new RuntimeException("Etapa de destino nao encontrada")));
         cadencia.setNome(cadenciaFunil.getNome());
         cadencia.setDescricao(cadenciaFunil.getDescricao());
         cadencia.setDiasNaEtapa(cadenciaFunil.getDiasNaEtapa());
@@ -190,13 +208,13 @@ public class CadenciaFunilService {
         return cadencia;
     }
 
-    public void delete(Long id){
-        CadenciaFunil cadenciaFunil = cadenciaFunilRepository.findById(id).orElseThrow(()-> new RuntimeException("Tag nao encontrada"));
+    public void delete(String id){
+        CadenciaFunil cadenciaFunil = cadenciaFunilRepository.findByPublicId(id).orElseThrow(()-> new RuntimeException("Tag nao encontrada"));
         cadenciaFunilRepository.delete(cadenciaFunil);
     }
 
-    public void update(Long id, CadenciaFunilRequestDto cadenciaFunil) {
-        CadenciaFunil cadenciaBanco = cadenciaFunilRepository.findById(id)
+    public void update(String id, CadenciaFunilRequestDto cadenciaFunil) {
+        CadenciaFunil cadenciaBanco = cadenciaFunilRepository.findByPublicId(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cadencia de Funil não encontrada"));
         CadenciaFunil updateCadencia = criaCadencia(cadenciaFunil);
         CadenciaFunil newCadencia = preencheTag(cadenciaBanco, updateCadencia);

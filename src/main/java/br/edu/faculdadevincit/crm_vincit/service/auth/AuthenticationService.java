@@ -1,5 +1,6 @@
 package br.edu.faculdadevincit.crm_vincit.service.auth;
 
+import br.edu.faculdadevincit.crm_vincit.infra.security.TenantContext;
 import br.edu.faculdadevincit.crm_vincit.infra.security.TokenService;
 import br.edu.faculdadevincit.crm_vincit.model.Acesso;
 import br.edu.faculdadevincit.crm_vincit.model.Usuario;
@@ -36,7 +37,10 @@ public class AuthenticationService {
 
     public LoginResponseDTO login(AuthenticationDTO data) {
         try {
-            var usernamePassword = new UsernamePasswordAuthenticationToken(data.login(), data.senha());
+            // login é único por Empresa, não globalmente — o "username" que o Spring Security
+            // enxerga precisa carregar os dois pra desambiguar (ver AuthorizationService).
+            String username = data.codigoEmpresa() + "|" + data.login();
+            var usernamePassword = new UsernamePasswordAuthenticationToken(username, data.senha());
             var auth = authenticationManager.authenticate(usernamePassword);
             var usuario = (Usuario) auth.getPrincipal();
             var token = tokenService.generateToken(usuario);
@@ -44,9 +48,19 @@ public class AuthenticationService {
             if(usuario.getBloqueado()){
                 throw new UsuarioBloqueadoException("Você não tem permissão para acessar o sistema.");
             }
-            Acesso acesso = clientInfoService.createLogAcesso(usuario, request);
-            Long logId = acessoService.save(acesso);
-            return new LoginResponseDTO(token,logId);
+
+            // O login em si não passa pelo SecurityFilter (é permitAll, sem Authorization
+            // header), então o TenantContext ainda não foi populado neste ponto — sem isso,
+            // o insert de Acesso (que é @TenantId) cairia no sentinel -1 e violaria a FK
+            // pra empresa. Aqui já temos o Usuario autenticado, então setamos manualmente.
+            TenantContext.set(usuario.getEmpresaId());
+            try {
+                Acesso acesso = clientInfoService.createLogAcesso(usuario, request);
+                String logId = acessoService.save(acesso);
+                return new LoginResponseDTO(token, logId);
+            } finally {
+                TenantContext.clear();
+            }
         } catch (InternalAuthenticationServiceException ex) {
             throw new InternalAuthenticationServiceException("Erro na autenticação: " + ex.getMessage(), ex);
         }

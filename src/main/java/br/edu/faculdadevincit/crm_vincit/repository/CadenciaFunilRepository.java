@@ -15,6 +15,9 @@ import java.util.Optional;
 @Repository
 public interface CadenciaFunilRepository extends JpaRepository<CadenciaFunil, Long> {
 
+    @EntityGraph(attributePaths = {"funilOrigem", "etapaOrigem", "funilDestino", "etapaDestino"})
+    Optional<CadenciaFunil> findByPublicId(String publicId);
+
     /**
      * Usada pelo scheduler: traz etapaOrigem/etapaDestino já carregadas porque o processamento de
      * cada cadência roda fora de uma transação única (cada movimentação de oportunidade tem sua

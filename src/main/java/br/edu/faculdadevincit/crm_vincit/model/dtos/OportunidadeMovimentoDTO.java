@@ -14,9 +14,9 @@ import lombok.Setter;
 public class OportunidadeMovimentoDTO {
 
     @Schema(description = "Id da oportunidade que foi movida")
-    private Long oportunidadeId;
+    private String oportunidadeId;
 
     @Schema(description = "Id da etapa de destino para onde a oportunidade foi movida")
-    private Long etapaId;
+    private String etapaId;
 
 }

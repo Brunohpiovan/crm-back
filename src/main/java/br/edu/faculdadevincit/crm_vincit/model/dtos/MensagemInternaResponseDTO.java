@@ -17,20 +17,20 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class MensagemInternaResponseDTO {
 
-    private Long id;
+    private String id;
     @Schema(description = "Dados resumidos do usuário que enviou a mensagem.")
     private UsuarioAllContactsDTO sender;
     @Schema(description = "Id do grupo de chat ao qual a mensagem pertence.")
-    private Long grupoId;
+    private String grupoId;
     @Schema(description = "Conteúdo textual da mensagem.")
     private String conteudo;
     @Schema(description = "Data e hora de envio da mensagem.")
     private LocalDateTime dataEnvio;
 
     public MensagemInternaResponseDTO(MensagemInterna mensagemInterna){
-        this.id = mensagemInterna.getId();
+        this.id = mensagemInterna.getPublicId();
         this.sender = new UsuarioAllContactsDTO(mensagemInterna.getSender());
-        this.grupoId = mensagemInterna.getChatGrupo().getId();
+        this.grupoId = mensagemInterna.getChatGrupo().getPublicId();
         this.conteudo = mensagemInterna.getConteudo();;
         this.dataEnvio = mensagemInterna.getDataEnvio();
 

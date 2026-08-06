@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class MensagemResponseDTO {
 
-    private Long id;
+    private String id;
     private SenderDTO sender;
     @Schema(description = "Texto da mensagem, ou a URL da mídia (imagem/áudio/documento) quando a mensagem não possui texto")
     private String conteudo;
@@ -25,7 +25,7 @@ public class MensagemResponseDTO {
     private ProtocoloMessageDTO protocolo;
 
     public MensagemResponseDTO(Mensagem mensagem){
-        this.id = mensagem.getId();
+        this.id = mensagem.getPublicId();
         this.sender = new SenderDTO(mensagem.getSender());
         this.conteudo = mensagem.getConteudo();
         this.data_envio = mensagem.getData_envio();

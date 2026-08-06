@@ -11,6 +11,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.TenantId;
 
 import java.time.LocalDateTime;
 
@@ -26,6 +27,10 @@ public class LogMovimentacaoCadencia {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @TenantId
+    @Column(name = "empresa_id", nullable = false)
+    private Long empresaId;
 
     @Column(name = "cadencia_funil_id", nullable = false)
     private Long cadenciaFunilId;

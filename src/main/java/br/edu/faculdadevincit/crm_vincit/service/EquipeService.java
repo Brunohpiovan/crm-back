@@ -45,7 +45,7 @@ public class EquipeService {
     }
 
     @CacheEvict(value = CacheConfig.EQUIPES_CACHE, allEntries = true)
-    public EquipeResponse rename(Long id, EquipeCreateRequest request) {
+    public EquipeResponse rename(String id, EquipeCreateRequest request) {
         Equipe equipe = buscarOuFalhar(id);
         equipe.setNome(request.nome());
         equipe.setAtualizadoEm(LocalDateTime.now());
@@ -53,9 +53,9 @@ public class EquipeService {
     }
 
     @CacheEvict(value = CacheConfig.EQUIPES_CACHE, allEntries = true)
-    public EquipeResponse addMembro(Long equipeId, Long usuarioId) {
+    public EquipeResponse addMembro(String equipeId, String usuarioId) {
         Equipe equipe = buscarOuFalhar(equipeId);
-        Usuario usuario = usuarioRepository.findById(usuarioId)
+        Usuario usuario = usuarioRepository.findByPublicId(usuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário com id " + usuarioId + " não encontrado"));
         if (!equipe.getMembros().contains(usuario)) {
             equipe.getMembros().add(usuario);
@@ -65,21 +65,21 @@ public class EquipeService {
     }
 
     @CacheEvict(value = CacheConfig.EQUIPES_CACHE, allEntries = true)
-    public EquipeResponse removeMembro(Long equipeId, Long usuarioId) {
+    public EquipeResponse removeMembro(String equipeId, String usuarioId) {
         Equipe equipe = buscarOuFalhar(equipeId);
-        equipe.getMembros().removeIf(membro -> membro.getId().equals(usuarioId));
+        equipe.getMembros().removeIf(membro -> membro.getPublicId().equals(usuarioId));
         equipe.setAtualizadoEm(LocalDateTime.now());
         return new EquipeResponse(equipeRepository.save(equipe));
     }
 
     @CacheEvict(value = CacheConfig.EQUIPES_CACHE, allEntries = true)
-    public void delete(Long id) {
+    public void delete(String id) {
         Equipe equipe = buscarOuFalhar(id);
         equipeRepository.delete(equipe);
     }
 
-    private Equipe buscarOuFalhar(Long id) {
-        return equipeRepository.findById(id)
+    private Equipe buscarOuFalhar(String id) {
+        return equipeRepository.findByPublicId(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Equipe com id " + id + " não encontrada"));
     }
 }

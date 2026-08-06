@@ -49,7 +49,7 @@ public class MensagemInternaController {
     })
     @GetMapping("/messagesInterna/{grupoId}")
     public List<MensagemInternaResponseDTO> getMessagesLimit(
-            @Parameter(description = "Id do grupo de chat", required = true) @PathVariable Long grupoId,
+            @Parameter(description = "Id do grupo de chat", required = true) @PathVariable String grupoId,
             @Parameter(description = "Deslocamento (offset) usado para calcular a página: página = offset / limit") @RequestParam(defaultValue = "0") int offset,
             @Parameter(description = "Quantidade máxima de mensagens retornadas na página (limitado a " + LIMIT_MAXIMO + ")") @RequestParam(defaultValue = "10") int limit) {
         int limiteValido = Math.max(1, Math.min(limit, LIMIT_MAXIMO));

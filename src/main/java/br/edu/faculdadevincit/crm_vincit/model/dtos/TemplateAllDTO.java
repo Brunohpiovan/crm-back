@@ -14,14 +14,14 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TemplateAllDTO {
-    private Long id;
+    private String id;
     private String nome;
     private String assunto;
     @Schema(description = "Situação do template: ATIVA ou INATIVA.")
     private Situacao situacao;
 
     public TemplateAllDTO(TemplateEmail templateEmail){
-        this.id = templateEmail.getId();
+        this.id = templateEmail.getPublicId();
         this.nome = templateEmail.getNome();
         this.assunto = templateEmail.getAssunto();
         this.situacao = templateEmail.getSituacao();

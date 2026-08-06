@@ -11,9 +11,9 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class MensagemDto{
 
-    private Long id;
-    private Long id_protocolo;
-    private Long id_sender;
+    private String id;
+    private String id_protocolo;
+    private String id_sender;
     private String conteudo;
     private String media;
     private LocalDateTime data_envio;

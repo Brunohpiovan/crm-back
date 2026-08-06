@@ -18,13 +18,13 @@ public class CadenciaFunilRequestDto {
 
     private String nome;
     @Schema(description = "Id do funil de onde as oportunidades elegíveis serão movidas")
-    private Long funilOrigem;
+    private String funilOrigem;
     @Schema(description = "Id da etapa de onde as oportunidades elegíveis serão movidas")
-    private Long etapaOrigem;
+    private String etapaOrigem;
     @Schema(description = "Id do funil para onde as oportunidades serão movidas")
-    private Long funilDestino;
+    private String funilDestino;
     @Schema(description = "Id da etapa para onde as oportunidades serão movidas")
-    private Long etapaDestino;
+    private String etapaDestino;
     @Schema(description = "Quantidade de dias que uma oportunidade precisa permanecer na etapa de origem para se tornar elegível para a movimentação automática")
     private Integer diasNaEtapa;
     @Schema(description = "Horário do dia em que o scheduler deve executar a movimentação das oportunidades elegíveis")

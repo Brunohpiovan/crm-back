@@ -13,6 +13,9 @@ import java.util.Optional;
 @Repository
 public interface ChatGrupoRepository extends JpaRepository<ChatGrupo, Long> {
 
+    @EntityGraph(attributePaths = {"usuarios"})
+    Optional<ChatGrupo> findByPublicId(String publicId);
+
     @Override
     @EntityGraph(attributePaths = {"usuarios"})
     Optional<ChatGrupo> findById(Long id);

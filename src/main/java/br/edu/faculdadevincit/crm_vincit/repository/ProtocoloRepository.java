@@ -24,6 +24,9 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
     @EntityGraph(attributePaths = {"admin", "participante", "adminAnterior"})
     Optional<Protocolo> findById(Long id);
 
+    @EntityGraph(attributePaths = {"admin", "participante", "adminAnterior"})
+    Optional<Protocolo> findByPublicId(String publicId);
+
     @Query("SELECT p FROM Protocolo p JOIN FETCH p.admin JOIN FETCH p.participante LEFT JOIN FETCH p.adminAnterior WHERE ((p.admin.celular = :celular1 AND p.participante.celular = :celular2) OR (p.admin.celular = :celular2 AND p.participante.celular = :celular1)) AND p.status = :status")
     Optional<Protocolo> findByAdminCelularAndParticipanteCelularAndStatus(@Param("celular1") String celular1, @Param("celular2") String celular2, @Param("status") StatusProtocolo status);
 
@@ -128,27 +131,33 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
      * de coleção vazio gera "IN ()" em SQL nativo, que é erro de sintaxe no MySQL. Quando não há
      * restrição de usuário, o service passa semRestricaoUsuario=true e uma lista dummy não-vazia
      * (nunca avaliada, por causa do curto-circuito do OR).
+     * empresa_id é filtrado manualmente aqui (não pelo @TenantId): nativa não é reescrita pelo
+     * Hibernate — ver TenantIdentifierResolver.
      */
     @Query(value = """
     SELECT DATE(data_criacao) AS dia, COUNT(*) AS quantidade
     FROM protocolo
-    WHERE data_criacao BETWEEN :inicio AND :fim
+    WHERE empresa_id = :empresaId
+      AND data_criacao BETWEEN :inicio AND :fim
       AND (:semRestricaoUsuario = TRUE OR admin_id IN (:usuarioIds))
     GROUP BY DATE(data_criacao)
     """, nativeQuery = true)
-    List<DiaContagemProjection> countAbertosPorDia(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim,
+    List<DiaContagemProjection> countAbertosPorDia(@Param("empresaId") Long empresaId,
+                                                     @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim,
                                                      @Param("semRestricaoUsuario") boolean semRestricaoUsuario,
                                                      @Param("usuarioIds") List<Long> usuarioIds);
 
     @Query(value = """
     SELECT DATE(data_encerramento) AS dia, COUNT(*) AS quantidade
     FROM protocolo
-    WHERE status = 'FECHADO'
+    WHERE empresa_id = :empresaId
+      AND status = 'FECHADO'
       AND data_encerramento BETWEEN :inicio AND :fim
       AND (:semRestricaoUsuario = TRUE OR admin_id IN (:usuarioIds))
     GROUP BY DATE(data_encerramento)
     """, nativeQuery = true)
-    List<DiaContagemProjection> countFechadosPorDia(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim,
+    List<DiaContagemProjection> countFechadosPorDia(@Param("empresaId") Long empresaId,
+                                                      @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim,
                                                       @Param("semRestricaoUsuario") boolean semRestricaoUsuario,
                                                       @Param("usuarioIds") List<Long> usuarioIds);
 
@@ -160,12 +169,14 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
     @Query(value = """
     SELECT DATE(data_encerramento) AS dia, AVG(TIMESTAMPDIFF(MINUTE, data_criacao, data_encerramento)) AS tempoMedioMinutos
     FROM protocolo
-    WHERE status = 'FECHADO'
+    WHERE empresa_id = :empresaId
+      AND status = 'FECHADO'
       AND data_encerramento BETWEEN :inicio AND :fim
       AND (:semRestricaoUsuario = TRUE OR admin_id IN (:usuarioIds))
     GROUP BY DATE(data_encerramento)
     """, nativeQuery = true)
-    List<DiaTempoMedioProjection> avgTempoAtendimentoPorDia(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim,
+    List<DiaTempoMedioProjection> avgTempoAtendimentoPorDia(@Param("empresaId") Long empresaId,
+                                                              @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim,
                                                               @Param("semRestricaoUsuario") boolean semRestricaoUsuario,
                                                               @Param("usuarioIds") List<Long> usuarioIds);
 

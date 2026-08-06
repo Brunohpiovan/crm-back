@@ -14,7 +14,7 @@ import lombok.Setter;
 public class EtapaUpdateDTO {
 
     @Schema(description = "Não utilizado pelo endpoint (o id da etapa vem do path variable); pode ser omitido")
-    private Long id;
+    private String id;
     private String nome;
     @Schema(description = "Funil de destino da etapa (apenas o id é considerado). Se omitido, o funil da etapa não é alterado.")
     private FunilDtoCard funil;

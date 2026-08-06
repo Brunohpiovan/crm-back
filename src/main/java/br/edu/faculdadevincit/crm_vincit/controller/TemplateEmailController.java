@@ -52,7 +52,7 @@ public class TemplateEmailController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Template não encontrada")))
     })
     @GetMapping(value = "/{id}")
-    public ResponseEntity<?> findById(@Parameter(description = "Id do template", required = true) @PathVariable Long id){
+    public ResponseEntity<?> findById(@Parameter(description = "Id do template", required = true) @PathVariable String id){
         return ResponseEntity.ok(templateEmailService.findById(id));
     }
 
@@ -93,7 +93,7 @@ public class TemplateEmailController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Template nao encontrada")))
     })
     @DeleteMapping(value = "/{id}")
-    public ResponseEntity<?> delete(@Parameter(description = "Id do template a ser excluído", required = true) @PathVariable Long id) {
+    public ResponseEntity<?> delete(@Parameter(description = "Id do template a ser excluído", required = true) @PathVariable String id) {
         templateEmailService.delete(id);
         return ResponseEntity.ok(Map.of("message", "Template apagado com sucesso"));
     }
@@ -113,7 +113,7 @@ public class TemplateEmailController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Template não encontrado")))
     })
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> update(@Parameter(description = "Id do template a ser atualizado", required = true) @PathVariable Long id,
+    public ResponseEntity<?> update(@Parameter(description = "Id do template a ser atualizado", required = true) @PathVariable String id,
                                     @Parameter(description = "Nome do template", required = true) @RequestParam("nome") String nome,
                                     @Parameter(description = "Assunto do e-mail do template", required = true) @RequestParam("assunto") String assunto,
                                     @Parameter(description = "Corpo/mensagem do template (até 1000 caracteres)", required = true) @RequestParam("mensagem") String mensagem,

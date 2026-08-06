@@ -6,8 +6,10 @@ import br.edu.faculdadevincit.crm_vincit.model.dtos.ParticipanteDTO;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.ParticipanteUpdateRequest;
 import br.edu.faculdadevincit.crm_vincit.model.enums.StatusProtocolo;
 import br.edu.faculdadevincit.crm_vincit.model.enums.TipoParticipante;
+import br.edu.faculdadevincit.crm_vincit.model.Usuario;
 import br.edu.faculdadevincit.crm_vincit.repository.ParticipanteRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.ProtocoloRepository;
+import br.edu.faculdadevincit.crm_vincit.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -28,9 +30,14 @@ public class ParticipanteService {
     @Autowired
     private ProtocoloRepository protocoloRepository;
 
-    public List<ParticipanteDTO> findAllFilter(Long id){
-        List<Participante> participantes = participanteRepository.findAllWithoutOpenProtocoloFromOtherAdmins(id);
-        Set<Long> comProtocoloAbertoComigo = new HashSet<>(protocoloRepository.findParticipanteIdsComProtocoloAbertoPorAdmin(id));
+    @Autowired
+    private UsuarioRepository usuarioRepository;
+
+    public List<ParticipanteDTO> findAllFilter(String id){
+        Usuario admin = usuarioRepository.findByPublicId(id)
+                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+        List<Participante> participantes = participanteRepository.findAllWithoutOpenProtocoloFromOtherAdmins(admin.getId());
+        Set<Long> comProtocoloAbertoComigo = new HashSet<>(protocoloRepository.findParticipanteIdsComProtocoloAbertoPorAdmin(admin.getId()));
 
         return participantes.stream()
                 .map(p -> new ParticipanteDTO(p, comProtocoloAbertoComigo.contains(p.getId())))
@@ -85,15 +92,15 @@ public class ParticipanteService {
         participanteRepository.save(participante);
     }
 
-    public ParticipanteDTO findById(Long id) {
-        Participante participante = participanteRepository.findById(id)
+    public ParticipanteDTO findById(String id) {
+        Participante participante = participanteRepository.findByPublicId(id)
                 .orElseThrow(() -> new UsernameNotFoundException("Participante não encontrado"));
 
         return new ParticipanteDTO(participante);
     }
 
 
-    public Participante update(ParticipanteUpdateRequest request, Long id){
+    public Participante update(ParticipanteUpdateRequest request, String id){
         Participante participante = new Participante();
         participante.setUrlPicture(request.urlPicture());
         participante.setNome(request.nome());
@@ -110,7 +117,9 @@ public class ParticipanteService {
         participante.setCidade(request.cidade());
         participante.setObservacoes(request.observacoes());
         participante.setTipoParticipante(request.tipoParticipante());
-        return update(participante, id);
+        Participante existente = participanteRepository.findByPublicId(id)
+                .orElseThrow(() -> new UsernameNotFoundException("Participante não encontrado"));
+        return update(participante, existente.getId());
     }
 
     /**
@@ -144,8 +153,8 @@ public class ParticipanteService {
         return participanteBanco;
     }
 
-    public void delete(Long id){
-        Participante optionalParticipante = participanteRepository.findById(id).orElseThrow(() ->
+    public void delete(String id){
+        Participante optionalParticipante = participanteRepository.findByPublicId(id).orElseThrow(() ->
                 new UsernameNotFoundException("Participante não encontrado"));
         participanteRepository.delete(optionalParticipante);
     }

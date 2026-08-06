@@ -59,7 +59,7 @@ public class EquipeController {
     })
     @PutMapping("/{id}")
     public ResponseEntity<EquipeResponse> rename(
-            @Parameter(description = "Id da equipe", required = true) @PathVariable Long id,
+            @Parameter(description = "Id da equipe", required = true) @PathVariable String id,
             @RequestBody @Valid EquipeCreateRequest request) {
         return ResponseEntity.ok(equipeService.rename(id, request));
     }
@@ -73,8 +73,8 @@ public class EquipeController {
     })
     @PostMapping("/add-membro/{equipeId}/{usuarioId}")
     public ResponseEntity<EquipeResponse> addMembro(
-            @Parameter(description = "Id da equipe", required = true) @PathVariable Long equipeId,
-            @Parameter(description = "Id do usuário a ser adicionado", required = true) @PathVariable Long usuarioId) {
+            @Parameter(description = "Id da equipe", required = true) @PathVariable String equipeId,
+            @Parameter(description = "Id do usuário a ser adicionado", required = true) @PathVariable String usuarioId) {
         return ResponseEntity.ok(equipeService.addMembro(equipeId, usuarioId));
     }
 
@@ -87,8 +87,8 @@ public class EquipeController {
     })
     @DeleteMapping("/remove-membro/{equipeId}/{usuarioId}")
     public ResponseEntity<EquipeResponse> removeMembro(
-            @Parameter(description = "Id da equipe", required = true) @PathVariable Long equipeId,
-            @Parameter(description = "Id do usuário a ser removido", required = true) @PathVariable Long usuarioId) {
+            @Parameter(description = "Id da equipe", required = true) @PathVariable String equipeId,
+            @Parameter(description = "Id do usuário a ser removido", required = true) @PathVariable String usuarioId) {
         return ResponseEntity.ok(equipeService.removeMembro(equipeId, usuarioId));
     }
 
@@ -98,7 +98,7 @@ public class EquipeController {
             @ApiResponse(responseCode = "404", description = "Equipe não encontrada para o id informado")
     })
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> delete(@Parameter(description = "Id da equipe", required = true) @PathVariable Long id) {
+    public ResponseEntity<?> delete(@Parameter(description = "Id da equipe", required = true) @PathVariable String id) {
         equipeService.delete(id);
         return ResponseEntity.ok().build();
     }

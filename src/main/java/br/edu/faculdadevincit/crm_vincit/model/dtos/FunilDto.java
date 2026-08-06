@@ -18,13 +18,13 @@ import java.util.List;
 @AllArgsConstructor
 public class FunilDto {
 
-    private Long id;
+    private String id;
     private String nome;
     @Schema(description = "Etapas do funil, cada uma com suas oportunidades")
     private List<EtapaDto> etapas;
 
     public FunilDto(Funil funil) {
-        this.id = funil.getId();
+        this.id = funil.getPublicId();
         this.nome = funil.getNome();
         this.etapas = new ArrayList<>();
 

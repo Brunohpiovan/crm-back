@@ -17,12 +17,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Cobre o shape real do claim "roles" do JWT gerado pelo backend (usado pelo AuthService.isAdmin()
- * do frontend) e confirma que um token opaco de recuperação de senha (não-JWT) não é aceito como
- * autenticação normal pelo SecurityFilter.
+ * do frontend), o subject como publicId (UUID) do usuário — não o id numérico interno, que um JWT
+ * decodificado no navegador exporia — e o claim "empresaId" (multi-tenant — ver
+ * SecurityFilter/TenantContext) e confirma que um token opaco de recuperação de senha (não-JWT)
+ * não é aceito como autenticação normal pelo SecurityFilter.
  */
 class TokenServiceTest {
 
     private static final String SEGREDO_DE_TESTE = "segredo-de-teste-nao-usado-em-producao";
+    private static final String PUBLIC_ID_DE_TESTE = "550e8400-e29b-41d4-a716-446655440000";
 
     private TokenService tokenService;
 
@@ -35,6 +38,8 @@ class TokenServiceTest {
     private Usuario usuarioComCargo(UserRole cargo) {
         Usuario usuario = new Usuario();
         usuario.setId(1L);
+        usuario.setPublicId(PUBLIC_ID_DE_TESTE);
+        usuario.setEmpresaId(9L);
         usuario.setLogin("usuario@teste.com");
         usuario.setNome("Usuário Teste");
         usuario.setCargo(cargo);
@@ -48,7 +53,8 @@ class TokenServiceTest {
         DecodedJWT decoded = JWT.decode(token);
 
         assertThat(decoded.getClaim("roles").asString()).isEqualTo("ADMINISTRADOR");
-        assertThat(decoded.getSubject()).isEqualTo("usuario@teste.com");
+        assertThat(decoded.getSubject()).isEqualTo(PUBLIC_ID_DE_TESTE);
+        assertThat(decoded.getClaim("empresaId").asLong()).isEqualTo(9L);
     }
 
     @Test
@@ -61,25 +67,27 @@ class TokenServiceTest {
     }
 
     @Test
-    void validateToken_tokenValido_retornaOLoginDoSubject() {
+    void validateToken_tokenValido_retornaOPublicIdDoSubjectEEmpresaIdComoClaim() {
         String token = tokenService.generateToken(usuarioComCargo(UserRole.VENDEDOR));
 
-        String login = tokenService.validateToken(token);
+        DecodedJWT decoded = tokenService.validateToken(token);
 
-        assertThat(login).isEqualTo("usuario@teste.com");
+        assertThat(decoded).isNotNull();
+        assertThat(decoded.getSubject()).isEqualTo(PUBLIC_ID_DE_TESTE);
+        assertThat(decoded.getClaim("empresaId").asLong()).isEqualTo(9L);
     }
 
     @Test
-    void validateToken_tokenExpirado_retornaVazio() {
+    void validateToken_tokenExpirado_retornaNulo() {
         String tokenExpirado = JWT.create()
                 .withIssuer("crm_vincit")
-                .withSubject("usuario@teste.com")
+                .withSubject(PUBLIC_ID_DE_TESTE)
                 .withExpiresAt(Instant.now().minusSeconds(60))
                 .sign(Algorithm.HMAC256(SEGREDO_DE_TESTE));
 
-        String login = tokenService.validateToken(tokenExpirado);
+        DecodedJWT decoded = tokenService.validateToken(tokenExpirado);
 
-        assertThat(login).isEmpty();
+        assertThat(decoded).isNull();
     }
 
     @Test
@@ -88,8 +96,8 @@ class TokenServiceTest {
         new SecureRandom().nextBytes(randomBytes);
         String tokenDeRecuperacaoDeSenha = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
 
-        String login = tokenService.validateToken(tokenDeRecuperacaoDeSenha);
+        DecodedJWT decoded = tokenService.validateToken(tokenDeRecuperacaoDeSenha);
 
-        assertThat(login).isEmpty();
+        assertThat(decoded).isNull();
     }
 }

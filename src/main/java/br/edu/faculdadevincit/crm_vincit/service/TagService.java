@@ -47,8 +47,8 @@ public class TagService {
     }
 
 
-    public TagDTO findById(Long id){
-        return new TagDTO(tagRepository.findById(id).orElseThrow(()->new RuntimeException("Tag nao encontrada")));
+    public TagDTO findById(String id){
+        return new TagDTO(tagRepository.findByPublicId(id).orElseThrow(()->new RuntimeException("Tag nao encontrada")));
     }
 
     @CacheEvict(value = CacheConfig.TAGS_CACHE, allEntries = true)
@@ -62,14 +62,14 @@ public class TagService {
     }
 
     @CacheEvict(value = CacheConfig.TAGS_CACHE, allEntries = true)
-    public void delete(Long id){
-        Tag tag = tagRepository.findById(id).orElseThrow(()-> new RuntimeException("Tag nao encontrada"));
+    public void delete(String id){
+        Tag tag = tagRepository.findByPublicId(id).orElseThrow(()-> new RuntimeException("Tag nao encontrada"));
         tagRepository.delete(tag);
     }
 
     @CacheEvict(value = CacheConfig.TAGS_CACHE, allEntries = true)
-    public void update(Long id, TagRequestDTO tag) {
-        Tag tagBanco = tagRepository.findById(id)
+    public void update(String id, TagRequestDTO tag) {
+        Tag tagBanco = tagRepository.findByPublicId(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tag não encontrada"));
 
         if (!tag.getNome().equals(tagBanco.getNome())) {

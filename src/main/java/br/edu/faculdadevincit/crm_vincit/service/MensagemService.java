@@ -6,8 +6,8 @@ import br.edu.faculdadevincit.crm_vincit.model.Protocolo;
 import br.edu.faculdadevincit.crm_vincit.model.Usuario;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.MensagemResponseDTO;
 import br.edu.faculdadevincit.crm_vincit.repository.MensagemRepository;
+import br.edu.faculdadevincit.crm_vincit.repository.ParticipanteRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.ProtocoloRepository;
-import br.edu.faculdadevincit.crm_vincit.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
@@ -31,7 +31,7 @@ public class MensagemService{
     private ProtocoloRepository protocoloRepository;
 
     @Autowired
-    private UsuarioRepository usuarioRepository;
+    private ParticipanteRepository participanteRepository;
 
 
     public List<Mensagem> sendMessage(Protocolo protocolo, Participante sender, String conteudo, String media) {
@@ -99,14 +99,12 @@ public class MensagemService{
         return isAdminAtual || isParticipante || isAdminAnterior;
     }
 
-    public List<MensagemResponseDTO> getMessagesForProtocolLimit(Long protocoloId, int offset, int limit) {
-        Protocolo protocolo = protocoloRepository.findById(protocoloId)
+    public List<MensagemResponseDTO> getMessagesForProtocolLimit(String protocoloId, int offset, int limit) {
+        Protocolo protocolo = protocoloRepository.findByPublicId(protocoloId)
                 .orElseThrow(() -> new RuntimeException("Protocolo não encontrado"));
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String authenticatedUsername = authentication.getName();
-        Usuario usuario = (Usuario) usuarioRepository.findByLogin(authenticatedUsername)
-                .orElseThrow(() -> new RuntimeException("Admin não encontrado"));
+        Usuario usuario = (Usuario) authentication.getPrincipal();
 
         if (!autorizadoParaProtocolo(protocolo, usuario)) {
             throw new RuntimeException("Usuário não autorizado a acessar este protocolo.");
@@ -125,12 +123,10 @@ public class MensagemService{
     }
 
 
-    public List<MensagemResponseDTO> getMessagesForProtocol(Long protocoloId) {
-        Protocolo protocolo = protocoloRepository.findById(protocoloId).orElseThrow(()-> new RuntimeException("Protocolo nao encontrado"));
+    public List<MensagemResponseDTO> getMessagesForProtocol(String protocoloId) {
+        Protocolo protocolo = protocoloRepository.findByPublicId(protocoloId).orElseThrow(()-> new RuntimeException("Protocolo nao encontrado"));
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String authenticatedUsername = authentication.getName();
-        Usuario usuario = (Usuario) usuarioRepository.findByLogin(authenticatedUsername)
-                .orElseThrow(() -> new RuntimeException("Admin não encontrado"));
+        Usuario usuario = (Usuario) authentication.getPrincipal();
         if (!autorizadoParaProtocolo(protocolo, usuario)) {
             throw new RuntimeException("Usuário não autorizado a acessar este protocolo.");
         }
@@ -143,20 +139,24 @@ public class MensagemService{
 
     }
 
-    public List<MensagemResponseDTO> getMessagesPublic(Long userId) {
-        return mensagemRepository.findBySenderIdAndProtocoloIsNull(userId)
+    public List<MensagemResponseDTO> getMessagesPublic(String userId) {
+        Participante participante = participanteRepository.findByPublicId(userId)
+                .orElseThrow(() -> new RuntimeException("Participante não encontrado"));
+        return mensagemRepository.findBySenderIdAndProtocoloIsNull(participante.getId())
                 .stream()
                 .map(MensagemResponseDTO::new)
                 .collect(Collectors.toList());
     }
 
-    public List<Long> getSenderIdsWithoutProtocol() {
+    public List<String> getSenderIdsWithoutProtocol() {
         return mensagemRepository.findDistinctSenderIdsWithoutProtocol();
     }
 
 
-    public void deleteMessagesWithoutProtocol(Long userId) {
-        List<Mensagem> messagesToDelete = mensagemRepository.findBySenderIdAndProtocoloIsNull(userId);
+    public void deleteMessagesWithoutProtocol(String userId) {
+        Participante participante = participanteRepository.findByPublicId(userId)
+                .orElseThrow(() -> new RuntimeException("Participante não encontrado"));
+        List<Mensagem> messagesToDelete = mensagemRepository.findBySenderIdAndProtocoloIsNull(participante.getId());
         mensagemRepository.deleteAll(messagesToDelete);
     }
 }

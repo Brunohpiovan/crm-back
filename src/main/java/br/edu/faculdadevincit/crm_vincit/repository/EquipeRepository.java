@@ -9,9 +9,13 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface EquipeRepository extends JpaRepository<Equipe, Long> {
+
+    @EntityGraph(attributePaths = {"membros"})
+    Optional<Equipe> findByPublicId(String publicId);
 
     @Query("SELECT m.id FROM Equipe e JOIN e.membros m WHERE e.id = :equipeId")
     List<Long> findMembroIdsById(@Param("equipeId") Long equipeId);

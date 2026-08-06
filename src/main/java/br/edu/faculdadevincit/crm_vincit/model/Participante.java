@@ -13,6 +13,8 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.TenantId;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -21,12 +23,17 @@ import java.time.LocalDateTime;
  * Ainda usada diretamente como corpo de resposta em GET /participante/celular/{celular}
  * e PUT /participante/{id} (ver ParticipanteDTO para as listagens/buscas por id). As
  * requisições de entrada de POST/PUT usam ParticipanteCreateRequest/ParticipanteUpdateRequest.
+ * login/cpf são únicos por Empresa, não globalmente — o mesmo cliente pode falar com o
+ * WhatsApp de duas empresas diferentes.
  */
 @Schema(description = "Participante (contato externo do CRM, ex.: cliente via WhatsApp) ou usuário interno espelhado (tipoParticipante = FUNCIONARIO).")
 @Getter
 @Setter
 @Entity
-@Table(name = "participante")
+@Table(name = "participante", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_participante_empresa_login", columnNames = {"empresa_id", "login"}),
+        @UniqueConstraint(name = "uk_participante_empresa_cpf", columnNames = {"empresa_id", "cpf"})
+})
 @NoArgsConstructor
 @AllArgsConstructor
 public class Participante {
@@ -36,6 +43,14 @@ public class Participante {
     @Column(name = "id", nullable = false)
     private Long id;
 
+    @UuidGenerator
+    @Column(name = "public_id", nullable = false, unique = true, updatable = false, length = 36)
+    private String publicId;
+
+    @TenantId
+    @Column(name = "empresa_id", nullable = false)
+    private Long empresaId;
+
     @Column(name = "urlPicture")
     private String urlPicture;
 
@@ -44,7 +59,7 @@ public class Participante {
     private String nome;
 
     @Email(message = "O e-mail deve ser válido.")
-    @Column(name = "login",unique = true)
+    @Column(name = "login")
     @Size(max = 150, message = "O login deve ter no maximo 255 caracteres")
     private String login;
 
@@ -52,7 +67,7 @@ public class Participante {
     @Size(max = 12, message = "O rg deve ter no maximo 12 caracteres")
     private String rg;
 
-    @Column(name = "cpf", unique = true)
+    @Column(name = "cpf")
     @Size(max = 14, message = "O cpf deve ter no maximo 14 caracteres")
     private String cpf;
 

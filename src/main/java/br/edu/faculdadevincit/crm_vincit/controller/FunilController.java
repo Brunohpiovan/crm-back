@@ -49,7 +49,7 @@ public class FunilController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil não encontrado")))
     })
     @GetMapping("/no-funil/{funilId}")
-    public ResponseEntity<List<UsuarioContatoDto>> findFuncionarios(@Parameter(description = "Id do funil", required = true) @PathVariable Long funilId) {
+    public ResponseEntity<List<UsuarioContatoDto>> findFuncionarios(@Parameter(description = "Id do funil", required = true) @PathVariable String funilId) {
         List<UsuarioContatoDto> funcionarios = funilService.findFuncionariosFunil(funilId);
         return ResponseEntity.ok(funcionarios);
     }
@@ -63,7 +63,7 @@ public class FunilController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil com id 1 não encontrado")))
     })
     @GetMapping(value = "/{id}")
-    public ResponseEntity<?> findById(@Parameter(description = "Id do funil", required = true) @PathVariable Long id) {
+    public ResponseEntity<?> findById(@Parameter(description = "Id do funil", required = true) @PathVariable String id) {
         FunilDto funil = funilService.findById(id);
         return ResponseEntity.ok(funil);
     }
@@ -103,8 +103,8 @@ public class FunilController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil não encontrado")))
     })
     @PostMapping("/add-funcionario/{funilId}/{funcionarioId}")
-    public ResponseEntity<FunilDto> addFuncionario(@Parameter(description = "Id do funil", required = true) @PathVariable Long funilId,
-                                                    @Parameter(description = "Id do usuário/funcionário a ser adicionado", required = true) @PathVariable Long funcionarioId) {
+    public ResponseEntity<FunilDto> addFuncionario(@Parameter(description = "Id do funil", required = true) @PathVariable String funilId,
+                                                    @Parameter(description = "Id do usuário/funcionário a ser adicionado", required = true) @PathVariable String funcionarioId) {
         funilService.adicionarFuncionarioFunil(funcionarioId,funilId);
         return ResponseEntity.ok().build();
     }
@@ -117,7 +117,7 @@ public class FunilController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil com id 1 não encontrado")))
     })
     @PutMapping(value = "/{id}")
-    public ResponseEntity<?> update(@Parameter(description = "Id do funil", required = true) @PathVariable Long id,@RequestBody FunilAllDTO funilRequest ) {
+    public ResponseEntity<?> update(@Parameter(description = "Id do funil", required = true) @PathVariable String id,@RequestBody FunilAllDTO funilRequest ) {
         FunilAllDTO funil = funilService.update(id, funilRequest);
         return ResponseEntity.ok(funil);
     }
@@ -130,7 +130,7 @@ public class FunilController {
             @ApiResponse(responseCode = "409", description = "Funil possui etapas com oportunidades e não pode ser excluído")
     })
     @DeleteMapping(value = "/{id}")
-    public ResponseEntity<?> delete(@Parameter(description = "Id do funil", required = true) @PathVariable Long id) {
+    public ResponseEntity<?> delete(@Parameter(description = "Id do funil", required = true) @PathVariable String id) {
         funilService.delete(id);
         return ResponseEntity.ok().build();
     }

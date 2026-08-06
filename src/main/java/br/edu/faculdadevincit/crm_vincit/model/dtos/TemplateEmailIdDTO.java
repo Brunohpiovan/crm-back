@@ -18,7 +18,7 @@ import java.util.List;
 @AllArgsConstructor
 public class TemplateEmailIdDTO {
 
-    private Long id;
+    private String id;
     private String nome;
     @Schema(description = "Corpo/mensagem do template.")
     private String mensagem;
@@ -29,7 +29,7 @@ public class TemplateEmailIdDTO {
     private List<String> urlAnexo = new ArrayList<>();
 
     public TemplateEmailIdDTO(TemplateEmail templateEmail){
-        this.id = templateEmail.getId();
+        this.id = templateEmail.getPublicId();
         this.nome = templateEmail.getNome();
         this.mensagem = templateEmail.getMensagem();
         this.assunto = templateEmail.getAssunto();

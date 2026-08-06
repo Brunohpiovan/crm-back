@@ -5,7 +5,6 @@ import br.edu.faculdadevincit.crm_vincit.model.dtos.MensagemInternaResponseDTO;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioAllContactsDTO;
 import br.edu.faculdadevincit.crm_vincit.repository.ChatGrupoRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.MensagemInternaRepository;
-import br.edu.faculdadevincit.crm_vincit.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
@@ -25,20 +24,15 @@ public class MensagemInternaService {
     private ChatGrupoRepository chatGrupoRepository;
 
     @Autowired
-    private UsuarioRepository usuarioRepository;
-
-    @Autowired
     private MensagemInternaRepository mensagemInternaRepository;
 
 
-    public List<MensagemInternaResponseDTO> getMessagesForProtocolLimit(Long grupoId, int offset, int limit) {
-        ChatGrupo grupo = chatGrupoRepository.findById(grupoId)
+    public List<MensagemInternaResponseDTO> getMessagesForProtocolLimit(String grupoId, int offset, int limit) {
+        ChatGrupo grupo = chatGrupoRepository.findByPublicId(grupoId)
                 .orElseThrow(() -> new RuntimeException("Grupo não encontrado"));
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String authenticatedUsername = authentication.getName();
-        Usuario usuario = (Usuario) usuarioRepository.findByLogin(authenticatedUsername)
-                .orElseThrow(() -> new RuntimeException("Admin não encontrado"));
+        Usuario usuario = (Usuario) authentication.getPrincipal();
 
         boolean usuarioNoGrupo = grupo.getUsuarios()
                 .stream()
@@ -55,11 +49,11 @@ public class MensagemInternaService {
                 )
                 .map(mensagem -> {
                     MensagemInternaResponseDTO dto = new MensagemInternaResponseDTO();
-                    dto.setId(mensagem.getId());
+                    dto.setId(mensagem.getPublicId());
 
                     Usuario senderUser = mensagem.getSender();
                     UsuarioAllContactsDTO sender = new UsuarioAllContactsDTO();
-                    sender.setId(senderUser.getId());
+                    sender.setId(senderUser.getPublicId());
                     sender.setNome(senderUser.getNome());
                     sender.setUrlPicture(senderUser.getUrlPicture());
 

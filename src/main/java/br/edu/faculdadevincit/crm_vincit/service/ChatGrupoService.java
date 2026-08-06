@@ -48,9 +48,9 @@ public class ChatGrupoService {
     @Value("${aws.s3.bucket-name}")
     private String bucketName;
 
-    public Optional<Long> getGrupoByUsuario(Long id_usuario1, Long id_usuario2) {
-        Optional<Usuario> usuario1 = usuarioRepository.findById(id_usuario1);
-        Optional<Usuario> usuario2 = usuarioRepository.findById(id_usuario2);
+    public Optional<String> getGrupoByUsuario(String id_usuario1, String id_usuario2) {
+        Optional<Usuario> usuario1 = usuarioRepository.findByPublicId(id_usuario1);
+        Optional<Usuario> usuario2 = usuarioRepository.findByPublicId(id_usuario2);
 
         if (usuario1.isEmpty() || usuario2.isEmpty()) {
             return Optional.empty();
@@ -59,12 +59,12 @@ public class ChatGrupoService {
         return chatGrupoRepository.findGrupoPrivadoByUsuarios(usuario1.get().getId(), usuario2.get().getId())
                 .stream()
                 .min(Comparator.comparing(ChatGrupo::getCriadoEm))
-                .map(ChatGrupo::getId);
+                .map(ChatGrupo::getPublicId);
     }
 
 
-    public Optional<List<ChatGrupoResponseDTO>> getGrupoByUsuarioAndPublic(Long idUsuario) {
-        Usuario usuario = usuarioRepository.findById(idUsuario)
+    public Optional<List<ChatGrupoResponseDTO>> getGrupoByUsuarioAndPublic(String idUsuario) {
+        Usuario usuario = usuarioRepository.findByPublicId(idUsuario)
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
 
         List<ChatGrupo> chatGrupos = chatGrupoRepository.findGruposPublicosByUsuario(usuario.getId());
@@ -78,7 +78,7 @@ public class ChatGrupoService {
             String imagemFundoUrl = grupo.getImagemFundoUrl();
 
             return new ChatGrupoResponseDTO(
-                    grupo.getId(),
+                    grupo.getPublicId(),
                     grupo.getNome(),
                     avatarUrl,
                     imagemFundoUrl,
@@ -116,15 +116,15 @@ public class ChatGrupoService {
         boolean anexosEnviadosAoS3 = foto != null || imagemFundo != null;
         ChatGrupoResponseDTO grupoDTO = new ChatGrupoResponseDTO(salvarGrupo(grupo, anexosEnviadosAoS3));
         ChatGrupoResponseById idUsers = new ChatGrupoResponseById(grupo);
-        for (Long userId : idUsers.getUsuarios()) {
+        for (String userId : idUsers.getUsuarios()) {
             messagingTemplate.convertAndSend("/topic/newPublicGroup/" + userId, grupoDTO);
         }
     }
 
 
-    public void update(Long id,GrupoCreateDTO dto, MultipartFile foto,MultipartFile imagemFundo) {
+    public void update(String id,GrupoCreateDTO dto, MultipartFile foto,MultipartFile imagemFundo) {
         ChatGrupo newgrupo = dtoToModel(dto);
-        ChatGrupo grupo = chatGrupoRepository.findById(id).orElseThrow(()->new RuntimeException("Grupo nao encontrado"));
+        ChatGrupo grupo = chatGrupoRepository.findByPublicId(id).orElseThrow(()->new RuntimeException("Grupo nao encontrado"));
         if(foto == null && newgrupo.getAvatarUrl().contains("assets/img/avatar/grupo3.jpg") && grupo.getAvatarUrl().contains(bucketName)){
             String keyAntiga = grupo.getAvatarUrl().replace(s3Service.getBaseUrl() + "/", "");
             s3Service.deleteFile(keyAntiga);
@@ -162,10 +162,10 @@ public class ChatGrupoService {
 
 
         List<Usuario> usuariosAntigos = grupo.getUsuarios();
-        List<Long> novosUsuarios = dto.getUsuarios();
-        List<Long> usuariosRemovidos = new ArrayList<>();
+        List<String> novosUsuarios = dto.getUsuarios();
+        List<String> usuariosRemovidos = new ArrayList<>();
         for (Usuario usuario : usuariosAntigos) {
-            Long usuarioId = usuario.getId();
+            String usuarioId = usuario.getPublicId();
             if (!novosUsuarios.contains(usuarioId)) {
                 usuariosRemovidos.add(usuarioId);
             }
@@ -177,10 +177,10 @@ public class ChatGrupoService {
         ChatGrupoResponseById idUsers = new ChatGrupoResponseById(grupo);
         boolean anexosAlteradosNoS3 = foto != null || imagemFundo != null;
         ChatGrupoResponseDTO grupoDTO = new ChatGrupoResponseDTO(salvarGrupo(grupo, anexosAlteradosNoS3));
-        for (Long userId : idUsers.getUsuarios()) {
+        for (String userId : idUsers.getUsuarios()) {
             messagingTemplate.convertAndSend("/topic/attPublicGroup/" + userId, grupoDTO);
         }
-        for (Long userId : usuariosRemovidos) {
+        for (String userId : usuariosRemovidos) {
             messagingTemplate.convertAndSend("/topic/delPublicGroup/" + userId, grupoDTO.getId());
         }
 
@@ -207,7 +207,6 @@ public class ChatGrupoService {
     private ChatGrupo dtoToModel(GrupoCreateDTO dto){
         ChatGrupo grupo = new ChatGrupo();
 
-        grupo.setId(dto.getId());
         grupo.setNome(dto.getNome());
         grupo.setAvatarUrl(dto.getUrlPicture());
         grupo.setUsuarios(buscarUsuarios(dto.getUsuarios()));
@@ -215,29 +214,29 @@ public class ChatGrupoService {
         return grupo;
     }
 
-    private List<Usuario> buscarUsuarios(List<Long> usuarioIds) {
-        List<Usuario> usuarios = usuarioRepository.findAllById(usuarioIds);
+    private List<Usuario> buscarUsuarios(List<String> usuarioIds) {
+        List<Usuario> usuarios = usuarioRepository.findAllByPublicIdIn(usuarioIds);
         if (usuarios.size() != new HashSet<>(usuarioIds).size()) {
-            Set<Long> encontrados = usuarios.stream().map(Usuario::getId).collect(Collectors.toSet());
-            List<Long> faltando = usuarioIds.stream().filter(id -> !encontrados.contains(id)).toList();
+            Set<String> encontrados = usuarios.stream().map(Usuario::getPublicId).collect(Collectors.toSet());
+            List<String> faltando = usuarioIds.stream().filter(id -> !encontrados.contains(id)).toList();
             throw new EntityNotFoundException("Usuário(s) com ID " + faltando + " não encontrado(s)");
         }
         return usuarios;
     }
 
-    public ChatGrupoResponseById findById(Long id) {
-        ChatGrupo grupo = chatGrupoRepository.findById(id)
+    public ChatGrupoResponseById findById(String id) {
+        ChatGrupo grupo = chatGrupoRepository.findByPublicId(id)
                 .orElseThrow(() -> new RuntimeException("grupo nao encontrado"));
 
         String avatarUrl = grupo.getAvatarUrl();
         String imagemFundoUrl = grupo.getImagemFundoUrl();
 
         return new ChatGrupoResponseById(
-                grupo.getId(),
+                grupo.getPublicId(),
                 grupo.getNome(),
                 avatarUrl,
                 imagemFundoUrl,
-                grupo.getUsuarios().stream().map(Usuario::getId).toList()
+                grupo.getUsuarios().stream().map(Usuario::getPublicId).toList()
         );
     }
 

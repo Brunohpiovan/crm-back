@@ -47,13 +47,13 @@ public class UsuarioService {
     @Autowired
     private ParticipanteService participanteService;
 
-    public UsuarioResponseNoAuthDto findByIdParaEdicao(Long id) {
+    public UsuarioResponseNoAuthDto findByIdParaEdicao(String publicId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String authenticatedUsername = authentication.getName();
         boolean isAdmin = authentication.getAuthorities().stream()
                 .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
 
-        Usuario usuario = usuarioRepository.findById(id).orElseThrow(() ->
+        Usuario usuario = usuarioRepository.findByPublicId(publicId).orElseThrow(() ->
                 new UsernameNotFoundException("Usuário não encontrado"));
 
         if (!isAdmin && !usuario.getLogin().equals(authenticatedUsername)) {
@@ -63,12 +63,14 @@ public class UsuarioService {
         return new UsuarioResponseNoAuthDto(usuario);
     }
 
-    public List<UsuarioAllContactsDTO> findAllContacts(Long userId) {
-        return usuarioRepository.findAllContactsWithPrivateGroups(userId);
+    public List<UsuarioAllContactsDTO> findAllContacts(String userPublicId) {
+        Usuario usuario = buscarUsuarioPorPublicId(userPublicId);
+        return usuarioRepository.findAllContactsWithPrivateGroups(usuario.getId());
     }
 
-    public List<UsuarioAllContactsDTO> findAllContactsDispo(Long userId) {
-        return usuarioRepository.findUsuariosSemGrupoPrivadoComum(userId);
+    public List<UsuarioAllContactsDTO> findAllContactsDispo(String userPublicId) {
+        Usuario usuario = buscarUsuarioPorPublicId(userPublicId);
+        return usuarioRepository.findUsuariosSemGrupoPrivadoComum(usuario.getId());
     }
 
     public Page<UsuarioAllDTO> findAll(String search, Pageable pageable) {
@@ -86,13 +88,13 @@ public class UsuarioService {
         return usuarioRepository.findResumoByCargo(UserRole.ADMINISTRADOR);
     }
 
-    public UsuarioResponseDto findById(Long id) {
+    public UsuarioResponseDto findById(String publicId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String authenticatedUsername = authentication.getName();
         boolean isAdmin = authentication.getAuthorities().stream()
                 .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
 
-        Usuario usuario = usuarioRepository.findById(id).orElseThrow(() ->
+        Usuario usuario = usuarioRepository.findByPublicId(publicId).orElseThrow(() ->
                 new UsernameNotFoundException("Usuário não encontrado"));
 
         if (!isAdmin && !usuario.getLogin().equals(authenticatedUsername)) {
@@ -127,11 +129,11 @@ public class UsuarioService {
         return new UsuarioAllDTO(usuario);
     }
 
-    public LoginResponseDTO update(Long id, UsuarioSelfUpdateDTO dto, MultipartFile foto) {
+    public LoginResponseDTO update(String publicId, UsuarioSelfUpdateDTO dto, MultipartFile foto) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String authenticatedUsername = authentication.getName();
 
-        Usuario usuarioDoBanco = buscarUsuario(id);
+        Usuario usuarioDoBanco = buscarUsuarioPorPublicId(publicId);
 
         if (!usuarioDoBanco.getLogin().equals(authenticatedUsername)) {
             throw new AccessDeniedException("Você não tem permissão para alterar este usuário.");
@@ -144,8 +146,8 @@ public class UsuarioService {
         return new LoginResponseDTO(token, null);
     }
 
-    public UsuarioAllDTO updateAll(Long id, UsuarioAdminUpdateDTO dto, MultipartFile foto) {
-        Usuario usuarioDoBanco = buscarUsuario(id);
+    public UsuarioAllDTO updateAll(String publicId, UsuarioAdminUpdateDTO dto, MultipartFile foto) {
+        Usuario usuarioDoBanco = buscarUsuarioPorPublicId(publicId);
 
         aplicarAtualizacao(usuarioDoBanco, dto, foto);
         usuarioDoBanco.setCargo(dto.getCargo());
@@ -155,8 +157,8 @@ public class UsuarioService {
         return new UsuarioAllDTO(usuarioDoBanco);
     }
 
-    private Usuario buscarUsuario(Long id) {
-        return usuarioRepository.findById(id)
+    private Usuario buscarUsuarioPorPublicId(String publicId) {
+        return usuarioRepository.findByPublicId(publicId)
                 .orElseThrow(() -> new UserNotFoundException("Usuario nao encontrado"));
     }
 
@@ -217,8 +219,8 @@ public class UsuarioService {
     }
 
     @Transactional
-    public void delete(Long id) {
-        Usuario usuarioDoBanco = buscarUsuario(id);
+    public void delete(String publicId) {
+        Usuario usuarioDoBanco = buscarUsuarioPorPublicId(publicId);
         // Hard delete violaria as FKs de protocolo, e-mail, oportunidade, mensagem interna,
         // log de acesso etc. (ON DELETE RESTRICT). Excluir passa a inativar o usuário,
         // preservando o histórico e impedindo login (ver AuthenticationService).

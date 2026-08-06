@@ -1,8 +1,11 @@
 package br.edu.faculdadevincit.crm_vincit.service;
 
 import br.edu.faculdadevincit.crm_vincit.config.CacheConfig;
+import br.edu.faculdadevincit.crm_vincit.infra.security.TenantContext;
 import br.edu.faculdadevincit.crm_vincit.model.CadenciaFunil;
+import br.edu.faculdadevincit.crm_vincit.model.Equipe;
 import br.edu.faculdadevincit.crm_vincit.model.Funil;
+import br.edu.faculdadevincit.crm_vincit.model.Tag;
 import br.edu.faculdadevincit.crm_vincit.model.Usuario;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.DashboardCadenciaResponse;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.DashboardFiltroRequest;
@@ -28,14 +31,13 @@ import br.edu.faculdadevincit.crm_vincit.repository.OportunidadeRepository.DiaVa
 import br.edu.faculdadevincit.crm_vincit.repository.ProtocoloRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.ProtocoloRepository.DiaContagemProjection;
 import br.edu.faculdadevincit.crm_vincit.repository.ProtocoloRepository.DiaTempoMedioProjection;
+import br.edu.faculdadevincit.crm_vincit.repository.TagRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.UsuarioRepository;
 import br.edu.faculdadevincit.crm_vincit.service.exceptions.AccessDeniedException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -85,35 +87,39 @@ public class DashboardService {
     @Autowired
     private UsuarioRepository usuarioRepository;
 
-    @Value("${dashboard.protocolo.risco-horas:24}")
-    private long protocoloRiscoHoras;
+    @Autowired
+    private TagRepository tagRepository;
 
     @Cacheable(value = CacheConfig.DASHBOARD_CACHE,
-            key = "T(org.springframework.security.core.context.SecurityContextHolder).context.authentication.name" +
+            key = "T(org.springframework.security.core.context.SecurityContextHolder).context.authentication.principal.id" +
                     " + '|' + #startDateParam + '|' + #endDateParam + '|' + #pipelineId + '|' + #userIdFiltro" +
                     " + '|' + #teamId + '|' + #status + '|' + #origin + '|' + #tagIds")
-    public DashboardResponse getDashboard(LocalDateTime startDateParam, LocalDateTime endDateParam, Long pipelineId,
-                                           Long userIdFiltro, Long teamId, List<SituacaoOportunidade> status,
-                                           List<Origem> origin, List<Long> tagIds) {
+    public DashboardResponse getDashboard(LocalDateTime startDateParam, LocalDateTime endDateParam, String pipelineId,
+                                           String userIdFiltro, String teamId, List<SituacaoOportunidade> status,
+                                           List<Origem> origin, List<String> tagIds) {
         Usuario usuario = getUsuarioAutenticado();
 
         LocalDateTime endDate = endDateParam != null ? endDateParam : LocalDateTime.now();
         LocalDateTime startDate = startDateParam != null ? startDateParam : endDate.minusDays(PERIODO_PADRAO_DIAS);
 
-        List<Long> userIds = resolverUserIdsComAutorizacao(usuario, userIdFiltro, teamId);
-        List<Long> funilIdsPermitidos = resolverFunilIdsPermitidos(usuario, pipelineId);
+        Long pipelineIdInterno = resolverFunilIdInterno(pipelineId);
+        Long userIdFiltroInterno = resolverUsuarioIdInterno(userIdFiltro);
+        Long teamIdInterno = resolverEquipeIdInterno(teamId);
+
+        List<Long> userIds = resolverUserIdsComAutorizacao(usuario, userIdFiltroInterno, teamIdInterno);
+        List<Long> funilIdsPermitidos = resolverFunilIdsPermitidos(usuario, pipelineIdInterno);
         if (funilIdsPermitidos.isEmpty()) {
             return dashboardVazio();
         }
 
         List<SituacaoOportunidade> statusNormalizado = status != null ? status : List.of();
         List<Origem> originNormalizado = origin != null ? origin : List.of();
-        List<Long> tagsNormalizadas = tagIds != null ? tagIds : List.of();
+        List<Long> tagsNormalizadas = resolverTagIdsInterno(tagIds);
         DashboardFiltroRequest filtro = new DashboardFiltroRequest(
-                startDate, endDate, pipelineId, userIds, statusNormalizado, originNormalizado, tagsNormalizadas, funilIdsPermitidos);
+                startDate, endDate, pipelineIdInterno, userIds, statusNormalizado, originNormalizado, tagsNormalizadas, funilIdsPermitidos);
 
         return new DashboardResponse(
-                montarSummary(filtro),
+                montarSummary(filtro, usuario),
                 montarFunil(filtro),
                 montarOrigens(filtro),
                 montarSerieDiaria(filtro),
@@ -130,19 +136,23 @@ public class DashboardService {
      * OUTER JOIN), o que não compensa pelo volume real.
      */
     @Cacheable(value = CacheConfig.DASHBOARD_CACHE,
-            key = "T(org.springframework.security.core.context.SecurityContextHolder).context.authentication.name" +
+            key = "T(org.springframework.security.core.context.SecurityContextHolder).context.authentication.principal.id" +
                     " + '|ranking|' + #startDateParam + '|' + #endDateParam + '|' + #pipelineId + '|' + #userIdFiltro" +
                     " + '|' + #teamId + '|' + #status + '|' + #origin + '|' + #tagIds + '|' + #page + '|' + #size")
-    public PageResponse<DashboardRankingResponse> getRanking(LocalDateTime startDateParam, LocalDateTime endDateParam, Long pipelineId,
-                                                               Long userIdFiltro, Long teamId, List<SituacaoOportunidade> status,
-                                                               List<Origem> origin, List<Long> tagIds, int page, int size) {
+    public PageResponse<DashboardRankingResponse> getRanking(LocalDateTime startDateParam, LocalDateTime endDateParam, String pipelineId,
+                                                               String userIdFiltro, String teamId, List<SituacaoOportunidade> status,
+                                                               List<Origem> origin, List<String> tagIds, int page, int size) {
         Usuario usuario = getUsuarioAutenticado();
 
         LocalDateTime endDate = endDateParam != null ? endDateParam : LocalDateTime.now();
         LocalDateTime startDate = startDateParam != null ? startDateParam : endDate.minusDays(PERIODO_PADRAO_DIAS);
 
-        List<Long> userIds = resolverUserIdsComAutorizacao(usuario, userIdFiltro, teamId);
-        List<Long> funilIdsPermitidos = resolverFunilIdsPermitidos(usuario, pipelineId);
+        Long pipelineIdInterno = resolverFunilIdInterno(pipelineId);
+        Long userIdFiltroInterno = resolverUsuarioIdInterno(userIdFiltro);
+        Long teamIdInterno = resolverEquipeIdInterno(teamId);
+
+        List<Long> userIds = resolverUserIdsComAutorizacao(usuario, userIdFiltroInterno, teamIdInterno);
+        List<Long> funilIdsPermitidos = resolverFunilIdsPermitidos(usuario, pipelineIdInterno);
 
         int tamanhoValido = Math.max(1, Math.min(size, RANKING_PAGE_SIZE_MAXIMO));
         int paginaValida = Math.max(0, page);
@@ -153,18 +163,22 @@ public class DashboardService {
 
         List<SituacaoOportunidade> statusNormalizado = status != null ? status : List.of();
         List<Origem> originNormalizado = origin != null ? origin : List.of();
-        List<Long> tagsNormalizadas = tagIds != null ? tagIds : List.of();
+        List<Long> tagsNormalizadas = resolverTagIdsInterno(tagIds);
         DashboardFiltroRequest filtro = new DashboardFiltroRequest(
-                startDate, endDate, pipelineId, userIds, statusNormalizado, originNormalizado, tagsNormalizadas, funilIdsPermitidos);
+                startDate, endDate, pipelineIdInterno, userIds, statusNormalizado, originNormalizado, tagsNormalizadas, funilIdsPermitidos);
 
         return PageResponse.of(montarRanking(filtro), paginaValida, tamanhoValido);
     }
 
+    /**
+     * O principal já É o Usuario completo (SecurityFilter resolve por id e injeta o objeto
+     * inteiro no Authentication) — nada de re-buscar por login aqui. Login deixou de ser
+     * globalmente único (é único por empresa agora), então findByLogin(authentication.getName())
+     * ficaria ambíguo entre empresas diferentes.
+     */
     private Usuario getUsuarioAutenticado() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String login = authentication.getName();
-        return (Usuario) usuarioRepository.findByLogin(login)
-                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+        return (Usuario) authentication.getPrincipal();
     }
 
     /**
@@ -205,6 +219,32 @@ public class DashboardService {
         return List.of(usuario.getId());
     }
 
+    /**
+     * pipelineId/userIdFiltro/teamId/tagIds chegam do controller como publicId (UUID). Ids que
+     * não resolvem para nenhuma linha viram o sentinela -1L, que nunca bate em nenhuma checagem
+     * de autorização/pertencimento abaixo — preserva o mesmo 403 que um id inexistente já causava
+     * antes desta camada de resolução existir, sem duplicar a lógica de autorização.
+     */
+    private Long resolverFunilIdInterno(String pipelineId) {
+        if (pipelineId == null) return null;
+        return funilRepository.findByPublicId(pipelineId).map(Funil::getId).orElse(-1L);
+    }
+
+    private Long resolverUsuarioIdInterno(String userIdFiltro) {
+        if (userIdFiltro == null) return null;
+        return usuarioRepository.findByPublicId(userIdFiltro).map(Usuario::getId).orElse(-1L);
+    }
+
+    private Long resolverEquipeIdInterno(String teamId) {
+        if (teamId == null) return null;
+        return equipeRepository.findByPublicId(teamId).map(Equipe::getId).orElse(-1L);
+    }
+
+    private List<Long> resolverTagIdsInterno(List<String> tagIds) {
+        if (tagIds == null || tagIds.isEmpty()) return List.of();
+        return tagRepository.findAllByPublicIdIn(tagIds).stream().map(Tag::getId).toList();
+    }
+
     private List<Long> resolverFunilIdsPermitidos(Usuario usuario, Long pipelineId) {
         List<Long> permitidos = usuario.getCargo() == UserRole.ADMINISTRADOR
                 ? funilRepository.findAll().stream().map(Funil::getId).toList()
@@ -216,7 +256,7 @@ public class DashboardService {
         return permitidos;
     }
 
-    private DashboardSummaryResponse montarSummary(DashboardFiltroRequest filtro) {
+    private DashboardSummaryResponse montarSummary(DashboardFiltroRequest filtro, Usuario usuario) {
         DashboardFiltroRequest filtroAnterior = filtroPeriodoAnterior(filtro);
 
         BigDecimal valorAtual = oportunidadeRepository.sumValorPorSituacao(filtro, SituacaoOportunidade.ABERTO);
@@ -229,7 +269,7 @@ public class DashboardService {
         Double taxaConversao = calcularTaxaConversao(oportunidadesGanhas, oportunidadesPerdidas);
 
         long protocolosAbertos = protocoloRepository.countAbertos(filtro);
-        LocalDateTime limiteRisco = LocalDateTime.now().minusHours(protocoloRiscoHoras);
+        LocalDateTime limiteRisco = LocalDateTime.now().minusHours(usuario.getEmpresa().getProtocoloRiscoHoras());
         long protocolosEmRisco = protocoloRepository.countEmRisco(filtro, limiteRisco);
         Double tempoMedioAtendimentoMinutos = protocoloRepository.avgTempoAtendimentoMinutos(filtro);
         Double tempoMedioAtendimentoAnteriorMinutos = protocoloRepository.avgTempoAtendimentoMinutos(filtroAnterior);
@@ -305,16 +345,17 @@ public class DashboardService {
         boolean semRestricaoTag = filtro.getTagIds().isEmpty();
         List<Long> tagIdsParaQueryNativa = semRestricaoTag ? USUARIO_IDS_DUMMY_NATIVE_QUERY : filtro.getTagIds();
 
+        Long empresaId = TenantContext.get();
         Map<LocalDate, Long> abertosPorDia = mapaPorDia(
-                protocoloRepository.countAbertosPorDia(filtro.getStartDate(), filtro.getEndDate(), semRestricaoUsuario, usuarioIdsParaQueryNativa));
+                protocoloRepository.countAbertosPorDia(empresaId, filtro.getStartDate(), filtro.getEndDate(), semRestricaoUsuario, usuarioIdsParaQueryNativa));
         Map<LocalDate, Long> fechadosPorDia = mapaPorDia(
-                protocoloRepository.countFechadosPorDia(filtro.getStartDate(), filtro.getEndDate(), semRestricaoUsuario, usuarioIdsParaQueryNativa));
+                protocoloRepository.countFechadosPorDia(empresaId, filtro.getStartDate(), filtro.getEndDate(), semRestricaoUsuario, usuarioIdsParaQueryNativa));
         Map<LocalDate, Double> tempoMedioPorDia = protocoloRepository
-                .avgTempoAtendimentoPorDia(filtro.getStartDate(), filtro.getEndDate(), semRestricaoUsuario, usuarioIdsParaQueryNativa)
+                .avgTempoAtendimentoPorDia(empresaId, filtro.getStartDate(), filtro.getEndDate(), semRestricaoUsuario, usuarioIdsParaQueryNativa)
                 .stream()
                 .collect(Collectors.toMap(DiaTempoMedioProjection::getDia, DiaTempoMedioProjection::getTempoMedioMinutos));
         Map<LocalDate, BigDecimal> valorPorDia = oportunidadeRepository
-                .sumValorAbertoPorDia(filtro.getStartDate(), filtro.getEndDate(), filtro.getFunilIdsPermitidos(), filtro.getPipelineId(),
+                .sumValorAbertoPorDia(empresaId, filtro.getStartDate(), filtro.getEndDate(), filtro.getFunilIdsPermitidos(), filtro.getPipelineId(),
                         semRestricaoUsuario, usuarioIdsParaQueryNativa, semRestricaoOrigem, origensParaQueryNativa,
                         semRestricaoTag, tagIdsParaQueryNativa)
                 .stream()

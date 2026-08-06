@@ -11,6 +11,8 @@ import java.util.Optional;
 
 @Repository
 public interface FunilRepository extends JpaRepository<Funil, Long> {
+    Optional<Funil> findByPublicId(String publicId);
+
     List<Funil> findByFuncionariosContains(Usuario usuario);
 
     @Query("""
@@ -19,5 +21,12 @@ public interface FunilRepository extends JpaRepository<Funil, Long> {
     WHERE f.id = :id
     """)
     Optional<Funil> findByIdWithEtapas(@Param("id") Long id);
+
+    @Query("""
+    SELECT DISTINCT f FROM Funil f
+    LEFT JOIN FETCH f.etapas e
+    WHERE f.publicId = :publicId
+    """)
+    Optional<Funil> findByPublicIdWithEtapas(@Param("publicId") String publicId);
 
 }

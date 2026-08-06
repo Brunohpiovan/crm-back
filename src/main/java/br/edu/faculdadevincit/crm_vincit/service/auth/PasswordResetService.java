@@ -1,5 +1,6 @@
 package br.edu.faculdadevincit.crm_vincit.service.auth;
 
+import br.edu.faculdadevincit.crm_vincit.infra.security.TenantContext;
 import br.edu.faculdadevincit.crm_vincit.model.PasswordResetToken;
 import br.edu.faculdadevincit.crm_vincit.model.Usuario;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.ApiResponse;
@@ -39,11 +40,20 @@ public class PasswordResetService {
             throw new IllegalArgumentException("As senhas nao coincidem");
         }
 
-        Usuario user = usuarioRepository.findById(resetToken.getUsuarioId())
+        Usuario user = usuarioRepository.findByIdIgnorandoTenant(resetToken.getUsuarioId())
                 .orElseThrow(() -> new UserNotFoundException("Usuario nao encontrado"));
 
-        user.setSenha(passwordEncoder.encode(password));
-        usuarioRepository.save(user);
+        // TenantContext ainda vazio aqui (fluxo permitAll, sem sessão autenticada) — sem setar
+        // pro empresa_id real do usuário, o UPDATE do save() abaixo sairia com "AND empresa_id
+        // = -1" (sentinel) no WHERE, não bateria com a linha real, e a troca de senha não
+        // seria persistida.
+        TenantContext.set(user.getEmpresaId());
+        try {
+            user.setSenha(passwordEncoder.encode(password));
+            usuarioRepository.save(user);
+        } finally {
+            TenantContext.clear();
+        }
 
         resetToken.setUsado(true);
         passwordResetTokenRepository.save(resetToken);

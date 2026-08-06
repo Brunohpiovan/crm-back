@@ -45,7 +45,7 @@ public class EtapaController {
     @ApiResponse(responseCode = "200", description = "Lista de etapas do funil (vazia se o funil não existir ou não tiver etapas)",
             content = @Content(array = @ArraySchema(schema = @Schema(implementation = EtapaFunilDTO.class))))
     @GetMapping(value = "funil/{id}")
-    public List<EtapaFunilDTO> findByFunilId(@Parameter(description = "Id do funil", required = true) @PathVariable Long id){
+    public List<EtapaFunilDTO> findByFunilId(@Parameter(description = "Id do funil", required = true) @PathVariable String id){
         return etapaService.findByFunilId(id);
     }
 
@@ -57,7 +57,7 @@ public class EtapaController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Etapa com id 1 não encontrado")))
     })
     @GetMapping(value = "/{id}")
-    public ResponseEntity<?> findById(@Parameter(description = "Id da etapa", required = true) @PathVariable Long id) {
+    public ResponseEntity<?> findById(@Parameter(description = "Id da etapa", required = true) @PathVariable String id) {
         EtapaDto etapa = etapaService.findById(id);
         return ResponseEntity.ok(etapa);
     }
@@ -82,7 +82,7 @@ public class EtapaController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Etapa com id 1 nao encontrada")))
     })
     @PutMapping(value = "/{id}")
-    public ResponseEntity<?> update(@Parameter(description = "Id da etapa", required = true) @PathVariable Long id,@RequestBody EtapaUpdateDTO etapaRequest) {
+    public ResponseEntity<?> update(@Parameter(description = "Id da etapa", required = true) @PathVariable String id,@RequestBody EtapaUpdateDTO etapaRequest) {
         etapaService.update(id, etapaRequest);
         return ResponseEntity.ok().build();
     }
@@ -95,7 +95,7 @@ public class EtapaController {
             @ApiResponse(responseCode = "409", description = "Etapa possui oportunidades e não pode ser excluída")
     })
     @DeleteMapping(value = "/{id}")
-    public ResponseEntity<?> delete(@Parameter(description = "Id da etapa", required = true) @PathVariable Long id) {
+    public ResponseEntity<?> delete(@Parameter(description = "Id da etapa", required = true) @PathVariable String id) {
         etapaService.delete(id);
         return ResponseEntity.ok().build();
     }

@@ -61,17 +61,17 @@ public class DashboardController {
             @Parameter(description = "Fim do período (ISO-8601). Padrão: agora.")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
             @Parameter(description = "Id do funil/pipeline para restringir o resultado")
-            @RequestParam(required = false) Long pipelineId,
+            @RequestParam(required = false) String pipelineId,
             @Parameter(description = "Id do usuário para restringir o resultado (obrigatoriamente o próprio id para quem não é ADMINISTRADOR)")
-            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String userId,
             @Parameter(description = "Id da equipe (ver /equipe) para restringir o resultado aos seus membros")
-            @RequestParam(required = false) Long teamId,
+            @RequestParam(required = false) String teamId,
             @Parameter(description = "Situação(ões) da oportunidade (ABERTO, GANHO, PERDIDO, CONGELADO, LIXEIRA). Repita o parâmetro para filtrar por mais de uma (ex.: status=ABERTO&status=CONGELADO).")
             @RequestParam(required = false) List<SituacaoOportunidade> status,
             @Parameter(description = "Origem(ns)/canal da oportunidade. Repita o parâmetro para filtrar por mais de uma.")
             @RequestParam(required = false) List<Origem> origin,
             @Parameter(description = "Ids de tags para restringir o resultado a oportunidades com pelo menos uma delas")
-            @RequestParam(required = false) List<Long> tags
+            @RequestParam(required = false) List<String> tags
     ) {
         return dashboardService.getDashboard(startDate, endDate, pipelineId, userId, teamId, status, origin, tags);
     }
@@ -95,17 +95,17 @@ public class DashboardController {
             @Parameter(description = "Fim do período (ISO-8601). Padrão: agora.")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
             @Parameter(description = "Id do funil/pipeline para restringir o resultado")
-            @RequestParam(required = false) Long pipelineId,
+            @RequestParam(required = false) String pipelineId,
             @Parameter(description = "Id do usuário para restringir o resultado (obrigatoriamente o próprio id para quem não é ADMINISTRADOR)")
-            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String userId,
             @Parameter(description = "Id da equipe (ver /equipe) para restringir o resultado aos seus membros")
-            @RequestParam(required = false) Long teamId,
+            @RequestParam(required = false) String teamId,
             @Parameter(description = "Situação(ões) da oportunidade. Repita o parâmetro para mais de uma.")
             @RequestParam(required = false) List<SituacaoOportunidade> status,
             @Parameter(description = "Origem(ns)/canal da oportunidade. Repita o parâmetro para mais de uma.")
             @RequestParam(required = false) List<Origem> origin,
             @Parameter(description = "Ids de tags para restringir o resultado")
-            @RequestParam(required = false) List<Long> tags,
+            @RequestParam(required = false) List<String> tags,
             @Parameter(description = "Página, base 0. Padrão: 0.")
             @RequestParam(required = false, defaultValue = "0") int page,
             @Parameter(description = "Tamanho da página. Padrão: 20, máximo 100.")

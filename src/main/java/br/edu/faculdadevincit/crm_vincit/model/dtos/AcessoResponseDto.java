@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AcessoResponseDto {
-    private Long id;
+    private String id;
     private String enderecoIp;
     private String localizacao;
     private LocalDateTime data_acesso;

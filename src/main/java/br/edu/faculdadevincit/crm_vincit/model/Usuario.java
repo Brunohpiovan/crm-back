@@ -5,6 +5,7 @@ import br.edu.faculdadevincit.crm_vincit.model.enums.Uf;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import br.edu.faculdadevincit.crm_vincit.model.enums.UserRole;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -13,6 +14,8 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.TenantId;
+import org.hibernate.annotations.UuidGenerator;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -24,10 +27,14 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+@Schema(description = "Usuário (funcionário). login e cpf são únicos por Empresa, não mais globalmente — a mesma pessoa pode existir em duas empresas diferentes.")
 @Getter
 @Setter
 @Entity
-@Table(name = "usuario")
+@Table(name = "usuario", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_usuario_empresa_login", columnNames = {"empresa_id", "login"}),
+        @UniqueConstraint(name = "uk_usuario_empresa_cpf", columnNames = {"empresa_id", "cpf"})
+})
 @NoArgsConstructor
 @AllArgsConstructor
 public class Usuario implements UserDetails {
@@ -36,6 +43,24 @@ public class Usuario implements UserDetails {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
     private Long id;
+
+    @UuidGenerator
+    @Column(name = "public_id", nullable = false, unique = true, updatable = false, length = 36)
+    private String publicId;
+
+    /**
+     * Tenant desta entidade. Auto-preenchido pelo Hibernate a partir do TenantContext no
+     * insert, e usado automaticamente para filtrar toda leitura (ver TenantIdentifierResolver)
+     * — não setar manualmente. "empresa" abaixo é só um espelho somente-leitura da mesma
+     * coluna, pra navegação (usuario.getEmpresa().getNome() etc.).
+     */
+    @TenantId
+    @Column(name = "empresa_id", nullable = false)
+    private Long empresaId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "empresa_id", insertable = false, updatable = false)
+    private Empresa empresa;
 
     @Column(name = "urlPicture")
     private String urlPicture;
@@ -46,7 +71,7 @@ public class Usuario implements UserDetails {
     private String nome;
 
     @Email(message = "O e-mail deve ser válido.")
-    @Column(name = "login", nullable = false, unique = true)
+    @Column(name = "login", nullable = false)
     @Size(max = 150, message = "O login deve ter no maximo 255 caracteres")
     private String login;
 
@@ -62,7 +87,7 @@ public class Usuario implements UserDetails {
     private String rg;
 
     @NotBlank(message = "Informe um cpf")
-    @Column(name = "cpf",nullable = false, unique = true)
+    @Column(name = "cpf",nullable = false)
     @Size(max = 14, message = "O cpf deve ter no maximo 14 caracteres")
     private String cpf;
 

@@ -9,13 +9,15 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.TenantId;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
 
 @Getter
 @Setter
 @Entity
-@Table(name = "tag")
+@Table(name = "tag", uniqueConstraints = @UniqueConstraint(name = "uk_tag_empresa_nome", columnNames = {"empresa_id", "nome"}))
 @NoArgsConstructor
 @AllArgsConstructor
 public class Tag {
@@ -24,8 +26,15 @@ public class Tag {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @UuidGenerator
+    @Column(name = "public_id", nullable = false, unique = true, updatable = false, length = 36)
+    private String publicId;
+
+    @TenantId
+    @Column(name = "empresa_id", nullable = false)
+    private Long empresaId;
+
     @Size(max = 150, message = "O nome deve ter no maximo 150 caracteres")
-    @Column(unique = true)
     private String nome;
 
     @Enumerated(EnumType.STRING)

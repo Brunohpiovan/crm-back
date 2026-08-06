@@ -13,8 +13,20 @@ public class AuthorizationService implements UserDetailsService {
     @Autowired
     UsuarioRepository usuarioRepository;
 
+    /**
+     * "username" aqui é o composto "codigoEmpresa|login" montado por AuthenticationService —
+     * login sozinho não basta mais pra achar um Usuario único, já que passou a ser único por
+     * Empresa (duas empresas podem ter funcionário com o mesmo e-mail).
+     */
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        return usuarioRepository.findByLogin(username).orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+        int separatorIndex = username.indexOf('|');
+        if (separatorIndex < 0) {
+            throw new IllegalArgumentException("Usuário não encontrado.");
+        }
+        String codigoEmpresa = username.substring(0, separatorIndex);
+        String login = username.substring(separatorIndex + 1);
+        return usuarioRepository.findByEmpresaCodigoAndLogin(codigoEmpresa, login)
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
     }
 }

@@ -15,6 +15,8 @@ import java.util.Optional;
 
 @Repository
 public interface ParticipanteRepository extends JpaRepository<Participante, Long> {
+    Optional<Participante> findByPublicId(String publicId);
+
     Optional<Participante> findByCelular(String celular);
     Optional<Participante> findByLogin(String login);
 

@@ -14,11 +14,11 @@ import lombok.Setter;
 @AllArgsConstructor
 public class EtapaCadenciaDto {
 
-    private Long id;
+    private String id;
     private String nome;
 
     public EtapaCadenciaDto(Etapa etapaOrigem) {
-        this.id = etapaOrigem.getId();
+        this.id = etapaOrigem.getPublicId();
         this.nome = etapaOrigem.getNome();
     }
 }

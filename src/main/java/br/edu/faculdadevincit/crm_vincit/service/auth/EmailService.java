@@ -56,7 +56,7 @@ public class EmailService {
     }
 
     public void enviarEmail(EmailRequestDTO email) throws ResendException {
-        Usuario remetente = usuarioRepository.findById(email.getId_remetente())
+        Usuario remetente = usuarioRepository.findByPublicId(email.getId_remetente())
                 .orElseThrow(() -> new RuntimeException("Remetente não encontrado"));
 
         CreateEmailOptions.Builder params = CreateEmailOptions.builder()

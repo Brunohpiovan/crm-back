@@ -15,11 +15,11 @@ import java.util.ArrayList;
 @NoArgsConstructor
 @AllArgsConstructor
 public class EtapaUpdate2DTO {
-    private Long id;
+    private String id;
     private String nome;
 
     public EtapaUpdate2DTO(Etapa etapa) {
-        this.id = etapa.getId();
+        this.id = etapa.getPublicId();
         this.nome = etapa.getNome();
     }
 }

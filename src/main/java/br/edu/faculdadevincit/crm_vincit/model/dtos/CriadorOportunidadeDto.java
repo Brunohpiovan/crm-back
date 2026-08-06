@@ -13,12 +13,12 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CriadorOportunidadeDto {
-    private Long id;
+    private String id;
     private String nome;
     private String urlPicture;
 
     public CriadorOportunidadeDto(Usuario usuario){
-        this.id = usuario.getId();
+        this.id = usuario.getPublicId();
         this.nome=usuario.getNome();
         this.urlPicture = usuario.getUrlPicture();
     }

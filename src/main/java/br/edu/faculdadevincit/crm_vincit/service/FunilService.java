@@ -2,6 +2,7 @@ package br.edu.faculdadevincit.crm_vincit.service;
 
 import br.edu.faculdadevincit.crm_vincit.model.Etapa;
 import br.edu.faculdadevincit.crm_vincit.model.Funil;
+import br.edu.faculdadevincit.crm_vincit.model.Tag;
 import br.edu.faculdadevincit.crm_vincit.model.Usuario;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.*;
 import br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade;
@@ -9,12 +10,12 @@ import br.edu.faculdadevincit.crm_vincit.model.enums.UserRole;
 import br.edu.faculdadevincit.crm_vincit.repository.EtapaRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.FunilRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.OportunidadeRepository;
+import br.edu.faculdadevincit.crm_vincit.repository.TagRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.UsuarioRepository;
 import br.edu.faculdadevincit.crm_vincit.service.exceptions.ConflictException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -40,6 +41,9 @@ public class FunilService {
     @Autowired
     private OportunidadeRepository oportunidadeRepository;
 
+    @Autowired
+    private TagRepository tagRepository;
+
     public List<FunilAllDTO> findAll() {
         Usuario usuario = getUsuarioAutenticado();
 
@@ -54,28 +58,25 @@ public class FunilService {
 
     private Usuario getUsuarioAutenticado() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String email = authentication.getName();
-        return (Usuario) usuarioRepository.findByLogin(email)
-                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+        return (Usuario) authentication.getPrincipal();
     }
 
 
-    public List<UsuarioContatoDto> findFuncionariosFunil(Long funilId) {
-        if (!funilRepository.existsById(funilId)) {
-            throw new RuntimeException("Funil não encontrado");
-        }
+    public List<UsuarioContatoDto> findFuncionariosFunil(String funilId) {
+        Funil funil = funilRepository.findByPublicId(funilId)
+                .orElseThrow(() -> new RuntimeException("Funil não encontrado"));
 
         List<UsuarioContatoDto> usuariosNaoNoFunil =
-                usuarioRepository.findDisponiveisParaFunil(funilId, UserRole.ADMINISTRADOR);
+                usuarioRepository.findDisponiveisParaFunil(funil.getId(), UserRole.ADMINISTRADOR);
 
         return usuariosNaoNoFunil;
     }
 
 
-    public void adicionarFuncionarioFunil(Long funcionarioId,Long funilId){
-        Funil funil = funilRepository.findById(funilId)
+    public void adicionarFuncionarioFunil(String funcionarioId,String funilId){
+        Funil funil = funilRepository.findByPublicId(funilId)
                 .orElseThrow(() -> new RuntimeException("Funil não encontrado"));
-        Usuario funcionario = usuarioRepository.findById(funcionarioId).orElseThrow(() -> new RuntimeException("Funcionario não encontrado"));
+        Usuario funcionario = usuarioRepository.findByPublicId(funcionarioId).orElseThrow(() -> new RuntimeException("Funcionario não encontrado"));
         if (!funil.getFuncionarios().contains(funcionario)) {
             funil.getFuncionarios().add(funcionario);
         }
@@ -87,8 +88,8 @@ public class FunilService {
     }
 
 
-    public FunilDto findById(Long id) {
-        Funil funil = funilRepository.findByIdWithEtapas(id)
+    public FunilDto findById(String id) {
+        Funil funil = funilRepository.findByPublicIdWithEtapas(id)
                 .orElseThrow(() -> new RuntimeException("Funil com id " + id + " não encontrado"));
 
         List<Long> etapaIds = funil.getEtapas().stream().map(Etapa::getId).toList();
@@ -98,15 +99,16 @@ public class FunilService {
                 .map(etapa -> new EtapaDto(etapa, oportunidadesPorEtapa.getOrDefault(etapa.getId(), List.of())))
                 .collect(Collectors.toList());
 
-        return new FunilDto(funil.getId(), funil.getNome(), etapaDtos);
+        return new FunilDto(funil.getPublicId(), funil.getNome(), etapaDtos);
     }
 
-    public FunilDto findByIdAndSituacao(Long id, List<SituacaoOportunidade> situacoes, List<TagOportunidadeDTO> tags) {
-        Funil funil = funilRepository.findByIdWithEtapas(id).orElse(null);
+    public FunilDto findByIdAndSituacao(String id, List<SituacaoOportunidade> situacoes, List<TagOportunidadeDTO> tags) {
+        Funil funil = funilRepository.findByPublicIdWithEtapas(id).orElse(null);
         if (funil == null) return null;
 
-        List<Long> tagIds = tags != null
-                ? tags.stream().map(TagOportunidadeDTO::getId).toList()
+        List<Long> tagIds = tags != null && !tags.isEmpty()
+                ? tagRepository.findAllByPublicIdIn(tags.stream().map(TagOportunidadeDTO::getId).toList())
+                        .stream().map(Tag::getId).toList()
                 : List.of();
         List<Long> etapaIds = funil.getEtapas().stream().map(Etapa::getId).toList();
 
@@ -117,7 +119,7 @@ public class FunilService {
                 .map(etapa -> new EtapaDto(etapa, oportunidadesPorEtapa.getOrDefault(etapa.getId(), List.of())))
                 .collect(Collectors.toList());
 
-        return new FunilDto(funil.getId(), funil.getNome(), etapaDtos);
+        return new FunilDto(funil.getPublicId(), funil.getNome(), etapaDtos);
     }
 
 
@@ -129,8 +131,8 @@ public class FunilService {
         return new FunilDto(savedFunil);
     }
 
-    public FunilAllDTO update(Long id, FunilAllDTO funil) {
-        Funil funilBanco = funilRepository.findById(id)
+    public FunilAllDTO update(String id, FunilAllDTO funil) {
+        Funil funilBanco = funilRepository.findByPublicId(id)
                 .orElseThrow(() -> new RuntimeException("Funil com id " + id + " não encontrado"));
         funilBanco.setNome(funil.getNome());
         Funil savedFunil = funilRepository.save(funilBanco);
@@ -138,10 +140,10 @@ public class FunilService {
         return new FunilAllDTO(savedFunil);
     }
 
-    public void delete(Long id) {
-        Funil funilBanco = funilRepository.findById(id)
+    public void delete(String id) {
+        Funil funilBanco = funilRepository.findByPublicId(id)
                 .orElseThrow(() -> new RuntimeException("Funil com id " + id + " não encontrado"));
-        List<Long> etapaIds = etapaRepository.findByFunilId(id).stream().map(Etapa::getId).toList();
+        List<Long> etapaIds = etapaRepository.findByFunilId(funilBanco.getId()).stream().map(Etapa::getId).toList();
         long oportunidadesAtivas = etapaIds.isEmpty() ? 0 : oportunidadeRepository.countPorEtapaIdIn(etapaIds);
         if (oportunidadesAtivas > 0) {
             throw new ConflictException("Não é possível excluir o funil: existem " + oportunidadesAtivas

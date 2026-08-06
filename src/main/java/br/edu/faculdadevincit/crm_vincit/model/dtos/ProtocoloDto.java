@@ -17,13 +17,13 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class ProtocoloDto {
 
-    private Long id;
+    private String id;
     @Schema(description = "Id do Usuario (administrador/atendente) que abrirá o protocolo")
     @NotNull(message = "O ID do administrador não pode ser nulo.")
-    private Long id_admin;
+    private String id_admin;
     @Schema(description = "Id do Participante a ser atendido")
     @NotNull(message = "O ID do participante não pode ser nulo.")
-    private Long id_participante;
+    private String id_participante;
     @Schema(description = "Status do protocolo: ABERTO ou FECHADO. Ignorado na criação (o servidor sempre cria como ABERTO).")
     @NotNull(message = "O status não pode ser nulo.")
     private StatusProtocolo status;

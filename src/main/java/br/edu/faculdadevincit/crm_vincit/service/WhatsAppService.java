@@ -281,7 +281,7 @@ public class WhatsAppService {
             Protocolo protocolo = optionalProtocolo.get();
             List<Mensagem> savedMessage = mensagemService.sendMessage(protocolo, participante, body,media);
             savedMessage.forEach(mensagemNew ->
-                    publicarNoWebSocket("/topic/messages/" + protocolo.getId(), new MensagemResponseDTO(mensagemNew)));
+                    publicarNoWebSocket("/topic/messages/" + protocolo.getPublicId(), new MensagemResponseDTO(mensagemNew)));
         } else {
             List<Mensagem> savedMessages = mensagemService.sendMessagePublico(participante, body, media);
             savedMessages.forEach(mensagemNew ->
@@ -316,7 +316,7 @@ public class WhatsAppService {
         participante.setObservacoes(null);
         participante.setTipoParticipante(TipoParticipante.PARTICIPANTE);
         participanteRepository.save(participante);
-        UsuarioContatoDto contatoDto = new UsuarioContatoDto(participante.getId(), participante.getNome(), participante.getUrlPicture());
+        UsuarioContatoDto contatoDto = new UsuarioContatoDto(participante.getPublicId(), participante.getNome(), participante.getUrlPicture());
         messagingTemplate.convertAndSend("/topic/usuarios", contatoDto);
         return participante;
     }

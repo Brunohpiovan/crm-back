@@ -11,6 +11,9 @@ import java.util.Optional;
 
 @Repository
 public interface TemplateEmailRepository extends JpaRepository<TemplateEmail, Long> {
+    @EntityGraph(attributePaths = "urlAnexo")
+    Optional<TemplateEmail> findByPublicId(String publicId);
+
     @Query("SELECT t FROM TemplateEmail t ORDER BY " +
             "CASE t.situacao WHEN 'ATIVA' THEN 0 ELSE 1 END, " +
             "LOWER(t.nome) ASC")

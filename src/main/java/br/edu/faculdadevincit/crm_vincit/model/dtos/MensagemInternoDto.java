@@ -11,10 +11,10 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class MensagemInternoDto {
 
-    private Long id;
-    private Long id_group;
-    private Long id_sender;
-    private Long id_reciver;
+    private String id;
+    private String id_group;
+    private String id_sender;
+    private String id_reciver;
     private String conteudo;
     private LocalDateTime data_envio;
 }

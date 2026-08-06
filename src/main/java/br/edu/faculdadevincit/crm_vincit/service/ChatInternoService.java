@@ -43,8 +43,8 @@ public class ChatInternoService {
     }
 
     public MensagemInterna sendMessage(MensagemInternoDto mensagem) {
-        Usuario sender = usuarioRepository.findById(mensagem.getId_sender()).orElseThrow(()->new RuntimeException("Usuario Sender nao encontrado"));
-        Usuario reciver = usuarioRepository.findById(mensagem.getId_reciver()).orElseThrow(()->new RuntimeException("Usuario Reciver nao encontrado"));
+        Usuario sender = usuarioRepository.findByPublicId(mensagem.getId_sender()).orElseThrow(()->new RuntimeException("Usuario Sender nao encontrado"));
+        Usuario reciver = usuarioRepository.findByPublicId(mensagem.getId_reciver()).orElseThrow(()->new RuntimeException("Usuario Reciver nao encontrado"));
         MensagemInterna mensagemNew = new MensagemInterna();
         if(mensagem.getId_group() == null){
             Optional<ChatGrupo> grupoExistente = chatGrupoRepository
@@ -56,11 +56,11 @@ public class ChatInternoService {
                 mensagemNew.setChatGrupo(grupoExistente.get());
             } else {
                 mensagemNew.setChatGrupo(criaGroup(sender, reciver));
-                messagingTemplate.convertAndSend("/topic/newGroup/" + sender.getId(), criaDto(reciver));
-                messagingTemplate.convertAndSend("/topic/newGroup/" + reciver.getId(), criaDto(sender));
+                messagingTemplate.convertAndSend("/topic/newGroup/" + sender.getPublicId(), criaDto(reciver));
+                messagingTemplate.convertAndSend("/topic/newGroup/" + reciver.getPublicId(), criaDto(sender));
             }
         }else{
-            mensagemNew.setChatGrupo(chatGrupoRepository.findById(mensagem.getId_group()).orElseThrow(()->new RuntimeException("chatGrupo nao encontrado")));
+            mensagemNew.setChatGrupo(chatGrupoRepository.findByPublicId(mensagem.getId_group()).orElseThrow(()->new RuntimeException("chatGrupo nao encontrado")));
         }
         mensagemNew.setConteudo(mensagem.getConteudo());
         mensagemNew.setSender(sender);
@@ -69,9 +69,9 @@ public class ChatInternoService {
     }
 
     public MensagemInterna sendMessageGroup(MensagemInternoDto mensagem){
-        Usuario sender = usuarioRepository.findById(mensagem.getId_sender()).orElseThrow(()->new RuntimeException("Usuario Sender nao encontrado"));
+        Usuario sender = usuarioRepository.findByPublicId(mensagem.getId_sender()).orElseThrow(()->new RuntimeException("Usuario Sender nao encontrado"));
         MensagemInterna mensagemNew = new MensagemInterna();
-        mensagemNew.setChatGrupo(chatGrupoRepository.findById(mensagem.getId_group()).orElseThrow(()->new RuntimeException("chatGrupo nao encontrado")));
+        mensagemNew.setChatGrupo(chatGrupoRepository.findByPublicId(mensagem.getId_group()).orElseThrow(()->new RuntimeException("chatGrupo nao encontrado")));
         mensagemNew.setConteudo(mensagem.getConteudo());
         mensagemNew.setSender(sender);
         mensagemNew.setDataEnvio(LocalDateTime.now());

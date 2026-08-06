@@ -11,7 +11,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class UsuarioLogDto {
 
-    private Long id;
+    private String id;
     private String nome;
     private String login;
 }

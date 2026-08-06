@@ -24,7 +24,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class UsuarioAllDTO {
 
-    private Long id;
+    private String id;
     private String nome;
     private String login;
     private String celular;
@@ -35,7 +35,7 @@ public class UsuarioAllDTO {
 
 
     public UsuarioAllDTO(Usuario usuario){
-        this.id = usuario.getId();
+        this.id = usuario.getPublicId();
         this.nome = usuario.getNome();
         this.login = usuario.getLogin();
         this.celular = usuario.getCelular();

@@ -23,7 +23,7 @@ public class EmailRequestDTO {
     private String corpo;
     @JoinColumn(name = "remetente_id")
     @Schema(description = "Id do usuário remetente, usado apenas para registro no histórico de envio (não altera o endereço 'De:' do e-mail).")
-    private Long id_remetente;
+    private String id_remetente;
     @Schema(description = "Arquivos a serem anexados ao e-mail.")
     private List<MultipartFile> anexos;
 }

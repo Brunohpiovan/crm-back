@@ -10,9 +10,12 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface MensagemRepository extends JpaRepository<Mensagem, Long> {
+
+    Optional<Mensagem> findByPublicId(String publicId);
 
     @Query(value = "SELECT m FROM Mensagem m JOIN FETCH m.sender JOIN FETCH m.protocolo WHERE m.protocolo = :protocolo",
            countQuery = "SELECT COUNT(m) FROM Mensagem m WHERE m.protocolo = :protocolo")
@@ -24,6 +27,6 @@ public interface MensagemRepository extends JpaRepository<Mensagem, Long> {
     @Query("SELECT m FROM Mensagem m JOIN FETCH m.sender WHERE m.sender.id = :senderId AND m.protocolo IS NULL")
     List<Mensagem> findBySenderIdAndProtocoloIsNull(@Param("senderId") Long senderId);
 
-    @Query("SELECT DISTINCT m.sender.id FROM Mensagem m WHERE m.protocolo IS NULL")
-    List<Long> findDistinctSenderIdsWithoutProtocol();
+    @Query("SELECT DISTINCT m.sender.publicId FROM Mensagem m WHERE m.protocolo IS NULL")
+    List<String> findDistinctSenderIdsWithoutProtocol();
 }

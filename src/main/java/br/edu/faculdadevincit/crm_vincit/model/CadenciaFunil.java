@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.TenantId;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -22,6 +24,14 @@ public class CadenciaFunil {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @UuidGenerator
+    @Column(name = "public_id", nullable = false, unique = true, updatable = false, length = 36)
+    private String publicId;
+
+    @TenantId
+    @Column(name = "empresa_id", nullable = false)
+    private Long empresaId;
 
     @Column(nullable = false)
     private String nome;

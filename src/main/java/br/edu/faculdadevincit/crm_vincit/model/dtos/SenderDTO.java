@@ -15,12 +15,12 @@ import lombok.Setter;
 @AllArgsConstructor
 public class SenderDTO {
 
-    private Long id;
+    private String id;
     private String nome;
     private String urlPicture;
 
     public SenderDTO(Participante usuario){
-        this.id = usuario.getId();
+        this.id = usuario.getPublicId();
         this.nome = usuario.getNome();
         this.urlPicture = usuario.getUrlPicture();
     }

@@ -52,7 +52,7 @@ public class AcessoController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Log não encontrado")))
     })
     @PutMapping("/finalizar/{id}")
-    public ResponseEntity<Void> updateLogExit(@Parameter(description = "Id do log de acesso (retornado como logId no login)", required = true) @PathVariable Long id) {
+    public ResponseEntity<Void> updateLogExit(@Parameter(description = "Id do log de acesso (retornado como logId no login)", required = true) @PathVariable String id) {
         acessoService.updateExitTime(id);
         return ResponseEntity.ok().build();
     }
@@ -69,7 +69,7 @@ public class AcessoController {
     @ApiResponse(responseCode = "200", description = "Lista de logs de acesso do usuário",
             content = @Content(array = @ArraySchema(schema = @Schema(implementation = AcessoResponseDto.class))))
     @GetMapping("/{id}")
-    public List<AcessoResponseDto> findAllByUser(@Parameter(description = "Id do usuário", required = true) @PathVariable Long id) {
+    public List<AcessoResponseDto> findAllByUser(@Parameter(description = "Id do usuário", required = true) @PathVariable String id) {
         return acessoService.findAllByUser(id);
     }
 

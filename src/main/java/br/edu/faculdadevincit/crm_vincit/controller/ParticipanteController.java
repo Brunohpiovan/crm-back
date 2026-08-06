@@ -52,7 +52,7 @@ public class ParticipanteController {
     @Operation(summary = "Listar participantes sem protocolo aberto com outro administrador", description = "Requer JWT. Retorna os participantes disponíveis para abertura de um novo protocolo com o admin `id` (exclui participantes que já possuem protocolo ABERTO com outro administrador).")
     @ApiResponse(responseCode = "200", description = "Lista filtrada de participantes", content = @Content(array = @ArraySchema(schema = @Schema(implementation = ParticipanteDTO.class))))
     @GetMapping(value = "/filter/{id}")
-    public List<ParticipanteDTO> findAllFilter(@Parameter(description = "Id do administrador de referência", required = true) @PathVariable Long id) {
+    public List<ParticipanteDTO> findAllFilter(@Parameter(description = "Id do administrador de referência", required = true) @PathVariable String id) {
 
         return participanteService.findAllFilter(id);
     }
@@ -64,7 +64,7 @@ public class ParticipanteController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Participante não encontrado")))
     })
     @GetMapping(value = "/{id}")
-    public ResponseEntity<?> findById(@Parameter(description = "Id do participante", required = true) @PathVariable Long id) {
+    public ResponseEntity<?> findById(@Parameter(description = "Id do participante", required = true) @PathVariable String id) {
         ParticipanteDTO resposta = participanteService.findById(id);
         return ResponseEntity.ok(resposta);
     }
@@ -83,7 +83,7 @@ public class ParticipanteController {
 
     @Operation(summary = "Atualizar participante", description = "Requer JWT. Atualiza os dados cadastrais do participante identificado por `id`.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Participante atualizado", content = @Content(schema = @Schema(implementation = Participante.class))),
+            @ApiResponse(responseCode = "200", description = "Participante atualizado", content = @Content(schema = @Schema(implementation = ParticipanteDTO.class))),
             @ApiResponse(responseCode = "400", description = "Três formas possíveis: (1) dados inválidos — JSON de erros de validação por campo; (2) participante não encontrado — texto puro (UsernameNotFoundException, sem handler dedicado); (3) login/CPF em conflito com outro registro — JSON StandardError (org.springframework.dao.DataIntegrityViolationException)",
                     content = {
                             @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Participante não encontrado")),
@@ -91,9 +91,9 @@ public class ParticipanteController {
                     })
     })
     @PutMapping(value = "/{id}")
-    public ResponseEntity<?> update(@Parameter(description = "Id do participante", required = true) @PathVariable Long id, @Parameter(description = "Dados atualizados do participante", required = true) @RequestBody @Valid ParticipanteUpdateRequest participante) {
+    public ResponseEntity<?> update(@Parameter(description = "Id do participante", required = true) @PathVariable String id, @Parameter(description = "Dados atualizados do participante", required = true) @RequestBody @Valid ParticipanteUpdateRequest participante) {
         Participante participanteResposta = participanteService.update(participante,id);
-        return ResponseEntity.ok(participanteResposta);
+        return ResponseEntity.ok(new ParticipanteDTO(participanteResposta));
     }
 
     @Operation(summary = "Excluir participante", description = "Requer JWT. Exclusão física (hard delete) do participante identificado por `id`.")
@@ -103,20 +103,20 @@ public class ParticipanteController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Participante não encontrado")))
     })
     @DeleteMapping(value = "/{id}")
-    public ResponseEntity<?> delete(@Parameter(description = "Id do participante", required = true) @PathVariable Long id) {
+    public ResponseEntity<?> delete(@Parameter(description = "Id do participante", required = true) @PathVariable String id) {
         participanteService.delete(id);
         return ResponseEntity.ok().build();
     }
 
     @Operation(summary = "Buscar participante por celular", description = "Requer JWT.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Participante encontrado", content = @Content(schema = @Schema(implementation = Participante.class))),
+            @ApiResponse(responseCode = "200", description = "Participante encontrado", content = @Content(schema = @Schema(implementation = ParticipanteDTO.class))),
             @ApiResponse(responseCode = "400", description = "Nenhum participante cadastrado com esse celular (resposta em texto puro, não JSON estruturado — RuntimeException genérica sem handler dedicado)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Nao existe participante com esse celular cadastrado")))
     })
     @GetMapping(value = "/celular/{celular}")
     public ResponseEntity<?> findByCelular(@Parameter(description = "Número de celular do participante", required = true) @PathVariable String celular) {
-        return ResponseEntity.ok(participanteService.findByCelular(celular));
+        return ResponseEntity.ok(new ParticipanteDTO(participanteService.findByCelular(celular)));
     }
 
     @Operation(summary = "Buscar participante por login", description = "Requer JWT.")

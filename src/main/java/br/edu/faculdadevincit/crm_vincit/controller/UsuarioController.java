@@ -61,14 +61,14 @@ public class UsuarioController {
     @Operation(summary = "Listar contatos do usuário (para chat interno)", description = "Requer JWT com cargo ROLE_VENDEDOR. Retorna os usuários com quem `userId` compartilha algum grupo privado de chat interno.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lista de contatos", content = @Content(array = @ArraySchema(schema = @Schema(implementation = UsuarioAllContactsDTO.class))))
     @GetMapping("/contacts/{userId}")
-    public List<UsuarioAllContactsDTO> findAllContacts(@Parameter(description = "Id do usuário", required = true) @PathVariable Long userId) {
+    public List<UsuarioAllContactsDTO> findAllContacts(@Parameter(description = "Id do usuário", required = true) @PathVariable String userId) {
         return usuarioService.findAllContacts(userId);
     }
 
     @Operation(summary = "Listar usuários disponíveis para novo grupo/contato", description = "Requer JWT com cargo ROLE_VENDEDOR. Retorna os usuários que ainda não compartilham nenhum grupo privado de chat interno com `userId`.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lista de usuários disponíveis", content = @Content(array = @ArraySchema(schema = @Schema(implementation = UsuarioAllContactsDTO.class))))
     @GetMapping("/contacts/dispo/{userId}")
-    public List<UsuarioAllContactsDTO> findAllContactsDispo(@Parameter(description = "Id do usuário", required = true) @PathVariable Long userId) {
+    public List<UsuarioAllContactsDTO> findAllContactsDispo(@Parameter(description = "Id do usuário", required = true) @PathVariable String userId) {
         return usuarioService.findAllContactsDispo(userId);
     }
 
@@ -104,7 +104,7 @@ public class UsuarioController {
                     content = @Content(schema = @Schema(implementation = ApiResponse.class)))
     })
     @GetMapping(value = "/{id}/edicao")
-    public ResponseEntity<?> findByIdParaEdicao(@Parameter(description = "Id do usuário", required = true) @PathVariable Long id) {
+    public ResponseEntity<?> findByIdParaEdicao(@Parameter(description = "Id do usuário", required = true) @PathVariable String id) {
         UsuarioResponseNoAuthDto resposta = usuarioService.findByIdParaEdicao(id);
         return ResponseEntity.ok(resposta);
     }
@@ -126,7 +126,7 @@ public class UsuarioController {
                     content = @Content(schema = @Schema(implementation = ApiResponse.class)))
     })
     @GetMapping(value = "/{id}")
-    public ResponseEntity<?> findById(@Parameter(description = "Id do usuário", required = true) @PathVariable Long id) {
+    public ResponseEntity<?> findById(@Parameter(description = "Id do usuário", required = true) @PathVariable String id) {
         UsuarioResponseDto resposta = usuarioService.findById(id);
         return ResponseEntity.ok(resposta);
     }
@@ -177,7 +177,7 @@ public class UsuarioController {
                     content = @Content(schema = @Schema(implementation = ApiResponse.class)))
     })
     @PutMapping(value = "/{id}")
-    public ResponseEntity<?> update(@Parameter(description = "Id do usuário", required = true) @PathVariable Long id,
+    public ResponseEntity<?> update(@Parameter(description = "Id do usuário", required = true) @PathVariable String id,
                                     @Parameter(description = "Dados pessoais atualizados", required = true) @RequestPart("usuario") UsuarioSelfUpdateDTO usuarioRequest,
                                     @Parameter(description = "Nova foto/avatar (opcional)") @RequestPart(value = "foto", required = false) MultipartFile foto) {
         LoginResponseDTO responseDTO = usuarioService.update(id, usuarioRequest, foto);
@@ -202,7 +202,7 @@ public class UsuarioController {
                     })
     })
     @PutMapping(value = "/all/{id}")
-    public ResponseEntity<?> updateAll(@Parameter(description = "Id do usuário", required = true) @PathVariable Long id,
+    public ResponseEntity<?> updateAll(@Parameter(description = "Id do usuário", required = true) @PathVariable String id,
                                     @Parameter(description = "Dados administrativos atualizados (inclui cargo e bloqueado)", required = true) @RequestPart("usuario") UsuarioAdminUpdateDTO usuarioRequest,
                                     @Parameter(description = "Nova foto/avatar (opcional)") @RequestPart(value = "foto", required = false) MultipartFile foto) {
         UsuarioAllDTO responseDTO = usuarioService.updateAll(id, usuarioRequest, foto);
@@ -225,7 +225,7 @@ public class UsuarioController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Usuario nao encontrado")))
     })
     @DeleteMapping(value = "/{id}")
-    public ResponseEntity<?> delete(@Parameter(description = "Id do usuário", required = true) @PathVariable Long id) {
+    public ResponseEntity<?> delete(@Parameter(description = "Id do usuário", required = true) @PathVariable String id) {
         usuarioService.delete(id);
         return ResponseEntity.ok().build();
     }

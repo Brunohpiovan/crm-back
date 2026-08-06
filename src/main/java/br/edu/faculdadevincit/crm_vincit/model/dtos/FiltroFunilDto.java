@@ -17,7 +17,7 @@ import java.util.List;
 public class FiltroFunilDto {
 
     @Schema(description = "Id do funil a ser buscado")
-    private Long id;
+    private String id;
     @Schema(description = "Lista de situações de oportunidade a incluir no resultado (ex.: ABERTO, GANHO, PERDIDO). Se vazia/nula, não filtra por situação.")
     private List<SituacaoOportunidade> situacoes;
     @Schema(description = "Lista de tags a incluir no resultado (apenas oportunidades com pelo menos uma das tags informadas). Se vazia/nula, não filtra por tag.")

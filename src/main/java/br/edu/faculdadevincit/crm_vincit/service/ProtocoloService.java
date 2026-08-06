@@ -51,13 +51,13 @@ public class ProtocoloService {
 
     @Transactional
     public ProtocoloMoveDTO createProtocolo(ProtocoloDto protocoloDto) {
-        Usuario admin = usuarioRepository.findById(protocoloDto.getId_admin()).orElseThrow(() ->
+        Usuario admin = usuarioRepository.findByPublicId(protocoloDto.getId_admin()).orElseThrow(() ->
                 new UsernameNotFoundException("Usuário não encontrado"));
-        Optional<Protocolo> protocoloOptional = protocoloRepository.findByParticipanteIdAndStatusAberto(protocoloDto.getId_participante(),StatusProtocolo.ABERTO);
+        Participante participante = participanteRepository.findByPublicId(protocoloDto.getId_participante()).orElseGet(()->createParticipante(protocoloDto.getId_participante()));
+        Optional<Protocolo> protocoloOptional = protocoloRepository.findByParticipanteIdAndStatusAberto(participante.getId(),StatusProtocolo.ABERTO);
         if(protocoloOptional.isPresent()){
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Já existe um protocolo em andamento com esse usuário");
         }
-        Participante participante = participanteRepository.findById(protocoloDto.getId_participante()).orElseGet(()->createParticipante(protocoloDto.getId_participante()));
         Protocolo protocolo = new Protocolo();
         protocolo.setAdmin(admin);
         protocolo.setParticipante(participante);
@@ -82,16 +82,16 @@ public class ProtocoloService {
 
         mensagemRepository.saveAll(mensagensSemProtocolo);
         ProtocoloMoveDTO dto = new ProtocoloMoveDTO(protocolo);
-        ProtocoloNotificacaoDTO notificacaoDTO = new ProtocoloNotificacaoDTO(participante.getId(), admin.getId());
+        ProtocoloNotificacaoDTO notificacaoDTO = new ProtocoloNotificacaoDTO(participante.getPublicId(), admin.getPublicId());
         publishAfterCommit(() -> {
-            messagingTemplate.convertAndSend("/topic/protocolo/aberto/" + protocolo.getParticipante().getId(), dto);
+            messagingTemplate.convertAndSend("/topic/protocolo/aberto/" + protocolo.getParticipante().getPublicId(), dto);
             messagingTemplate.convertAndSend("/topic/protocolo/novo", notificacaoDTO);
         });
         return dto;
     }
 
-    public Participante createParticipante(Long id){
-        Usuario usuario = usuarioRepository.findById(id).orElseThrow(()-> new RuntimeException("Nao existe um usuario com esse Id"));
+    public Participante createParticipante(String usuarioPublicId){
+        Usuario usuario = usuarioRepository.findByPublicId(usuarioPublicId).orElseThrow(()-> new RuntimeException("Nao existe um usuario com esse Id"));
         Optional<Participante> participante = participanteRepository.findByLogin(usuario.getLogin());
         if(participante.isPresent()){
             return participante.get();
@@ -118,12 +118,8 @@ public class ProtocoloService {
     }
 
     @Transactional
-    public void closeProtocolo(Long protocolId) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String emailAdmin = authentication.getName();
-        usuarioRepository.findByLogin(emailAdmin)
-                .orElseThrow(() -> new RuntimeException("Admin não encontrado"));
-        Protocolo protocolo = protocoloRepository.findById(protocolId).orElseThrow(()-> new RuntimeException("Protocolo nao encontrado"));
+    public void closeProtocolo(String protocolPublicId) {
+        Protocolo protocolo = protocoloRepository.findByPublicId(protocolPublicId).orElseThrow(()-> new RuntimeException("Protocolo nao encontrado"));
         if (StatusProtocolo.FECHADO.equals(protocolo.getStatus())) {
             throw new RuntimeException("Protocolo ja encerrado");
         }
@@ -134,7 +130,7 @@ public class ProtocoloService {
         StatusProtocolo statusFechado = protocolo.getStatus();
         ParticipanteDTO participanteDTO = new ParticipanteDTO(protocolo.getParticipante());
         publishAfterCommit(() -> {
-            messagingTemplate.convertAndSend("/topic/protocolo/"+protocolo.getId(), statusFechado);
+            messagingTemplate.convertAndSend("/topic/protocolo/"+protocolo.getPublicId(), statusFechado);
             messagingTemplate.convertAndSend("/topic/contatoRet", participanteDTO);
         });
     }
@@ -152,11 +148,11 @@ public class ProtocoloService {
         }
     }
 
-    public Optional<Protocolo> getProtocoloByUsuario(Long id_usuario1, Long id_usuario2) {
-        Usuario usuario1 = usuarioRepository.findById(id_usuario1)
+    public Optional<Protocolo> getProtocoloByUsuario(String id_usuario1, String id_usuario2) {
+        Usuario usuario1 = usuarioRepository.findByPublicId(id_usuario1)
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário 1 não encontrado"));
 
-        Participante participante = participanteRepository.findById(id_usuario2)
+        Participante participante = participanteRepository.findByPublicId(id_usuario2)
                 .orElseThrow(() -> new UsernameNotFoundException("Participante não encontrado"));
 
         String celular1 = usuario1.getCelular();
@@ -171,11 +167,11 @@ public class ProtocoloService {
                 .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
     }
 
-    public List<ProtocoloMoveDTO> getProtocols(Long id_usuario) {
+    public List<ProtocoloMoveDTO> getProtocols(String id_usuario) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String authenticatedUsername = authentication.getName();
         boolean isAdmin = isAdmin(authentication);
-        Usuario usuario = usuarioRepository.findById(id_usuario).orElseThrow(() ->
+        Usuario usuario = usuarioRepository.findByPublicId(id_usuario).orElseThrow(() ->
                 new UsernameNotFoundException("Usuário não encontrado"));
         if (!isAdmin && !usuario.getLogin().equals(authenticatedUsername)) {
             throw new br.edu.faculdadevincit.crm_vincit.service.exceptions.AccessDeniedException("Você não tem permissão para acessar este usuário.");
@@ -193,11 +189,11 @@ public class ProtocoloService {
         }
     }
 
-    public Page<ProtocoloMoveDTO> getProtocolsPaginado(Long id_usuario, String search, Pageable pageable) {
+    public Page<ProtocoloMoveDTO> getProtocolsPaginado(String id_usuario, String search, Pageable pageable) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String authenticatedUsername = authentication.getName();
         boolean isAdmin = isAdmin(authentication);
-        Usuario usuario = usuarioRepository.findById(id_usuario).orElseThrow(() ->
+        Usuario usuario = usuarioRepository.findByPublicId(id_usuario).orElseThrow(() ->
                 new UsernameNotFoundException("Usuário não encontrado"));
         if (!isAdmin && !usuario.getLogin().equals(authenticatedUsername)) {
             throw new br.edu.faculdadevincit.crm_vincit.service.exceptions.AccessDeniedException("Você não tem permissão para acessar este usuário.");
@@ -211,11 +207,11 @@ public class ProtocoloService {
         return pagina.map(ProtocoloMoveDTO::new);
     }
 
-    public ProtocoloMoveDTO findById(Long id) {
+    public ProtocoloMoveDTO findById(String id) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String authenticatedUsername = authentication.getName();
         boolean isAdmin = isAdmin(authentication);
-        Optional<Protocolo> protocolo = protocoloRepository.findById(id);
+        Optional<Protocolo> protocolo = protocoloRepository.findByPublicId(id);
         if (protocolo.isPresent()) {
             Protocolo p = protocolo.get();
             boolean isAdminAtual = p.getAdmin().getLogin().equals(authenticatedUsername);
@@ -231,11 +227,11 @@ public class ProtocoloService {
     }
 
     @Transactional
-    public ProtocoloMoveDTO encaminha(Long id_admin,Long id_Protocolo){
-        Protocolo protocolo = protocoloRepository.findById(id_Protocolo).orElseThrow(()->new RuntimeException("Protocolo nao encontrado"));
-        Usuario usuario_adm = usuarioRepository.findById(id_admin)
+    public ProtocoloMoveDTO encaminha(String id_admin,String id_Protocolo){
+        Protocolo protocolo = protocoloRepository.findByPublicId(id_Protocolo).orElseThrow(()->new RuntimeException("Protocolo nao encontrado"));
+        Usuario usuario_adm = usuarioRepository.findByPublicId(id_admin)
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
-        Optional<Protocolo> opcional = getProtocoloByUsuario(id_admin,protocolo.getParticipante().getId());
+        Optional<Protocolo> opcional = getProtocoloByUsuario(id_admin,protocolo.getParticipante().getPublicId());
         if (opcional.isPresent()) {
             throw new Error("Já existe um protocolo aberto para este usuário.");
         }
@@ -246,7 +242,7 @@ public class ProtocoloService {
         ProtocoloMoveDTO dto = new ProtocoloMoveDTO(protocoloSalvo);
         ParticipanteDTO participanteDTO = new ParticipanteDTO(protocoloSalvo.getParticipante(), true);
         ProtocoloNotificacao2DTO notify = new ProtocoloNotificacao2DTO(dto,participanteDTO);
-        publishAfterCommit(() -> messagingTemplate.convertAndSend("/topic/protocolo/aberto/" + usuario_adm.getId(), notify));
+        publishAfterCommit(() -> messagingTemplate.convertAndSend("/topic/protocolo/aberto/" + usuario_adm.getPublicId(), notify));
         return dto;
     }
 

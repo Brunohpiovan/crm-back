@@ -22,6 +22,8 @@ import java.util.Optional;
 @Repository
 public interface OportunidadeRepository extends JpaRepository<Oportunidade, Long> {
 
+    Optional<Oportunidade> findByPublicId(String publicId);
+
     @Query("""
     SELECT o FROM Oportunidade o
     LEFT JOIN FETCH o.etapa
@@ -39,6 +41,16 @@ public interface OportunidadeRepository extends JpaRepository<Oportunidade, Long
     WHERE o.id = :id
     """)
     Optional<Oportunidade> findByIdWithDetails(@Param("id") Long id);
+
+    @Query("""
+    SELECT DISTINCT o FROM Oportunidade o
+    LEFT JOIN FETCH o.etapa
+    LEFT JOIN FETCH o.criador
+    LEFT JOIN FETCH o.cliente
+    LEFT JOIN FETCH o.tags
+    WHERE o.publicId = :publicId
+    """)
+    Optional<Oportunidade> findByPublicIdWithDetails(@Param("publicId") String publicId);
 
     @Query("""
     SELECT DISTINCT o FROM Oportunidade o
@@ -224,12 +236,15 @@ public interface OportunidadeRepository extends JpaRepository<Oportunidade, Long
      * sintaxe em SQL nativo no MySQL quando a coleção está vazia). Usado para o mini-gráfico do
      * card "Valor em negociação" no dashboard — é um proxy de atividade (valor criado por dia),
      * não uma reconstrução histórica do saldo total em aberto (o schema não guarda isso).
+     * empresa_id é filtrado manualmente aqui (não pelo @TenantId): nativa não é reescrita pelo
+     * Hibernate — ver TenantIdentifierResolver.
      */
     @Query(value = """
     SELECT DATE(o.data_criacao) AS dia, COALESCE(SUM(o.valor), 0) AS valor
     FROM oportunidade o
     JOIN etapa e ON e.id = o.card_id
-    WHERE o.situacao = 'ABERTO'
+    WHERE o.empresa_id = :empresaId
+      AND o.situacao = 'ABERTO'
       AND o.data_criacao BETWEEN :inicio AND :fim
       AND e.funil_id IN (:funilIds)
       AND (:pipelineId IS NULL OR e.funil_id = :pipelineId)
@@ -240,7 +255,8 @@ public interface OportunidadeRepository extends JpaRepository<Oportunidade, Long
           ))
     GROUP BY DATE(o.data_criacao)
     """, nativeQuery = true)
-    List<DiaValorProjection> sumValorAbertoPorDia(@Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim,
+    List<DiaValorProjection> sumValorAbertoPorDia(@Param("empresaId") Long empresaId,
+                                                    @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim,
                                                     @Param("funilIds") List<Long> funilIds, @Param("pipelineId") Long pipelineId,
                                                     @Param("semRestricaoUsuario") boolean semRestricaoUsuario,
                                                     @Param("usuarioIds") List<Long> usuarioIds,

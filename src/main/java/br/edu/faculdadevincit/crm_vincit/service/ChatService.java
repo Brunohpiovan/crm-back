@@ -32,8 +32,8 @@ public class ChatService {
     private ParticipanteRepository participanteRepository;
 
     public List<Mensagem> sendMessage(MensagemDto mensagem) {
-        Protocolo protocol = protocoloRepository.findById(mensagem.getId_protocolo()).orElseThrow(()-> new RuntimeException("Protocolo nao encontrado"));
-        Usuario usuario = usuarioRepository.findById(mensagem.getId_sender()).orElseThrow(()->new RuntimeException("Usuario nao encontrado"));
+        Protocolo protocol = protocoloRepository.findByPublicId(mensagem.getId_protocolo()).orElseThrow(()-> new RuntimeException("Protocolo nao encontrado"));
+        Usuario usuario = usuarioRepository.findByPublicId(mensagem.getId_sender()).orElseThrow(()->new RuntimeException("Usuario nao encontrado"));
         Participante sender = participanteRepository.findByLogin(usuario.getLogin()).orElseThrow(() ->
                 new UsernameNotFoundException("Usuário não encontrado"));
         MensagemRequest mensagemRequest = new MensagemRequest();

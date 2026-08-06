@@ -28,8 +28,10 @@ public class AcessoService {
         return mapeiaDto(logs);
     }
 
-    public List<AcessoResponseDto> findAllByUser(Long id) {
-        List<Acesso> logs = acessoRepository.findByUsuarioId(id);
+    public List<AcessoResponseDto> findAllByUser(String id) {
+        Usuario usuario = usuarioRepository.findByPublicId(id)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        List<Acesso> logs = acessoRepository.findByUsuarioId(usuario.getId());
         return mapeiaDto(logs);
     }
 
@@ -38,13 +40,13 @@ public class AcessoService {
         return logs.stream()
                 .map(log -> {
                     UsuarioLogDto usuarioDto = new UsuarioLogDto(
-                            log.getUsuario().getId(),
+                            log.getUsuario().getPublicId(),
                             log.getUsuario().getNome(),
                             log.getUsuario().getLogin()
                     );
 
                     return new AcessoResponseDto(
-                            log.getId(),
+                            log.getPublicId(),
                             log.getEnderecoIp(),
                             log.getLocalizacao(),
                             log.getData_acesso(),
@@ -63,13 +65,13 @@ public class AcessoService {
 
 
 
-    public Long save(Acesso log){
+    public String save(Acesso log){
         Acesso savedLog = acessoRepository.save(log);
-        return savedLog.getId();
+        return savedLog.getPublicId();
     }
 
-    public void updateExitTime(Long id) {
-        Acesso log = acessoRepository.findById(id).orElseThrow(() -> new RuntimeException("Log não encontrado"));
+    public void updateExitTime(String id) {
+        Acesso log = acessoRepository.findByPublicId(id).orElseThrow(() -> new RuntimeException("Log não encontrado"));
         if(log.getData_saida()==null){
             log.setData_saida(LocalDateTime.now());
         }else {

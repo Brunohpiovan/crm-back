@@ -73,7 +73,7 @@ public class ProtocoloController {
             @ApiResponse(responseCode = "400", description = "Admin autenticado não encontrado, protocolo não encontrado ou protocolo já encerrado")
     })
     @DeleteMapping(value = "/{id}")
-    public ResponseEntity<?> closeProtocol(@Parameter(description = "Id do protocolo", required = true) @PathVariable Long id) {
+    public ResponseEntity<?> closeProtocol(@Parameter(description = "Id do protocolo", required = true) @PathVariable String id) {
         protocoloService.closeProtocolo(id);
         return ResponseEntity.ok(Map.of("message", "Protocolo fechado com sucesso"));
     }
@@ -85,7 +85,7 @@ public class ProtocoloController {
             @ApiResponse(responseCode = "400", description = "Usuário ou participante não encontrado")
     })
     @GetMapping("/{idUsuario1}/{idUsuario2}")
-    public ResponseEntity<?> getProtocoloByUsuario(@Parameter(description = "Id do usuário (administrador)", required = true) @PathVariable Long idUsuario1, @Parameter(description = "Id do participante", required = true) @PathVariable Long idUsuario2) {
+    public ResponseEntity<?> getProtocoloByUsuario(@Parameter(description = "Id do usuário (administrador)", required = true) @PathVariable String idUsuario1, @Parameter(description = "Id do participante", required = true) @PathVariable String idUsuario2) {
         return protocoloService.getProtocoloByUsuario(idUsuario1, idUsuario2)
                 .map(protocolo -> ResponseEntity.ok(new ProtocoloMoveDTO(protocolo)))
                 .orElse(ResponseEntity.noContent().build());
@@ -100,7 +100,7 @@ public class ProtocoloController {
             @ApiResponse(responseCode = "403", description = "O usuário autenticado não corresponde ao idUsuario informado")
     })
     @GetMapping("/get/{idUsuario}")
-    public ResponseEntity<?> getProtocolo(@Parameter(description = "Id do usuário", required = true) @PathVariable Long idUsuario){
+    public ResponseEntity<?> getProtocolo(@Parameter(description = "Id do usuário", required = true) @PathVariable String idUsuario){
         return ResponseEntity.ok(protocoloService.getProtocols(idUsuario));
     }
 
@@ -120,7 +120,7 @@ public class ProtocoloController {
     })
     @GetMapping("/get/{idUsuario}/paginado")
     public Page<ProtocoloMoveDTO> getProtocolosPaginado(
-            @Parameter(description = "Id do usuário", required = true) @PathVariable Long idUsuario,
+            @Parameter(description = "Id do usuário", required = true) @PathVariable String idUsuario,
             @Parameter(description = "Termo de busca opcional (id, nome do administrador ou do participante)") @RequestParam(required = false) String search,
             @ParameterObject @PageableDefault(size = 6, sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
         return protocoloService.getProtocolsPaginado(idUsuario, search, pageable);
@@ -132,7 +132,7 @@ public class ProtocoloController {
             @ApiResponse(responseCode = "400", description = "Protocolo não encontrado ou usuário autenticado não autorizado a acessá-lo")
     })
     @GetMapping(value = "/{id}")
-    public ResponseEntity<?> findById(@Parameter(description = "Id do protocolo", required = true) @PathVariable Long id){
+    public ResponseEntity<?> findById(@Parameter(description = "Id do protocolo", required = true) @PathVariable String id){
         return ResponseEntity.ok(protocoloService.findById(id));
     }
 
@@ -149,7 +149,7 @@ public class ProtocoloController {
             @ApiResponse(responseCode = "400", description = "Protocolo ou administrador não encontrado, ou já existe protocolo aberto para o novo administrador com esse participante")
     })
     @PutMapping("/encaminhar")
-    public ResponseEntity<ProtocoloMoveDTO> encaminharProtocolo(@Parameter(description = "Id do novo administrador/atendente", required = true) @RequestParam Long id_admin, @Parameter(description = "Id do protocolo a ser encaminhado", required = true) @RequestParam Long id_Protocolo) {
+    public ResponseEntity<ProtocoloMoveDTO> encaminharProtocolo(@Parameter(description = "Id do novo administrador/atendente", required = true) @RequestParam String id_admin, @Parameter(description = "Id do protocolo a ser encaminhado", required = true) @RequestParam String id_Protocolo) {
         ProtocoloMoveDTO protocolo = protocoloService.encaminha(id_admin, id_Protocolo);
             return new ResponseEntity<>(protocolo, HttpStatus.OK);
     }

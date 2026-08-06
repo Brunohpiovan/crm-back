@@ -44,8 +44,8 @@ public class TemplateEmailService {
                 .collect(Collectors.toList());
     }
 
-    public TemplateEmailIdDTO findById(Long id) {
-        TemplateEmail template = templateEmailRepository.findById(id)
+    public TemplateEmailIdDTO findById(String id) {
+        TemplateEmail template = templateEmailRepository.findByPublicId(id)
                 .orElseThrow(() -> new RuntimeException("Template não encontrada"));
 
         return new TemplateEmailIdDTO(template);
@@ -79,8 +79,8 @@ public class TemplateEmailService {
     }
 
     @CacheEvict(value = CacheConfig.TEMPLATES_CACHE, allEntries = true)
-    public void update(Long id, EmailTemplateRequestDto dto) {
-        TemplateEmail templateEmailBanco = templateEmailRepository.findById(id)
+    public void update(String id, EmailTemplateRequestDto dto) {
+        TemplateEmail templateEmailBanco = templateEmailRepository.findByPublicId(id)
                 .orElseThrow(() -> new RuntimeException("Template não encontrado"));
 
         templateEmailBanco.setNome(dto.getNome());
@@ -124,8 +124,8 @@ public class TemplateEmailService {
     @Value("${aws.s3.base-url}")
     private String baseUrl;
     @CacheEvict(value = CacheConfig.TEMPLATES_CACHE, allEntries = true)
-    public void delete(Long id){
-        TemplateEmail templateEmailBanco = templateEmailRepository.findById(id).orElseThrow(()->new RuntimeException("Template nao encontrada"));
+    public void delete(String id){
+        TemplateEmail templateEmailBanco = templateEmailRepository.findByPublicId(id).orElseThrow(()->new RuntimeException("Template nao encontrada"));
         templateEmailRepository.delete(templateEmailBanco);
     }
 

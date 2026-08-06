@@ -15,11 +15,11 @@ import lombok.Setter;
 @AllArgsConstructor
 public class FunilAllDTO {
 
-    private Long id;
+    private String id;
     private String nome;
 
     public FunilAllDTO(Funil funil) {
-        this.id = funil.getId();
+        this.id = funil.getPublicId();
         this.nome = funil.getNome();
 
     }

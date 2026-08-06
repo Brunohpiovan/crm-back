@@ -21,10 +21,10 @@ import java.util.stream.Collectors;
 @NoArgsConstructor
 @AllArgsConstructor
 public class OportunidadeDTO {
-    private Long id;
+    private String id;
     private String titulo;
     @Schema(description = "Id da etapa em que a oportunidade se encontra atualmente")
-    private Long etapa;
+    private String etapa;
     @Schema(description = "Usuário responsável (vendedor/dono) pela oportunidade")
     private CriadorOportunidadeDto criador;
     @Schema(description = "Cliente/participante associado à oportunidade")
@@ -46,9 +46,9 @@ public class OportunidadeDTO {
     private int indice;
 
     public OportunidadeDTO(Oportunidade oportunidade) {
-        this.id = oportunidade.getId();
+        this.id = oportunidade.getPublicId();
         this.titulo = oportunidade.getTitulo();
-        this.etapa = oportunidade.getEtapa() != null ? oportunidade.getEtapa().getId() : null;
+        this.etapa = oportunidade.getEtapa() != null ? oportunidade.getEtapa().getPublicId() : null;
         this.criador = oportunidade.getCriador() != null ? new CriadorOportunidadeDto(oportunidade.getCriador()) : null;
         this.cliente = oportunidade.getCliente() != null ? new ParticipanteDTO(oportunidade.getCliente()) : null;
         this.valor = oportunidade.getValor();

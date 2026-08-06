@@ -21,7 +21,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class ParticipanteProtocoloDTO {
 
-    private Long id;
+    private String id;
     private String urlPicture;
     private String nome;
     private String login;
@@ -30,7 +30,7 @@ public class ParticipanteProtocoloDTO {
     private TipoParticipante tipoParticipante;
 
     public ParticipanteProtocoloDTO(Participante participante) {
-        this.id = participante.getId();
+        this.id = participante.getPublicId();
         this.nome = participante.getNome();
 
     }

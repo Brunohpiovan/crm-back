@@ -20,7 +20,7 @@ import java.util.List;
 public class GrupoCreateDTO {
 
     @Schema(description = "Id do grupo. Não deve ser enviado ao criar um novo grupo; usado apenas ao atualizar um grupo existente (deve corresponder ao {id} da URL).")
-    private Long id;
+    private String id;
 
     @Nullable
     @Schema(description = "URL da imagem de avatar do grupo já existente no S3. Ignorado quando um novo arquivo é enviado na parte multipart 'foto'.")
@@ -36,5 +36,5 @@ public class GrupoCreateDTO {
     private String nome;
 
     @Schema(description = "Ids dos usuários participantes do grupo.")
-    private List<Long> usuarios;
+    private List<String> usuarios;
 }

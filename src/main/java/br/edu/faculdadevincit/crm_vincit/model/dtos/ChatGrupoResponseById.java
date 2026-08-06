@@ -17,23 +17,23 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChatGrupoResponseById {
-    private Long id;
+    private String id;
     private String nome;
     @Schema(description = "URL pública do avatar do grupo no S3 (ou o avatar padrão, se o grupo não tiver um customizado).")
     private String avatarUrl;
     @Schema(description = "URL pública da imagem de fundo do grupo no S3, se houver.")
     private String imagemFundoUrl;
     @Schema(description = "Ids de todos os usuários participantes do grupo.")
-    private List<Long> usuarios;
+    private List<String> usuarios;
 
     public ChatGrupoResponseById(ChatGrupo chatGrupo){
-        this.id = chatGrupo.getId();;
+        this.id = chatGrupo.getPublicId();;
         this.nome = chatGrupo.getNome();;
         this.avatarUrl = chatGrupo.getAvatarUrl();;
         this.imagemFundoUrl = chatGrupo.getImagemFundoUrl();
         this.usuarios = new ArrayList<>();
         for (Usuario usuario : chatGrupo.getUsuarios()) {
-            this.usuarios.add(usuario.getId());
+            this.usuarios.add(usuario.getPublicId());
         }
     }
 }

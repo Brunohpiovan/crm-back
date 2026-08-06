@@ -50,7 +50,7 @@ public class EmailController {
             @Parameter(description = "Endereço de e-mail do destinatário", required = true) @RequestParam("destinatario") String destinatario,
             @Parameter(description = "Assunto do e-mail", required = true) @RequestParam("assunto") String assunto,
             @Parameter(description = "Corpo do e-mail (HTML)", required = true) @RequestParam("corpo") String corpo,
-            @Parameter(description = "Id do usuário remetente (registrado no histórico de envio)", required = true) @RequestParam("id_remetente") Long idRemetente,
+            @Parameter(description = "Id do usuário remetente (registrado no histórico de envio)", required = true) @RequestParam("id_remetente") String idRemetente,
             @Parameter(description = "Arquivos a serem anexados ao e-mail (multipart, opcional)") @RequestParam(value = "anexos", required = false) List<MultipartFile> anexos) throws ResendException {
             EmailRequestDTO email = new EmailRequestDTO(destinatario.toLowerCase(), assunto, corpo, idRemetente, anexos);
             emailService.enviarEmail(email);
