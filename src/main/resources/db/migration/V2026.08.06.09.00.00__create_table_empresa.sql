@@ -17,7 +17,3 @@ CREATE TABLE empresa (
     CONSTRAINT uk_empresa_codigo UNIQUE (codigo)
 );
 
--- id explícito (1) pois as próximas duas migrations usam esse valor como DEFAULT das colunas
--- empresa_id novas nas tabelas já existentes.
-INSERT INTO empresa (id, codigo, nome, timezone, protocolo_risco_horas, notificacao_visual_habilitada, notificacao_sonora_habilitada, criado_em, atualizado_em)
-VALUES (1, 'empresa-padrao', 'Empresa Padrão', 'America/Sao_Paulo', 24, TRUE, TRUE, NOW(), NOW());

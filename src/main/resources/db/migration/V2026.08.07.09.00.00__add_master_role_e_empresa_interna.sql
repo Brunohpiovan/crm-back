@@ -20,8 +20,8 @@ INSERT INTO empresa (
   protocolo_risco_horas, notificacao_visual_habilitada, notificacao_sonora_habilitada,
   interna, criado_em, atualizado_em
 ) VALUES (
-  'vincit-admin',
-  'Vincit - Administração Interna',
+  'juridiqsystem-admin',
+  'JuridiqSystem - Administração Interna',
   NULL,
   'America/Sao_Paulo',
   24,
@@ -33,8 +33,8 @@ INSERT INTO empresa (
 
 SET @empresa_master_id = LAST_INSERT_ID();
 
--- Senha temporária: TrocarSenha@2026 — TROCAR no primeiro login (não há tela de troca de senha
--- dedicada pro master ainda; usar o fluxo de recuperação de senha ou PUT /usuario/{id}).
+-- Senha temporária: TrocarSenha@2026 — TROCAR no primeiro login, via PUT /master/senha
+-- ("Minha conta" na área do master).
 INSERT INTO usuario (
   public_id, empresa_id, nome, login, senha, rg, cpf, data_nascimento, celular, cargo,
   endereco, numero_residencial, complemento, bairro, uf, cidade, cep,
@@ -42,8 +42,8 @@ INSERT INTO usuario (
 ) VALUES (
   UUID(),
   @empresa_master_id,
-  'Master Vincit',
-  'master@vincit.com.br',
+  'Master JuridiqSystem',
+  'master@juridiqsystem.com.br',
   '$2a$10$LVsTBTJteec5M6EI0YyJweYXOy.X62oum4p7dYqJeOGU0/Ej.Fy5a',
   '000000000',
   '00000000000',

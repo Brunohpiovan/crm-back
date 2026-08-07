@@ -1,0 +1,25 @@
+package com.juridiqsystem.crm.model.dtos;
+
+
+import com.juridiqsystem.crm.model.Usuario;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Schema(description = "Resumo mínimo (id, nome) do usuário administrador/atendente responsável por um protocolo. Usado embutido em ProtocoloMoveDTO.")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class UsuarioAdminDTO {
+
+    private String id;
+    private String nome;
+
+    public UsuarioAdminDTO(Usuario usuario){
+        this.id = usuario.getPublicId();
+        this.nome = usuario.getNome();
+    }
+}

@@ -4,7 +4,7 @@
 --
 -- Passo 1: gerar o hash da senha do primeiro admin (mesmo BCrypt usado pelo login, força padrão):
 --   mvn compile
---   java -cp target/classes br.edu.faculdadevincit.crm_vincit.tools.GeradorHashSenha "senha-do-admin"
+--   java -cp target/classes com.juridiqsystem.crm.tools.GeradorHashSenha "senha-do-admin"
 -- Copiar o hash impresso (começa com "$2a$10$...") e colar no lugar de <HASH_BCRYPT_AQUI> abaixo.
 --
 -- Passo 2: preencher os placeholders <...> com os dados reais da empresa/admin e rodar este
