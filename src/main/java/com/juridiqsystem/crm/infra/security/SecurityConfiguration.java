@@ -61,6 +61,11 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.PUT, "/usuario/all/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/usuario/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/usuario/**").hasAuthority("ROLE_VENDEDOR")
+                        // Autoatendimento da empresa (aba Configurações): qualquer usuário logado
+                        // pode ver, só ROLE_ADMIN pode editar (afeta toda a empresa, não só o
+                        // próprio cadastro).
+                        .requestMatchers(HttpMethod.GET, "/empresa").hasAuthority("ROLE_VENDEDOR")
+                        .requestMatchers(HttpMethod.PUT, "/empresa").hasAuthority("ROLE_ADMIN")
                         // Só ADMINISTRADOR cria/atualiza/exclui funil e etapa (afeta o pipeline
                         // de vendas de todos os vendedores). Match exato em "/funil" (POST) não
                         // pega POST /funil/filtro (consulta) nem POST /funil/add-funcionario/**.

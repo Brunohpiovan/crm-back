@@ -1,23 +1,32 @@
 package com.juridiqsystem.crm.service;
 
 import com.juridiqsystem.crm.model.Empresa;
+import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.EmpresaCreateDTO;
 import com.juridiqsystem.crm.model.dtos.EmpresaResponseDTO;
+import com.juridiqsystem.crm.model.dtos.EmpresaSelfUpdateDTO;
 import com.juridiqsystem.crm.repository.EmpresaRepository;
 import com.juridiqsystem.crm.service.exceptions.DataIntegrityViolationException;
 import com.juridiqsystem.crm.service.exceptions.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Service
 public class EmpresaService {
 
     @Autowired
     private EmpresaRepository empresaRepository;
+
+    @Autowired
+    private S3Service s3Service;
 
     public Page<EmpresaResponseDTO> findAll(Pageable pageable) {
         return empresaRepository.findByInternaFalse(pageable).map(EmpresaResponseDTO::new);
@@ -47,6 +56,54 @@ public class EmpresaService {
         empresa.setAtualizadoEm(LocalDateTime.now());
 
         return new EmpresaResponseDTO(empresaRepository.save(empresa));
+    }
+
+    /**
+     * Autoatendimento: dados da empresa do usuário autenticado (aba "Configurações" do CRM),
+     * sem receber id na URL — diferente de findById/update acima, que são o CRUD do master sobre
+     * qualquer empresa-cliente por id (/master/empresas/**). Aqui a empresa é resolvida a partir
+     * do próprio usuário logado, incluindo a empresa `interna` (o master não usa este endpoint,
+     * mas nada nele depende da exclusão aplicada em buscarEmpresaGerenciavel).
+     */
+    public EmpresaResponseDTO getEmpresaAutenticada() {
+        return new EmpresaResponseDTO(buscarEmpresaDoUsuarioAutenticado());
+    }
+
+    public EmpresaResponseDTO atualizarEmpresaAutenticada(EmpresaSelfUpdateDTO dto, MultipartFile logo) {
+        Empresa empresa = buscarEmpresaDoUsuarioAutenticado();
+
+        empresa.setNome(dto.getNome());
+        empresa.setLogoUrl(resolveLogoUrl(empresa, dto, logo));
+        empresa.setTimezone(dto.getTimezone());
+        empresa.setProtocoloRiscoHoras(dto.getProtocoloRiscoHoras());
+        empresa.setNotificacaoVisualHabilitada(dto.getNotificacaoVisualHabilitada());
+        empresa.setNotificacaoSonoraHabilitada(dto.getNotificacaoSonoraHabilitada());
+        empresa.setAtualizadoEm(LocalDateTime.now());
+
+        return new EmpresaResponseDTO(empresaRepository.save(empresa));
+    }
+
+    private Empresa buscarEmpresaDoUsuarioAutenticado() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        Usuario usuarioAutenticado = (Usuario) authentication.getPrincipal();
+
+        return empresaRepository.findById(usuarioAutenticado.getEmpresaId())
+                .orElseThrow(() -> new ResourceNotFoundException("Empresa do usuário autenticado não encontrada"));
+    }
+
+    private String resolveLogoUrl(Empresa empresaDoBanco, EmpresaSelfUpdateDTO dto, MultipartFile logo) {
+        String logoUrlAtual = empresaDoBanco.getLogoUrl();
+        boolean logoAtualEhS3 = logoUrlAtual != null && logoUrlAtual.contains(s3Service.getBaseUrl());
+
+        if (logoAtualEhS3 && (logo != null || dto.getLogoUrl() == null || dto.getLogoUrl().isBlank())) {
+            s3Service.deleteFile(logoUrlAtual.substring(logoUrlAtual.indexOf(".com/") + 5));
+        }
+        if (logo != null) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
+            String key = "logo/" + empresaDoBanco.getCodigo() + "_" + LocalDateTime.now().format(formatter);
+            return s3Service.uploadFile(logo, key);
+        }
+        return dto.getLogoUrl();
     }
 
     private void aplicarDados(Empresa empresa, EmpresaCreateDTO dto) {
