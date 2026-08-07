@@ -44,6 +44,9 @@ public class Etapa {
     @Column(name = "nome", nullable = false)
     @Size(max = 150, message = "O nome deve ter no maximo 150 caracteres")
     private String nome;
+    @Schema(description = "Posição da etapa dentro do funil (ordem de exibição das colunas no board)")
+    @Column(name = "posicao")
+    private Integer posicao;
     @Schema(description = "Funil ao qual esta etapa pertence (apenas o id é considerado ao criar)")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "funil_id")

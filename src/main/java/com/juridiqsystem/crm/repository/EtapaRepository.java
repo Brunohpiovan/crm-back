@@ -12,7 +12,7 @@ public interface EtapaRepository extends JpaRepository<Etapa, Long> {
     @EntityGraph(attributePaths = {"funil"})
     Optional<Etapa> findByPublicId(String publicId);
 
-    List<Etapa> findByFunilId(Long funilId);
+    List<Etapa> findByFunilIdOrderByPosicaoAscIdAsc(Long funilId);
 
     boolean existsByNomeAndFunilId(String nome, Long funilId);
 

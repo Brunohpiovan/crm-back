@@ -102,9 +102,16 @@ public class EtapaService {
         if (exists) {
             throw new RuntimeException("Já existe um etapa com o mesmo nome neste funil.");
         }
+        int proximaPosicao = etapaRepository.findByFunilIdOrderByPosicaoAscIdAsc(funil.getId()).stream()
+                .map(Etapa::getPosicao)
+                .filter(Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .max()
+                .orElse(-1) + 1;
         Etapa etapa = new Etapa();
         etapa.setNome(etapaCreateRequest.nome());
         etapa.setFunil(funil);
+        etapa.setPosicao(proximaPosicao);
         etapa.setValor_total(BigDecimal.ZERO);
         etapa.setCriadoEm(LocalDateTime.now());
         Etapa savedEtapa = etapaRepository.save(etapa);
@@ -170,7 +177,7 @@ public class EtapaService {
 
     public List<EtapaFunilDTO> findByFunilId(String funilId) {
         return funilRepository.findByPublicId(funilId)
-                .map(funil -> etapaRepository.findByFunilId(funil.getId()))
+                .map(funil -> etapaRepository.findByFunilIdOrderByPosicaoAscIdAsc(funil.getId()))
                 .orElseGet(List::of)
                 .stream().map(EtapaFunilDTO::new).collect(Collectors.toList());
     }

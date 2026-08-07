@@ -11,9 +11,8 @@ import org.hibernate.annotations.TenantId;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 @Schema(description = "Entidade Funil (pipeline de vendas). Etapas e funcionários são geridos por endpoints próprios; para criar um funil, use FunilCreateRequest.")
 @Getter
@@ -37,9 +36,10 @@ public class Funil {
     private Long empresaId;
 
     private String nome;
-    @Schema(description = "Etapas pertencentes a este funil (gerenciadas via /etapa, não são criadas diretamente aqui)")
+    @Schema(description = "Etapas pertencentes a este funil (gerenciadas via /etapa, não são criadas diretamente aqui), ordenadas por posição")
     @OneToMany(mappedBy = "funil", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<Etapa> etapas = new HashSet<>();
+    @OrderBy("posicao asc, id asc")
+    private List<Etapa> etapas = new ArrayList<>();
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "funil_funcionarios",

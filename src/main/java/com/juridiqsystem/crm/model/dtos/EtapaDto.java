@@ -20,8 +20,8 @@ import java.util.List;
 public class EtapaDto {
     private String id;
     private String nome;
-    @Schema(description = "Campo não utilizado atualmente (sempre nulo nas respostas)")
-    private String posicao;
+    @Schema(description = "Posição da etapa dentro do funil (ordem de exibição das colunas no board)")
+    private Integer posicao;
     @Schema(description = "Oportunidades pertencentes a esta etapa, na ordem definida pelo índice de cada uma")
     private List<OportunidadeDTO> oportunidades;
     private FunilDtoCard funil;
@@ -32,7 +32,7 @@ public class EtapaDto {
         this.id = etapa.getPublicId();
         this.nome = etapa.getNome();
         this.funil = new FunilDtoCard(etapa.getFunil());
-        //this.posicao = card.getPosicao();
+        this.posicao = etapa.getPosicao();
         this.oportunidades = new ArrayList<>();
         for (Oportunidade oportunidade : etapa.getOportunidades()) {
             this.oportunidades.add(new OportunidadeDTO(oportunidade));
@@ -44,6 +44,7 @@ public class EtapaDto {
         this.id = etapa.getPublicId();
         this.nome = etapa.getNome();
         this.funil = new FunilDtoCard(etapa.getFunil());
+        this.posicao = etapa.getPosicao();
         this.oportunidades = oportunidades != null ? oportunidades : new ArrayList<>();
         this.valor_total = etapa.getValor_total();
     }

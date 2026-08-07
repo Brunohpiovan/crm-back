@@ -143,7 +143,7 @@ public class FunilService {
     public void delete(String id) {
         Funil funilBanco = funilRepository.findByPublicId(id)
                 .orElseThrow(() -> new RuntimeException("Funil com id " + id + " não encontrado"));
-        List<Long> etapaIds = etapaRepository.findByFunilId(funilBanco.getId()).stream().map(Etapa::getId).toList();
+        List<Long> etapaIds = etapaRepository.findByFunilIdOrderByPosicaoAscIdAsc(funilBanco.getId()).stream().map(Etapa::getId).toList();
         long oportunidadesAtivas = etapaIds.isEmpty() ? 0 : oportunidadeRepository.countPorEtapaIdIn(etapaIds);
         if (oportunidadesAtivas > 0) {
             throw new ConflictException("Não é possível excluir o funil: existem " + oportunidadesAtivas
