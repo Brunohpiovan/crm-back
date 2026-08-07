@@ -1,5 +1,6 @@
 package com.juridiqsystem.crm.model.dtos;
 
+import com.juridiqsystem.crm.model.enums.FusoHorarioEmpresa;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -21,9 +22,8 @@ public class EmpresaSelfUpdateDTO {
     @Schema(description = "URL atual do logo, para o caso de nenhum arquivo novo ser enviado (ex.: usuário só mudou outro campo) ou de o logo ter sido removido (null/vazio).")
     private String logoUrl;
 
-    @NotBlank(message = "Informe o timezone da empresa")
-    @Size(max = 60, message = "O timezone deve ter no máximo 60 caracteres")
-    private String timezone;
+    @NotNull(message = "Informe o timezone da empresa")
+    private FusoHorarioEmpresa timezone;
 
     @NotNull(message = "Informe o protocoloRiscoHoras")
     private Integer protocoloRiscoHoras;

@@ -1,5 +1,6 @@
 package com.juridiqsystem.crm.model;
 
+import com.juridiqsystem.crm.model.enums.FusoHorarioEmpresa;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -8,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -42,8 +44,9 @@ public class Empresa {
     @Column(name = "logo_url")
     private String logoUrl;
 
+    @NotNull(message = "Informe o timezone da empresa")
     @Column(name = "timezone", nullable = false, length = 60)
-    private String timezone;
+    private FusoHorarioEmpresa timezone;
 
     @Column(name = "protocolo_risco_horas", nullable = false)
     private Integer protocoloRiscoHoras;
