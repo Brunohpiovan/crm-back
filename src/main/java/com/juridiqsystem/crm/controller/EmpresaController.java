@@ -26,11 +26,13 @@ public class EmpresaController {
     @Autowired
     private EmpresaService empresaService;
 
-    @Operation(summary = "Listar empresas (paginado)", description = "Requer JWT com cargo ROLE_MASTER.")
+    @Operation(summary = "Listar empresas (paginado, com busca opcional)", description = "Requer JWT com cargo ROLE_MASTER. `search` filtra por nome/código (case-insensitive); se omitido, retorna todas as empresas não-internas. Cada item inclui a quantidade de usuários ativos e de administradores da empresa.")
     @ApiResponse(responseCode = "200", description = "Página de empresas")
     @GetMapping
-    public Page<EmpresaResponseDTO> findAll(@ParameterObject @PageableDefault(size = 10, sort = "nome") Pageable pageable) {
-        return empresaService.findAll(pageable);
+    public Page<EmpresaResponseDTO> findAll(
+            @Parameter(description = "Termo de busca opcional (nome/código)") @RequestParam(required = false) String search,
+            @ParameterObject @PageableDefault(size = 10, sort = "nome") Pageable pageable) {
+        return empresaService.findAll(search, pageable);
     }
 
     @Operation(summary = "Buscar empresa por id", description = "Requer JWT com cargo ROLE_MASTER.")

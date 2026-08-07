@@ -5,7 +5,9 @@ import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.EmpresaCreateDTO;
 import com.juridiqsystem.crm.model.dtos.EmpresaResponseDTO;
 import com.juridiqsystem.crm.model.dtos.EmpresaSelfUpdateDTO;
+import com.juridiqsystem.crm.model.dtos.EmpresaUsuarioCountProjection;
 import com.juridiqsystem.crm.repository.EmpresaRepository;
+import com.juridiqsystem.crm.repository.UsuarioRepository;
 import com.juridiqsystem.crm.service.exceptions.DataIntegrityViolationException;
 import com.juridiqsystem.crm.service.exceptions.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +20,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class EmpresaService {
@@ -26,10 +33,34 @@ public class EmpresaService {
     private EmpresaRepository empresaRepository;
 
     @Autowired
+    private UsuarioRepository usuarioRepository;
+
+    @Autowired
     private S3Service s3Service;
 
-    public Page<EmpresaResponseDTO> findAll(Pageable pageable) {
-        return empresaRepository.findByInternaFalse(pageable).map(EmpresaResponseDTO::new);
+    public Page<EmpresaResponseDTO> findAll(String search, Pageable pageable) {
+        String termoBusca = (search == null || search.isBlank())
+                ? null
+                : "%" + search.trim().toLowerCase() + "%";
+
+        Page<Empresa> empresas = empresaRepository.findByInternaFalseAndSearch(termoBusca, pageable);
+        Map<Long, EmpresaUsuarioCountProjection> contagens = contarUsuariosPorEmpresa(empresas.getContent());
+
+        return empresas.map(empresa -> {
+            EmpresaUsuarioCountProjection contagem = contagens.get(empresa.getId());
+            long quantidadeUsuarios = contagem != null ? contagem.getTotalUsuarios() : 0L;
+            long quantidadeAdmins = contagem != null ? contagem.getTotalAdmins() : 0L;
+            return new EmpresaResponseDTO(empresa, quantidadeUsuarios, quantidadeAdmins);
+        });
+    }
+
+    private Map<Long, EmpresaUsuarioCountProjection> contarUsuariosPorEmpresa(List<Empresa> empresas) {
+        if (empresas.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<Long> empresaIds = empresas.stream().map(Empresa::getId).toList();
+        return usuarioRepository.countUsuariosPorEmpresa(empresaIds).stream()
+                .collect(Collectors.toMap(EmpresaUsuarioCountProjection::getEmpresaId, Function.identity()));
     }
 
     public EmpresaResponseDTO findById(Long id) {

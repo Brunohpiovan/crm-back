@@ -2,6 +2,7 @@ package com.juridiqsystem.crm.repository;
 
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.CriadorDto;
+import com.juridiqsystem.crm.model.dtos.EmpresaUsuarioCountProjection;
 import com.juridiqsystem.crm.model.dtos.UsuarioAllContactsDTO;
 import com.juridiqsystem.crm.model.dtos.UsuarioAllDTO;
 import com.juridiqsystem.crm.model.dtos.UsuarioContatoDto;
@@ -107,5 +108,20 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     @Query(value = "SELECT * FROM usuario WHERE bloqueado = false ORDER BY RAND() LIMIT 1", nativeQuery = true)
     Optional<Usuario> findRandomUsuarioDisponivel();
 
-
+    /**
+     * Nativa de propósito: usada por EmpresaService.findAll (listagem /master/empresas) para
+     * contar usuários ativos de várias empresas de uma vez. Como Usuario tem @TenantId, uma
+     * query JPQL normal seria filtrada automaticamente pelo tenant da requisição atual (a
+     * empresa interna do master) e nunca contaria as empresas-cliente. Só considera usuários não
+     * bloqueados (bloqueado = true é inativação lógica, não deve entrar na contagem "atual").
+     */
+    @Query(value = """
+    SELECT empresa_id AS empresaId,
+           COUNT(*) AS totalUsuarios,
+           SUM(CASE WHEN cargo = 'ADMINISTRADOR' THEN 1 ELSE 0 END) AS totalAdmins
+    FROM usuario
+    WHERE empresa_id IN (:empresaIds) AND bloqueado = false
+    GROUP BY empresa_id
+    """, nativeQuery = true)
+    List<EmpresaUsuarioCountProjection> countUsuariosPorEmpresa(@Param("empresaIds") List<Long> empresaIds);
 }
