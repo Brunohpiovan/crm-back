@@ -1,6 +1,7 @@
 package br.edu.faculdadevincit.crm_vincit.service;
 
 import br.edu.faculdadevincit.crm_vincit.model.Acesso;
+import br.edu.faculdadevincit.crm_vincit.model.Usuario;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.AcessoDTO;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.AcessoResponseDto;
 import br.edu.faculdadevincit.crm_vincit.model.dtos.UsuarioLogDto;

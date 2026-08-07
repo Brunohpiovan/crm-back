@@ -1,5 +1,7 @@
 package br.edu.faculdadevincit.crm_vincit.infra.security;
 
+import java.util.function.Supplier;
+
 /**
  * Guarda o id da Empresa (tenant) da requisição atual, numa ThreadLocal. Populado por
  * SecurityFilter logo após resolver o Usuario autenticado, e SEMPRE limpo no finally do
@@ -24,5 +26,26 @@ public final class TenantContext {
 
     public static void clear() {
         CURRENT_EMPRESA_ID.remove();
+    }
+
+    /**
+     * Executa `action` com o tenant temporariamente trocado para `empresaId`, restaurando o
+     * tenant anterior ao final (mesmo em caso de exceção). Usado pelos endpoints /master/**,
+     * onde o usuário master (que pertence à empresa interna) precisa operar sobre os dados de
+     * uma empresa-cliente específica — generaliza o bypass manual já usado em
+     * AuthenticationService.login.
+     */
+    public static <T> T runAs(Long empresaId, Supplier<T> action) {
+        Long previous = CURRENT_EMPRESA_ID.get();
+        CURRENT_EMPRESA_ID.set(empresaId);
+        try {
+            return action.get();
+        } finally {
+            if (previous != null) {
+                CURRENT_EMPRESA_ID.set(previous);
+            } else {
+                CURRENT_EMPRESA_ID.remove();
+            }
+        }
     }
 }

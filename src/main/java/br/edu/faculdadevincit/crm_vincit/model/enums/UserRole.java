@@ -3,7 +3,8 @@ package br.edu.faculdadevincit.crm_vincit.model.enums;
 public enum UserRole {
 
     ADMINISTRADOR(0, "administrador"),
-    VENDEDOR(1, "vendedor");
+    VENDEDOR(1, "vendedor"),
+    MASTER(2, "master");
 
     private final int id;
     private final String role;

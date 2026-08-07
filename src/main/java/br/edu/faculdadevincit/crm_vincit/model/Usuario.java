@@ -183,10 +183,14 @@ public class Usuario implements UserDetails {
     public Collection<? extends GrantedAuthority> getAuthorities() {
         List<SimpleGrantedAuthority> authorities = new ArrayList<>();
 
-        if (this.cargo == UserRole.ADMINISTRADOR) {
+        if (this.cargo == UserRole.MASTER) {
+            // Master administra empresas/usuários via /master/**, sem acesso às telas normais
+            // do CRM (chat, funil, etc.) — por isso não recebe ROLE_ADMIN nem ROLE_VENDEDOR.
+            authorities.add(new SimpleGrantedAuthority("ROLE_MASTER"));
+        } else if (this.cargo == UserRole.ADMINISTRADOR) {
             authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
             authorities.add(new SimpleGrantedAuthority("ROLE_VENDEDOR"));
-        } else{
+        } else {
             authorities.add(new SimpleGrantedAuthority("ROLE_VENDEDOR"));
         }
 

@@ -3,6 +3,7 @@ package br.edu.faculdadevincit.crm_vincit.service;
 import br.edu.faculdadevincit.crm_vincit.config.CacheConfig;
 import br.edu.faculdadevincit.crm_vincit.infra.security.TenantContext;
 import br.edu.faculdadevincit.crm_vincit.model.CadenciaFunil;
+import br.edu.faculdadevincit.crm_vincit.model.Empresa;
 import br.edu.faculdadevincit.crm_vincit.model.Equipe;
 import br.edu.faculdadevincit.crm_vincit.model.Funil;
 import br.edu.faculdadevincit.crm_vincit.model.Tag;
@@ -23,6 +24,7 @@ import br.edu.faculdadevincit.crm_vincit.model.enums.Situacao;
 import br.edu.faculdadevincit.crm_vincit.model.enums.SituacaoOportunidade;
 import br.edu.faculdadevincit.crm_vincit.model.enums.UserRole;
 import br.edu.faculdadevincit.crm_vincit.repository.CadenciaFunilRepository;
+import br.edu.faculdadevincit.crm_vincit.repository.EmpresaRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.EquipeRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.FunilRepository;
 import br.edu.faculdadevincit.crm_vincit.repository.LogMovimentacaoCadenciaRepository;
@@ -89,6 +91,9 @@ public class DashboardService {
 
     @Autowired
     private TagRepository tagRepository;
+
+    @Autowired
+    private EmpresaRepository empresaRepository;
 
     @Cacheable(value = CacheConfig.DASHBOARD_CACHE,
             key = "T(org.springframework.security.core.context.SecurityContextHolder).context.authentication.principal.id" +
@@ -269,7 +274,14 @@ public class DashboardService {
         Double taxaConversao = calcularTaxaConversao(oportunidadesGanhas, oportunidadesPerdidas);
 
         long protocolosAbertos = protocoloRepository.countAbertos(filtro);
-        LocalDateTime limiteRisco = LocalDateTime.now().minusHours(usuario.getEmpresa().getProtocoloRiscoHoras());
+        // usuario vem do principal autenticado (SecurityContext), carregado numa sessão Hibernate
+        // de uma requisição anterior já fechada - usuario.getEmpresa() (lazy) sempre lançava
+        // LazyInitializationException. empresaId é uma coluna simples (não lazy), então buscar a
+        // Empresa direto pelo repositório evita depender de sessão nenhuma.
+        Integer protocoloRiscoHoras = empresaRepository.findById(usuario.getEmpresaId())
+                .map(Empresa::getProtocoloRiscoHoras)
+                .orElseThrow(() -> new RuntimeException("Empresa não encontrada"));
+        LocalDateTime limiteRisco = LocalDateTime.now().minusHours(protocoloRiscoHoras);
         long protocolosEmRisco = protocoloRepository.countEmRisco(filtro, limiteRisco);
         Double tempoMedioAtendimentoMinutos = protocoloRepository.avgTempoAtendimentoMinutos(filtro);
         Double tempoMedioAtendimentoAnteriorMinutos = protocoloRepository.avgTempoAtendimentoMinutos(filtroAnterior);

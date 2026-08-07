@@ -1,5 +1,6 @@
 package br.edu.faculdadevincit.crm_vincit.service;
 
+import br.edu.faculdadevincit.crm_vincit.infra.security.TenantContext;
 import br.edu.faculdadevincit.crm_vincit.infra.security.TokenService;
 import br.edu.faculdadevincit.crm_vincit.model.Participante;
 import br.edu.faculdadevincit.crm_vincit.model.Usuario;
@@ -127,6 +128,60 @@ public class UsuarioService {
         usuario = usuarioRepository.save(usuario);
 
         return new UsuarioAllDTO(usuario);
+    }
+
+    /**
+     * Variantes usadas pelo MasterUsuarioController (/master/empresas/{empresaId}/usuarios):
+     * o usuário master pertence à empresa interna, então essas operações "miram"
+     * temporariamente a empresa-cliente informada via TenantContext.runAs antes de delegar
+     * para os métodos normais acima — reaproveita 100% da lógica (incluindo a criação
+     * automática do Participante em save()), sem duplicar nada.
+     */
+    public UsuarioAllDTO saveParaEmpresa(Long empresaId, UsuarioCreateDTO dto, MultipartFile foto) {
+        return TenantContext.runAs(empresaId, () -> save(dto, foto));
+    }
+
+    public Page<UsuarioAllDTO> findAllParaEmpresa(Long empresaId, String search, Pageable pageable) {
+        return TenantContext.runAs(empresaId, () -> findAll(search, pageable));
+    }
+
+    public UsuarioResponseNoAuthDto findByIdParaEdicaoMaster(Long empresaId, String publicId) {
+        return TenantContext.runAs(empresaId, () -> new UsuarioResponseNoAuthDto(buscarUsuarioPorPublicId(publicId)));
+    }
+
+    public UsuarioAllDTO updateAllParaEmpresa(Long empresaId, String publicId, UsuarioAdminUpdateDTO dto, MultipartFile foto) {
+        return TenantContext.runAs(empresaId, () -> updateAll(publicId, dto, foto));
+    }
+
+    public void deleteParaEmpresa(Long empresaId, String publicId) {
+        TenantContext.runAs(empresaId, () -> {
+            delete(publicId);
+            return null;
+        });
+    }
+
+    /**
+     * Troca a senha do próprio usuário autenticado (usado pelo master, que não tem acesso à
+     * tela normal de "Conta" nem ao PUT /usuario/{id} — esse último exige dados pessoais
+     * completos e sincroniza um Participante que o master não possui). Não mexe em nenhum
+     * outro campo do cadastro.
+     */
+    public void alterarSenhaPropria(AlterarSenhaDTO dto) {
+        if (!dto.getNovaSenha().equals(dto.getNovaSenha2())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "As senhas não coincidem");
+        }
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        Usuario usuarioAutenticado = (Usuario) authentication.getPrincipal();
+        Usuario usuario = buscarUsuarioPorPublicId(usuarioAutenticado.getPublicId());
+
+        if (!encoder.matches(dto.getSenhaAtual(), usuario.getSenha())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Senha atual incorreta");
+        }
+
+        usuario.setSenha(encoder.encode(dto.getNovaSenha()));
+        usuario.setAtualizadoEm(LocalDateTime.now());
+        usuarioRepository.save(usuario);
     }
 
     public LoginResponseDTO update(String publicId, UsuarioSelfUpdateDTO dto, MultipartFile foto) {

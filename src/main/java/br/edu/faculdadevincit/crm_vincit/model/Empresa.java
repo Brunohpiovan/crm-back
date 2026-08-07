@@ -54,6 +54,10 @@ public class Empresa {
     @Column(name = "notificacao_sonora_habilitada", nullable = false)
     private Boolean notificacaoSonoraHabilitada;
 
+    @Schema(description = "Empresa interna reservada para o usuário master (não é uma empresa-cliente): fica de fora das listagens/CRUD de empresas em /master/empresas.")
+    @Column(name = "interna", nullable = false)
+    private Boolean interna = false;
+
     @Column(name = "criado_em")
     private LocalDateTime criadoEm;
 

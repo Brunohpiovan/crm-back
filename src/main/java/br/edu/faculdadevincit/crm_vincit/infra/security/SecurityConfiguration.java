@@ -72,6 +72,11 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.DELETE, "/etapa/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/log/finalizar/**").permitAll()
+                        // Área do usuário master (super-admin multi-empresa): CRUD de empresas e
+                        // de usuários de qualquer empresa. Cargo MASTER só recebe a authority
+                        // ROLE_MASTER (ver Usuario.getAuthorities()), então ele já é rejeitado
+                        // por todas as regras ROLE_ADMIN/ROLE_VENDEDOR acima automaticamente.
+                        .requestMatchers("/master/**").hasAuthority("ROLE_MASTER")
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
