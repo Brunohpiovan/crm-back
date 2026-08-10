@@ -1,5 +1,6 @@
 package com.juridiqsystem.crm.service;
 
+import com.juridiqsystem.crm.infra.security.TenantContext;
 import com.juridiqsystem.crm.model.Etapa;
 import com.juridiqsystem.crm.model.Oportunidade;
 import com.juridiqsystem.crm.model.Participante;
@@ -172,7 +173,8 @@ public class OportunidadeService {
         novo.setTipoParticipante(TipoParticipante.PARTICIPANTE);
         Participante salvo = participanteRepository.save(novo);
         UsuarioContatoDto contatoDto = new UsuarioContatoDto(salvo.getPublicId(), salvo.getNome(), salvo.getUrlPicture());
-        afterCommit(() -> messagingTemplate.convertAndSend("/topic/usuarios", contatoDto));
+        Long empresaId = TenantContext.get();
+        afterCommit(() -> messagingTemplate.convertAndSend("/topic/empresa/" + empresaId + "/usuarios", contatoDto));
         return salvo;
     }
 

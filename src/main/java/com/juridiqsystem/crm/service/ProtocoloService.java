@@ -1,5 +1,6 @@
 package com.juridiqsystem.crm.service;
 
+import com.juridiqsystem.crm.infra.security.TenantContext;
 import com.juridiqsystem.crm.model.Mensagem;
 import com.juridiqsystem.crm.model.Participante;
 import com.juridiqsystem.crm.model.Protocolo;
@@ -83,9 +84,10 @@ public class ProtocoloService {
         mensagemRepository.saveAll(mensagensSemProtocolo);
         ProtocoloMoveDTO dto = new ProtocoloMoveDTO(protocolo);
         ProtocoloNotificacaoDTO notificacaoDTO = new ProtocoloNotificacaoDTO(participante.getPublicId(), admin.getPublicId());
+        Long empresaId = TenantContext.get();
         publishAfterCommit(() -> {
-            messagingTemplate.convertAndSend("/topic/protocolo/aberto/" + protocolo.getParticipante().getPublicId(), dto);
-            messagingTemplate.convertAndSend("/topic/protocolo/novo", notificacaoDTO);
+            messagingTemplate.convertAndSend("/topic/empresa/" + empresaId + "/protocolo/aberto/" + protocolo.getParticipante().getPublicId(), dto);
+            messagingTemplate.convertAndSend("/topic/empresa/" + empresaId + "/protocolo/novo", notificacaoDTO);
         });
         return dto;
     }
@@ -129,9 +131,10 @@ public class ProtocoloService {
 
         StatusProtocolo statusFechado = protocolo.getStatus();
         ParticipanteDTO participanteDTO = new ParticipanteDTO(protocolo.getParticipante());
+        Long empresaId = TenantContext.get();
         publishAfterCommit(() -> {
-            messagingTemplate.convertAndSend("/topic/protocolo/"+protocolo.getPublicId(), statusFechado);
-            messagingTemplate.convertAndSend("/topic/contatoRet", participanteDTO);
+            messagingTemplate.convertAndSend("/topic/empresa/" + empresaId + "/protocolo/" + protocolo.getPublicId(), statusFechado);
+            messagingTemplate.convertAndSend("/topic/empresa/" + empresaId + "/contatoRet", participanteDTO);
         });
     }
 
@@ -242,7 +245,8 @@ public class ProtocoloService {
         ProtocoloMoveDTO dto = new ProtocoloMoveDTO(protocoloSalvo);
         ParticipanteDTO participanteDTO = new ParticipanteDTO(protocoloSalvo.getParticipante(), true);
         ProtocoloNotificacao2DTO notify = new ProtocoloNotificacao2DTO(dto,participanteDTO);
-        publishAfterCommit(() -> messagingTemplate.convertAndSend("/topic/protocolo/aberto/" + usuario_adm.getPublicId(), notify));
+        Long empresaId = TenantContext.get();
+        publishAfterCommit(() -> messagingTemplate.convertAndSend("/topic/empresa/" + empresaId + "/protocolo/aberto/" + usuario_adm.getPublicId(), notify));
         return dto;
     }
 

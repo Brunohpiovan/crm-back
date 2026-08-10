@@ -1,17 +1,21 @@
 package com.juridiqsystem.crm.service;
 
+import com.juridiqsystem.crm.infra.security.TenantContext;
 import com.juridiqsystem.crm.model.*;
 import com.juridiqsystem.crm.model.dtos.MensagemResponseDTO;
 import com.juridiqsystem.crm.model.dtos.UsuarioContatoDto;
 import com.juridiqsystem.crm.model.enums.StatusProtocolo;
 import com.juridiqsystem.crm.model.enums.TipoParticipante;
+import com.juridiqsystem.crm.repository.EmpresaTwilioConfigRepository;
 import com.juridiqsystem.crm.repository.OportunidadeRepository;
 import com.juridiqsystem.crm.repository.ParticipanteRepository;
 import com.juridiqsystem.crm.repository.ProtocoloRepository;
 import com.juridiqsystem.crm.repository.WhatsappWebhookEventoRepository;
 import com.juridiqsystem.crm.service.auth.SlidingWindowRateLimiter;
 import com.juridiqsystem.crm.service.exceptions.AccessDeniedException;
+import com.juridiqsystem.crm.service.exceptions.ConflictException;
 import com.juridiqsystem.crm.service.exceptions.IntegrationException;
+import com.juridiqsystem.crm.service.exceptions.ResourceNotFoundException;
 import com.juridiqsystem.crm.service.exceptions.TooManyRequestsException;
 import com.twilio.exception.ApiConnectionException;
 import com.twilio.http.TwilioRestClient;
@@ -19,7 +23,6 @@ import com.twilio.rest.api.v2010.account.Message;
 import com.twilio.security.RequestValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -28,6 +31,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -46,16 +50,6 @@ import java.util.Optional;
 @Slf4j
 @Service
 public class WhatsAppService {
-
-    @Value("${twilio.account.sid}")
-    private String accountSid;
-
-    @Value("${twilio.auth.token}")
-    private String authToken;
-
-    @Value("${twilio.whatsapp.number}")
-    private String twilioNumber;
-
 
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
@@ -79,7 +73,10 @@ public class WhatsAppService {
     private WhatsappWebhookEventoRepository whatsappWebhookEventoRepository;
 
     @Autowired
-    private TwilioRestClient twilioRestClient;
+    private EmpresaTwilioConfigRepository empresaTwilioConfigRepository;
+
+    @Autowired
+    private TwilioClientProvider twilioClientProvider;
 
     @Autowired
     private SlidingWindowRateLimiter rateLimiter;
@@ -96,10 +93,23 @@ public class WhatsAppService {
      */
     @Retryable(retryFor = ApiConnectionException.class, maxAttempts = 3, backoff = @Backoff(delay = 500, multiplier = 2))
     public Message sendWhatsAppMessage(MensagemRequest mensagemRequest) {
-        String actor = SecurityContextHolder.getContext().getAuthentication().getName();
+        // Chamado tanto por /whatsapp/send (REST, autenticado via SecurityFilter -> SecurityContextHolder
+        // populado) quanto por ChatService.sendMessage (STOMP /app/send, onde o Principal fica só na
+        // mensagem STOMP em si — StompAuthChannelInterceptor nunca popula o SecurityContextHolder global).
+        // Sem esse fallback, todo envio pelo chat interno (não pela tela de disparo avulso) lançava NPE aqui.
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String actor = authentication != null ? authentication.getName() : "empresa:" + TenantContext.get();
         if (!rateLimiter.tryAcquire("whatsapp-send:" + actor, MAX_MESSAGES_PER_WINDOW, RATE_LIMIT_WINDOW)) {
             throw new TooManyRequestsException("Muitas mensagens enviadas em um curto intervalo. Tente novamente em instantes.");
         }
+
+        Long empresaId = TenantContext.get();
+        EmpresaTwilioConfig config = empresaTwilioConfigRepository.findByEmpresaId(empresaId)
+                .orElseThrow(() -> new ConflictException("Integração com o WhatsApp (Twilio) não configurada para esta empresa."));
+        if (!Boolean.TRUE.equals(config.getEnabled())) {
+            throw new ConflictException("Integração com o WhatsApp (Twilio) está desativada para esta empresa.");
+        }
+        TwilioRestClient client = twilioClientProvider.getClient(config);
 
         String to = mensagemRequest.getTo();
         String media = mensagemRequest.getMedia();
@@ -121,29 +131,54 @@ public class WhatsAppService {
         String messageBody = mensagemRequest.getMessage() != null && !mensagemRequest.getMessage().isEmpty()
                 ? mensagemRequest.getMessage()
                 : "";
+
+        log.info("Enviando mensagem WhatsApp. empresaId={}", empresaId);
         if (media != null && !media.isEmpty()) {
-            Message message = Message.creator(
+            return Message.creator(
                             new com.twilio.type.PhoneNumber(to),
-                            new com.twilio.type.PhoneNumber("whatsapp:" + twilioNumber),
+                            new com.twilio.type.PhoneNumber("whatsapp:" + config.getWhatsappNumber()),
                             messageBody
                     )
                     .setMediaUrl(Arrays.asList(URI.create(media)))
-                    .create(twilioRestClient);
-            return message;
+                    .create(client);
         } else {
             return Message.creator(
                     new com.twilio.type.PhoneNumber(to),
-                    new com.twilio.type.PhoneNumber("whatsapp:" + twilioNumber),
+                    new com.twilio.type.PhoneNumber("whatsapp:" + config.getWhatsappNumber()),
                     mensagemRequest.getMessage()
-            ).create(twilioRestClient);
+            ).create(client);
         }
     }
 
-    public void receiveRequest(Map<String, String> params, String requestUrl, String twilioSignature){
-        if (!isValidTwilioRequest(requestUrl, params, twilioSignature)) {
+    /**
+     * Webhook público da Twilio: o tenant não é conhecido de antemão (sem JWT, sem TenantContext
+     * populado pelo SecurityFilter). A empresa é resolvida a partir do número de destino ("To") ANTES
+     * de qualquer outra coisa — inclusive antes de validar a assinatura, já que o Auth Token usado na
+     * validação é o daquela empresa específica. Só depois de validar a assinatura o processamento
+     * (idempotência + persistência + mídia + WebSocket) roda dentro de TenantContext.runAs, mesmo
+     * padrão já usado por ChatController/ChatInternoController para requisições autenticadas.
+     */
+    public void receiveRequest(Map<String, String> params, String requestUrl, String twilioSignature) {
+        String to = params.get("To");
+        String whatsappNumber = normalizeIncomingWhatsappNumber(to);
+        EmpresaTwilioConfig config = empresaTwilioConfigRepository.findByWhatsappNumberIgnoringTenant(whatsappNumber)
+                .filter(c -> Boolean.TRUE.equals(c.getEnabled()))
+                .orElseThrow(() -> {
+                    log.warn("Webhook Twilio recebido para numero nao cadastrado/desativado. to={}", to);
+                    return new ResourceNotFoundException("Numero de destino nao reconhecido.");
+                });
+
+        if (!isValidTwilioRequest(requestUrl, params, twilioSignature, config.getAuthToken())) {
             throw new AccessDeniedException("Assinatura Twilio inválida.");
         }
 
+        TenantContext.runAs(config.getEmpresaId(), () -> {
+            processarMensagemRecebida(params, config);
+            return null;
+        });
+    }
+
+    private void processarMensagemRecebida(Map<String, String> params, EmpresaTwilioConfig config) {
         String messageSid = params.get("MessageSid");
         if (!tentarRegistrarMensagemComoProcessada(messageSid)) {
             log.info("Webhook Twilio ignorado: MessageSid {} já foi processado ou está em processamento.", messageSid);
@@ -157,19 +192,18 @@ public class WhatsAppService {
             String mediaUrl = params.get("MediaUrl0");
             String mediaType = params.get("MediaContentType0");
             if (mediaUrl != null && mediaType != null && mediaType.startsWith("image")) {
-                receiveImage(from,profileName, mediaUrl, mediaType,body);
-            }
-            else if (mediaUrl != null && mediaType != null && mediaType.startsWith("audio")) {
-                receiveAudio(from,profileName, mediaUrl, mediaType,body);
-            }else if (mediaType!= null && mediaType.startsWith("application/")) {
+                receiveImage(config, from, profileName, mediaUrl, mediaType, body);
+            } else if (mediaUrl != null && mediaType != null && mediaType.startsWith("audio")) {
+                receiveAudio(config, from, profileName, mediaUrl, mediaType, body);
+            } else if (mediaType != null && mediaType.startsWith("application/")) {
                 if (mediaType.equals("application/pdf") ||
                         mediaType.equals("application/msword") ||
                         mediaType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document")) {
 
-                    receiveDocument(from,profileName, mediaUrl, mediaType,body);
+                    receiveDocument(config, from, profileName, mediaUrl, mediaType, body);
                 }
             } else {
-                receiveMessage(from,profileName, body);
+                receiveMessage(from, profileName, body);
             }
         } catch (RuntimeException e) {
             // Sem isso, uma falha real (ex.: S3 fora do ar) deixaria o MessageSid marcado como
@@ -178,6 +212,13 @@ public class WhatsAppService {
             desfazerRegistroDeProcessamento(messageSid);
             throw e;
         }
+    }
+
+    private String normalizeIncomingWhatsappNumber(String to) {
+        if (to == null) {
+            return null;
+        }
+        return to.startsWith("whatsapp:") ? to.substring("whatsapp:".length()) : to;
     }
 
     /**
@@ -213,57 +254,68 @@ public class WhatsAppService {
         }
         whatsappWebhookEventoRepository.deleteByMessageSid(messageSid);
     }
-    public void receiveAudio(String from,String profileName, String mediaUrl, String mediaType ,String body)  {
+
+    public void receiveAudio(EmpresaTwilioConfig config, String from, String profileName, String mediaUrl, String mediaType, String body) {
         String celular = reverseWhatsAppNumber(from);
         Participante participante = participanteRepository.findByCelular(celular)
-                .orElseGet(() -> criaParticipante(celular,Optional.ofNullable(profileName)));
+                .orElseGet(() -> criaParticipante(celular, Optional.ofNullable(profileName)));
         Optional<Protocolo> optionalProtocolo = protocoloRepository.findByCelularAndStatus(celular, StatusProtocolo.ABERTO);
 
         String s3Url;
         try {
-            byte[] audioBytes = downloadMediaFromTwilio(mediaUrl);
+            byte[] audioBytes = downloadMediaFromTwilio(mediaUrl, config);
 
             String extension = mediaType.split("/")[1];
             String fileName = "whatsapp_audio_" + System.currentTimeMillis() + "." + extension;
 
             MultipartFile multipartFile = createMultipartFile(audioBytes, fileName, mediaType);
 
-            s3Url = s3Service.uploadFile(multipartFile, "audio/" + fileName);
+            s3Url = s3Service.uploadFile(multipartFile, chatMediaKey("audio", fileName));
         } catch (Exception e) {
             throw new IntegrationException("Falha ao baixar ou enviar áudio recebido via WhatsApp (mediaUrl=" + mediaUrl + ")", e);
         }
-        handleMessage(optionalProtocolo, participante,body, s3Url);
+        handleMessage(optionalProtocolo, participante, body, s3Url);
     }
 
-
-
-    public void receiveMessage(String from,String profileName, String body) {
+    public void receiveMessage(String from, String profileName, String body) {
         String celular = reverseWhatsAppNumber(from);
         Participante participante = participanteRepository.findByCelular(celular)
                 .orElseGet(() -> criaParticipante(celular, Optional.ofNullable(profileName)));
         Optional<Protocolo> optionalProtocolo = protocoloRepository.findByCelularAndStatus(celular, StatusProtocolo.ABERTO);
-        handleMessage(optionalProtocolo, participante, body,null);
+        handleMessage(optionalProtocolo, participante, body, null);
     }
-    public void receiveImage(String from,String profileName, String mediaUrl,String mediaType,String body) {
+
+    public void receiveImage(EmpresaTwilioConfig config, String from, String profileName, String mediaUrl, String mediaType, String body) {
         String celular = reverseWhatsAppNumber(from);
         Participante participante = participanteRepository.findByCelular(celular)
-                .orElseGet(() -> criaParticipante(celular,Optional.ofNullable(profileName)));
+                .orElseGet(() -> criaParticipante(celular, Optional.ofNullable(profileName)));
         Optional<Protocolo> optionalProtocolo = protocoloRepository.findByCelularAndStatus(celular, StatusProtocolo.ABERTO);
         String s3Url;
         try {
-            byte[] imageBytes = downloadMediaFromTwilio(mediaUrl);
+            byte[] imageBytes = downloadMediaFromTwilio(mediaUrl, config);
 
             String extension = mediaType.split("/")[1];
             String fileName = "whatsapp_" + System.currentTimeMillis() + "." + extension;
 
             MultipartFile multipartFile = createMultipartFile(imageBytes, fileName, mediaType);
-            s3Url = s3Service.uploadFile(multipartFile, "imagem/" + fileName);
+            s3Url = s3Service.uploadFile(multipartFile, chatMediaKey("imagem", fileName));
         } catch (Exception e) {
             throw new IntegrationException("Falha ao baixar ou enviar imagem recebida via WhatsApp (mediaUrl=" + mediaUrl + ")", e);
         }
-        handleMessage(optionalProtocolo, participante,body, s3Url);
+        handleMessage(optionalProtocolo, participante, body, s3Url);
     }
-    private boolean isValidTwilioRequest(String requestUrl, Map<String, String> params, String twilioSignature) {
+
+    /**
+     * Prefixo "chat/{empresaId}/..." para toda mídia recebida via WhatsApp — mesmo bucket S3
+     * compartilhado, mas cada empresa só enxerga (e só é cobrada por auditoria/lifecycle de) sua
+     * própria pasta. empresaId vem de TenantContext.get(), já setado por TenantContext.runAs em
+     * receiveRequest.
+     */
+    private String chatMediaKey(String tipo, String fileName) {
+        return "chat/" + TenantContext.get() + "/" + tipo + "/" + fileName;
+    }
+
+    private boolean isValidTwilioRequest(String requestUrl, Map<String, String> params, String twilioSignature, String authToken) {
         if (twilioSignature == null || twilioSignature.isBlank()) {
             return false;
         }
@@ -274,35 +326,37 @@ public class WhatsAppService {
     private static final int TWILIO_MEDIA_CONNECT_TIMEOUT_MS = 10_000;
     private static final int TWILIO_MEDIA_READ_TIMEOUT_MS = 30_000;
 
-    private byte[] downloadMediaFromTwilio(String mediaUrl) throws IOException {
+    private byte[] downloadMediaFromTwilio(String mediaUrl, EmpresaTwilioConfig config) throws IOException {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(TWILIO_MEDIA_CONNECT_TIMEOUT_MS);
         requestFactory.setReadTimeout(TWILIO_MEDIA_READ_TIMEOUT_MS);
         RestTemplate restTemplate = new RestTemplate(requestFactory);
 
         HttpHeaders headers = new HttpHeaders();
-        headers.setBasicAuth(accountSid, authToken);
+        headers.setBasicAuth(config.getAccountSid(), config.getAuthToken());
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
         ResponseEntity<byte[]> response = restTemplate.exchange(mediaUrl, HttpMethod.GET, entity, byte[].class);
 
         return response.getBody();
     }
+
     private MultipartFile createMultipartFile(byte[] content, String fileName, String contentType) {
         return new ByteArrayMultipartFile(content, fileName, contentType);
     }
 
 
-    private void handleMessage(Optional<Protocolo> optionalProtocolo, Participante participante, String body,String media) {
+    private void handleMessage(Optional<Protocolo> optionalProtocolo, Participante participante, String body, String media) {
+        String empresaId = String.valueOf(TenantContext.get());
         if (optionalProtocolo.isPresent()) {
             Protocolo protocolo = optionalProtocolo.get();
-            List<Mensagem> savedMessage = mensagemService.sendMessage(protocolo, participante, body,media);
+            List<Mensagem> savedMessage = mensagemService.sendMessage(protocolo, participante, body, media);
             savedMessage.forEach(mensagemNew ->
-                    publicarNoWebSocket("/topic/messages/" + protocolo.getPublicId(), new MensagemResponseDTO(mensagemNew)));
+                    publicarNoWebSocket("/topic/empresa/" + empresaId + "/messages/" + protocolo.getPublicId(), new MensagemResponseDTO(mensagemNew)));
         } else {
             List<Mensagem> savedMessages = mensagemService.sendMessagePublico(participante, body, media);
             savedMessages.forEach(mensagemNew ->
-                    publicarNoWebSocket("/topic/messages/public", new MensagemResponseDTO(mensagemNew)));
+                    publicarNoWebSocket("/topic/empresa/" + empresaId + "/messages/public", new MensagemResponseDTO(mensagemNew)));
         }
     }
 
@@ -315,7 +369,7 @@ public class WhatsAppService {
     }
 
 
-    public Participante criaParticipante(String from,Optional<String> profilename) {
+    public Participante criaParticipante(String from, Optional<String> profilename) {
         Participante participante = new Participante();
         participante.setNome(profilename.orElse(from));
         participante.setLogin(null);
@@ -334,7 +388,7 @@ public class WhatsAppService {
         participante.setTipoParticipante(TipoParticipante.PARTICIPANTE);
         participanteRepository.save(participante);
         UsuarioContatoDto contatoDto = new UsuarioContatoDto(participante.getPublicId(), participante.getNome(), participante.getUrlPicture());
-        messagingTemplate.convertAndSend("/topic/usuarios", contatoDto);
+        messagingTemplate.convertAndSend("/topic/empresa/" + TenantContext.get() + "/usuarios", contatoDto);
         return participante;
     }
 
@@ -356,25 +410,25 @@ public class WhatsAppService {
     }
 
 
-    public void receiveDocument(String from,String profileName, String mediaUrl, String mediaType,String body)  {
+    public void receiveDocument(EmpresaTwilioConfig config, String from, String profileName, String mediaUrl, String mediaType, String body) {
         String celular = reverseWhatsAppNumber(from);
         Participante participante = participanteRepository.findByCelular(celular)
-                .orElseGet(() -> criaParticipante(celular,Optional.ofNullable(profileName)));
+                .orElseGet(() -> criaParticipante(celular, Optional.ofNullable(profileName)));
         Optional<Protocolo> optionalProtocolo = protocoloRepository.findByCelularAndStatus(celular, StatusProtocolo.ABERTO);
         String s3Url;
         try {
-            byte[] documentBytes = downloadMediaFromTwilio(mediaUrl);
+            byte[] documentBytes = downloadMediaFromTwilio(mediaUrl, config);
             String extension = mediaType.split("/")[1];
             String fileName = "whatsapp_document_" + System.currentTimeMillis() + "." + extension;
             MultipartFile multipartFile = createMultipartFile(documentBytes, fileName, mediaType);
-            s3Url = s3Service.uploadFile(multipartFile, "documentos/" + fileName);
+            s3Url = s3Service.uploadFile(multipartFile, chatMediaKey("documentos", fileName));
         } catch (Exception e) {
             throw new IntegrationException("Falha ao baixar ou enviar documento recebido via WhatsApp (mediaUrl=" + mediaUrl + ")", e);
         }
-        handleMessage(optionalProtocolo, participante,body, s3Url);
+        handleMessage(optionalProtocolo, participante, body, s3Url);
     }
 
-    public Oportunidade criaOportunidade(Participante cliente){
+    public Oportunidade criaOportunidade(Participante cliente) {
         Oportunidade newOportunidadae = new Oportunidade();
         newOportunidadae.setTitulo(null);
         newOportunidadae.setEtapa(null);
@@ -385,7 +439,7 @@ public class WhatsAppService {
         newOportunidadae.setInteresse(null);
         newOportunidadae.setUrl_anexo(null);
         newOportunidadae.setIndice(0);
-        messagingTemplate.convertAndSend("/topic/newoportunidadectt", newOportunidadae);
+        messagingTemplate.convertAndSend("/topic/empresa/" + TenantContext.get() + "/newoportunidadectt", newOportunidadae);
         return oportunidadeRepository.save(newOportunidadae);
     }
 

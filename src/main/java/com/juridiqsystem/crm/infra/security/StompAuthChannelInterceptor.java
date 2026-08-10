@@ -62,8 +62,33 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         if (usuario == null) {
             throw new MessagingException("Sessao WebSocket nao autenticada");
         }
+        if (accessor.getCommand() == StompCommand.SUBSCRIBE) {
+            validarDestinoDaMesmaEmpresa(accessor.getDestination(), usuario);
+        }
         accessor.setUser(toPrincipal(usuario));
         return message;
+    }
+
+    /**
+     * Tópicos do chat de atendimento (WhatsApp/Twilio) são escopados por empresa no formato
+     * "/topic/empresa/{empresaId}/...". Não basta o frontend montar a URL certa — sem essa
+     * checagem, qualquer usuário autenticado (de qualquer empresa) poderia assinar o tópico de
+     * outra empresa só sabendo o empresaId dela (é um Long sequencial, fácil de adivinhar).
+     * Tópicos fora desse padrão (chat interno, funil etc.) não são afetados por este método.
+     */
+    private void validarDestinoDaMesmaEmpresa(String destino, Usuario usuario) {
+        if (destino == null) {
+            return;
+        }
+        String prefixo = "/topic/empresa/";
+        if (!destino.startsWith(prefixo)) {
+            return;
+        }
+        String resto = destino.substring(prefixo.length());
+        String empresaIdDoTopico = resto.contains("/") ? resto.substring(0, resto.indexOf('/')) : resto;
+        if (!String.valueOf(usuario.getEmpresaId()).equals(empresaIdDoTopico)) {
+            throw new MessagingException("Nao autorizado a assinar topico de outra empresa");
+        }
     }
 
     private Usuario authenticate(StompHeaderAccessor accessor) {

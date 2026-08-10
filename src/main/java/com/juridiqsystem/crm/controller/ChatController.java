@@ -35,8 +35,9 @@ public class ChatController {
         List<Mensagem> savedMessage = TenantContext.runAs(usuarioAutenticado.getEmpresaId(),
                 () -> service.sendMessage(mensagem));
         String protocoloId = String.valueOf(mensagem.getId_protocolo());
+        String topicoBase = "/topic/empresa/" + usuarioAutenticado.getEmpresaId() + "/messages/" + protocoloId;
         savedMessage.forEach(mensagemNew -> {
-            messagingTemplate.convertAndSend("/topic/messages/" + protocoloId, new MensagemResponseDTO(mensagemNew));
+            messagingTemplate.convertAndSend(topicoBase, new MensagemResponseDTO(mensagemNew));
         });
     }
 

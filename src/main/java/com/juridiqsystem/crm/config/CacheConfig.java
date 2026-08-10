@@ -26,17 +26,24 @@ public class CacheConfig {
     public static final String TAGS_CACHE = "tags";
     public static final String TEMPLATES_CACHE = "templates";
     public static final String EQUIPES_CACHE = "equipes";
+    public static final String TWILIO_CLIENTS_CACHE = "twilioClients";
 
     @Bean
     public CacheManager cacheManager() {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager(
-                DASHBOARD_CACHE, TAGS_CACHE, TEMPLATES_CACHE, EQUIPES_CACHE);
+                DASHBOARD_CACHE, TAGS_CACHE, TEMPLATES_CACHE, EQUIPES_CACHE, TWILIO_CLIENTS_CACHE);
 
         cacheManager.registerCustomCache(DASHBOARD_CACHE,
                 Caffeine.newBuilder().expireAfterWrite(30, TimeUnit.SECONDS).maximumSize(1000).build());
         cacheManager.registerCustomCache(TAGS_CACHE, dadosDeReferencia());
         cacheManager.registerCustomCache(TEMPLATES_CACHE, dadosDeReferencia());
         cacheManager.registerCustomCache(EQUIPES_CACHE, dadosDeReferencia());
+        // TwilioRestClient por empresa (TwilioClientProvider): TTL só como defesa adicional —
+        // a invalidação de verdade acontece explicitamente (cache.evict) sempre que a config
+        // Twilio de uma empresa é salva, para nunca operar com credenciais antigas até o TTL
+        // expirar.
+        cacheManager.registerCustomCache(TWILIO_CLIENTS_CACHE,
+                Caffeine.newBuilder().expireAfterWrite(30, TimeUnit.MINUTES).maximumSize(500).build());
 
         return cacheManager;
     }

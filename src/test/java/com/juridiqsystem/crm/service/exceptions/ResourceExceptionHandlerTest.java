@@ -1,9 +1,12 @@
 package com.juridiqsystem.crm.service.exceptions;
 
+import com.juridiqsystem.crm.infra.security.logging.SecurityLogger;
 import com.juridiqsystem.crm.model.dtos.ApiResponse;
+import com.juridiqsystem.crm.service.auth.ClientInfoService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -21,10 +24,17 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ResourceExceptionHandlerTest {
 
-    private final ResourceExceptionHandler handler = new ResourceExceptionHandler();
+    @InjectMocks
+    private ResourceExceptionHandler handler;
 
     @Mock
     private HttpServletRequest request;
+
+    @Mock
+    private SecurityLogger securityLogger;
+
+    @Mock
+    private ClientInfoService clientInfoService;
 
     @Test
     void dataIntegrityViolationException_retorna400ComStandardError() {
@@ -63,7 +73,7 @@ class ResourceExceptionHandlerTest {
     void accessDeniedException_retorna403ComApiResponse() {
         AccessDeniedException ex = new AccessDeniedException("Você não tem permissão para acessar este usuário.");
 
-        ResponseEntity<ApiResponse> resposta = handler.handleAccessDenied(ex);
+        ResponseEntity<ApiResponse> resposta = handler.handleAccessDenied(ex, request);
 
         assertThat(resposta.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(resposta.getBody().message()).isEqualTo("Você não tem permissão para acessar este usuário.");
@@ -71,12 +81,13 @@ class ResourceExceptionHandlerTest {
 
     @Test
     void runtimeExceptionGenerica_retorna400ComMensagemEmTexto() {
+        when(request.getRequestURI()).thenReturn("/protocolo/1");
         RuntimeException ex = new RuntimeException("Protocolo nao encontrado");
 
-        ResponseEntity<String> resposta = handler.handleRuntimeException(ex);
+        ResponseEntity<StandardError> resposta = handler.handleRuntimeException(ex, request);
 
         assertThat(resposta.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(resposta.getBody()).isEqualTo("Protocolo nao encontrado");
+        assertThat(resposta.getBody().getMessage()).isEqualTo("Protocolo nao encontrado");
     }
 
     @Test

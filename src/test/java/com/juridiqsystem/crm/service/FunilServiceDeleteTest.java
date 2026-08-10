@@ -55,7 +55,7 @@ class FunilServiceDeleteTest {
         Etapa etapa = new Etapa();
         etapa.setId(10L);
         when(funilRepository.findByPublicId("funil-1")).thenReturn(Optional.of(funil));
-        when(etapaRepository.findByFunilId(1L)).thenReturn(List.of(etapa));
+        when(etapaRepository.findByFunilIdOrderByPosicaoAscIdAsc(1L)).thenReturn(List.of(etapa));
         when(oportunidadeRepository.countPorEtapaIdIn(List.of(10L))).thenReturn(2L);
 
         assertThatThrownBy(() -> funilService.delete("funil-1"))
@@ -70,7 +70,7 @@ class FunilServiceDeleteTest {
         funil.setId(1L);
         funil.setPublicId("funil-1");
         when(funilRepository.findByPublicId("funil-1")).thenReturn(Optional.of(funil));
-        when(etapaRepository.findByFunilId(1L)).thenReturn(List.of());
+        when(etapaRepository.findByFunilIdOrderByPosicaoAscIdAsc(1L)).thenReturn(List.of());
 
         funilService.delete("funil-1");
 
