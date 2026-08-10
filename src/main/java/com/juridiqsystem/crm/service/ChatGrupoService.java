@@ -43,6 +43,9 @@ public class ChatGrupoService {
     private S3Service s3Service;
 
     @Autowired
+    private ImageContentValidator imageContentValidator;
+
+    @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
     @Value("${aws.s3.bucket-name}")
@@ -95,6 +98,7 @@ public class ChatGrupoService {
         ChatGrupo grupo = dtoToModel(dto);
 
         if (foto != null) {
+            imageContentValidator.validar(foto);
             String key = "img-grupo/" + dto.getNome().replaceAll("\\s+", "") + "pic";
             String url = s3Service.uploadFile(foto, key);
             grupo.setAvatarUrl(url);
@@ -105,9 +109,10 @@ public class ChatGrupoService {
         }
 
         if (imagemFundo != null) {
+            imageContentValidator.validar(imagemFundo);
             String backgroundKey = "img-grupo/" + dto.getNome().replaceAll("\\s+", "") + "background";
             String backgroundUrl = s3Service.uploadFile(imagemFundo, backgroundKey);
-            grupo.setImagemFundoUrl(backgroundUrl); 
+            grupo.setImagemFundoUrl(backgroundUrl);
         }
 
         grupo.setPrivado(false);
@@ -136,6 +141,7 @@ public class ChatGrupoService {
         }
 
         if (foto != null) {
+            imageContentValidator.validar(foto);
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
             String timestamp = LocalDateTime.now().format(formatter);
             String keyNova = "img-grupo/" + dto.getNome().replaceAll("\\s+", "") + "pic_"+timestamp;
@@ -153,6 +159,7 @@ public class ChatGrupoService {
             s3Service.deleteFile(keyAntiga);
         }
         if (imagemFundo != null) {
+            imageContentValidator.validar(imagemFundo);
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
             String timestamp = LocalDateTime.now().format(formatter);
             String keyNova = "img-grupo-background/" + dto.getNome().replaceAll("\\s+", "") + "_back_" + timestamp;
