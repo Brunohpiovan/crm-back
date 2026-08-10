@@ -3,17 +3,20 @@ package com.juridiqsystem.crm.service;
 import com.juridiqsystem.crm.infra.security.TenantContext;
 import com.juridiqsystem.crm.model.Etapa;
 import com.juridiqsystem.crm.model.Oportunidade;
+import com.juridiqsystem.crm.model.OportunidadeHistorico;
 import com.juridiqsystem.crm.model.Participante;
 import com.juridiqsystem.crm.model.Tag;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.OportunidadeClienteRequest;
 import com.juridiqsystem.crm.model.dtos.OportunidadeCreateRequest;
 import com.juridiqsystem.crm.model.dtos.OportunidadeDTO;
+import com.juridiqsystem.crm.model.dtos.OportunidadeHistoricoDTO;
 import com.juridiqsystem.crm.model.dtos.OportunidadeMovimentoDTO;
 import com.juridiqsystem.crm.model.dtos.OportunidadeUpdateRequest;
 import com.juridiqsystem.crm.model.dtos.UsuarioContatoDto;
 import com.juridiqsystem.crm.model.enums.Origem;
 import com.juridiqsystem.crm.model.enums.SituacaoOportunidade;
+import com.juridiqsystem.crm.model.enums.TipoEventoOportunidade;
 import com.juridiqsystem.crm.model.enums.TipoParticipante;
 import com.juridiqsystem.crm.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +24,8 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -65,6 +70,9 @@ public class OportunidadeService {
 
     @Autowired
     private TagRepository tagRepository;
+
+    @Autowired
+    private OportunidadeHistoricoRepository oportunidadeHistoricoRepository;
 
     // Auto-injeção do proxy do Spring: criarComAnexoResolvido/atualizarComAnexoResolvido só rodam
     // numa transação de verdade se forem chamados através do proxy. Chamar via "this" dentro da
@@ -137,6 +145,7 @@ public class OportunidadeService {
 
         etapaService.updateAddValor(etapa.getId(), oportunidade.getValor());
         Oportunidade salva = oportunidadeRepository.save(oportunidade);
+        registrarHistorico(salva.getId(), TipoEventoOportunidade.CRIACAO, "criou esta oportunidade");
 
         OportunidadeDTO dto = toDto(salva);
         afterCommit(() -> messagingTemplate.convertAndSend("/topic/newoportunidade", dto));
@@ -250,6 +259,14 @@ public class OportunidadeService {
         oportunidadeBanco.setAtualizadoEm(LocalDateTime.now());
 
         Oportunidade salva = oportunidadeRepository.save(oportunidadeBanco);
+
+        if (etapaChanged && etapaAntiga != null) {
+            registrarHistorico(salva.getId(), TipoEventoOportunidade.MOVIMENTACAO,
+                    "moveu de '" + etapaAntiga.getNome() + "' para '" + novaEtapa.getNome() + "'");
+        } else {
+            registrarHistorico(salva.getId(), TipoEventoOportunidade.EDICAO, "editou os dados desta oportunidade");
+        }
+
         OportunidadeDTO dto = toDto(salva);
         String topic = etapaChanged ? "/topic/newoportunidade" : "/topic/updateOportunidade";
         afterCommit(() -> messagingTemplate.convertAndSend(topic, dto));
@@ -342,6 +359,9 @@ public class OportunidadeService {
             oportunidade.setDataEntradaEtapa(LocalDateTime.now());
             oportunidade.setEtapa(novaEtapa);
             reorganizarIndices(novaEtapa.getId(), oportunidade, novoIndice);
+
+            registrarHistorico(oportunidade.getId(), TipoEventoOportunidade.MOVIMENTACAO,
+                    "moveu de '" + etapaAtual.getNome() + "' para '" + novaEtapa.getNome() + "'");
         }
 
         OportunidadeMovimentoDTO movimentoDto = new OportunidadeMovimentoDTO(oportunidade.getPublicId(), oportunidade.getEtapa().getPublicId());
@@ -395,6 +415,7 @@ public class OportunidadeService {
         BigDecimal valor = oportunidadeBanco.getValor();
         oportunidadeBanco.setSituacao(SituacaoOportunidade.LIXEIRA);
         oportunidadeRepository.save(oportunidadeBanco);
+        registrarHistorico(oportunidadeBanco.getId(), TipoEventoOportunidade.LIXEIRA, "moveu esta oportunidade para a lixeira");
         if (etapa != null) {
             etapaService.updateSubValor(etapa.getId(), valor);
         }
@@ -414,6 +435,7 @@ public class OportunidadeService {
         Etapa etapa = oportunidadeBanco.getEtapa();
         oportunidadeBanco.setSituacao(SituacaoOportunidade.ABERTO);
         oportunidadeRepository.save(oportunidadeBanco);
+        registrarHistorico(oportunidadeBanco.getId(), TipoEventoOportunidade.RESTAURACAO, "restaurou esta oportunidade da lixeira");
         if (etapa != null) {
             etapaService.updateAddValor(etapa.getId(), oportunidadeBanco.getValor());
         }
@@ -430,6 +452,36 @@ public class OportunidadeService {
 
     private OportunidadeDTO toDto(Oportunidade oportunidade) {
         return new OportunidadeDTO(oportunidade);
+    }
+
+    /**
+     * Registra um evento no histórico/log da oportunidade (exibido no modal de edição, campo
+     * "Detalhes da oportunidade"). Chamado de dentro dos métodos @Transactional acima, então a
+     * linha só é persistida se a transação inteira for commitada com sucesso.
+     */
+    private void registrarHistorico(Long oportunidadeId, TipoEventoOportunidade tipo, String descricao) {
+        oportunidadeHistoricoRepository.save(new OportunidadeHistorico(oportunidadeId, currentActorName(), tipo, descricao));
+    }
+
+    /**
+     * Nome de quem está autenticado no momento (usado como autor do evento de histórico). Fora de
+     * um request autenticado — ex.: o scheduler de cadência movendo uma oportunidade em segundo
+     * plano — não há Authentication no contexto, e o evento é atribuído a "Cadência automática".
+     */
+    private String currentActorName() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof Usuario usuario) {
+            return usuario.getNome();
+        }
+        return "Cadência automática";
+    }
+
+    public List<OportunidadeHistoricoDTO> getHistorico(String oportunidadeId) {
+        Oportunidade oportunidade = oportunidadeRepository.findByPublicId(oportunidadeId)
+                .orElseThrow(() -> new RuntimeException("Oportunidade com id " + oportunidadeId + " nao encontrada"));
+        return oportunidadeHistoricoRepository.findByOportunidadeIdOrderByCriadoEmDesc(oportunidade.getId()).stream()
+                .map(OportunidadeHistoricoDTO::new)
+                .collect(Collectors.toList());
     }
 
     private void afterCommit(Runnable action) {
