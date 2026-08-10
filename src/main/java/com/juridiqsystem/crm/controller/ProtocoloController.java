@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -55,7 +56,7 @@ public class ProtocoloController {
             @ApiResponse(responseCode = "400", description = "Administrador não encontrado ou já existe protocolo em andamento com esse participante")
     })
     @PostMapping
-    public ResponseEntity<?> createProtocol(@Parameter(description = "Dados do protocolo a ser criado (id_admin e id_participante são obrigatórios)", required = true) @RequestBody ProtocoloDto protocoloDto) {
+    public ResponseEntity<?> createProtocol(@Parameter(description = "Dados do protocolo a ser criado (id_admin e id_participante são obrigatórios)", required = true) @RequestBody @Valid ProtocoloDto protocoloDto) {
         ProtocoloMoveDTO protocolo = protocoloService.createProtocolo(protocoloDto);
         return ResponseEntity.ok(protocolo);
     }

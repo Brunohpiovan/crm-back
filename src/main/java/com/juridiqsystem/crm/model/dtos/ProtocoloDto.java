@@ -25,7 +25,6 @@ public class ProtocoloDto {
     @NotNull(message = "O ID do participante não pode ser nulo.")
     private String id_participante;
     @Schema(description = "Status do protocolo: ABERTO ou FECHADO. Ignorado na criação (o servidor sempre cria como ABERTO).")
-    @NotNull(message = "O status não pode ser nulo.")
     private StatusProtocolo status;
     private LocalDateTime dataCriacao;
     private LocalDateTime dataEncerramento;

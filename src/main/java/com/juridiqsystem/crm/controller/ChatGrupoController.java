@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -58,7 +59,7 @@ public class ChatGrupoController {
             @ApiResponse(responseCode = "200", description = "Lista de grupos públicos do usuário",
                     content = @Content(array = @ArraySchema(schema = @Schema(implementation = ChatGrupoResponseDTO.class)))),
             @ApiResponse(responseCode = "204", description = "Usuário não participa de nenhum grupo público"),
-            @ApiResponse(responseCode = "400", description = "Usuário não encontrado (resposta em texto puro, não JSON estruturado)",
+            @ApiResponse(responseCode = "400", description = "Usuário não encontrado (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Usuário não encontrado")))
     })
     @GetMapping("/{idUsuario}")
@@ -76,7 +77,7 @@ public class ChatGrupoController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Grupo encontrado",
                     content = @Content(schema = @Schema(implementation = ChatGrupoResponseById.class))),
-            @ApiResponse(responseCode = "400", description = "Grupo não encontrado para o id informado (resposta em texto puro, não JSON estruturado)",
+            @ApiResponse(responseCode = "400", description = "Grupo não encontrado para o id informado (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "grupo nao encontrado")))
     })
     @GetMapping("/id/{idUsuario}")
@@ -102,13 +103,13 @@ public class ChatGrupoController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Grupo criado com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Dados inválidos, usuário(s) informado(s) não encontrado(s) ou falha no upload da imagem para o S3 (resposta em texto puro, não JSON estruturado; mensagem varia conforme a causa, ex.: \"Usuário(s) com ID [3] não encontrado(s)\", \"O arquivo está vazio\" ou \"A transferência falhou: ...\")",
+            @ApiResponse(responseCode = "400", description = "Dados inválidos, usuário(s) informado(s) não encontrado(s) ou falha no upload da imagem para o S3 (resposta em JSON estruturado — StandardError; mensagem varia conforme a causa, ex.: \"Usuário(s) com ID [3] não encontrado(s)\", \"O arquivo está vazio\" ou \"A transferência falhou: ...\")",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Usuário(s) com ID [3] não encontrado(s)")))
     })
     @PostMapping
     public ResponseEntity<?> create(
             @Parameter(description = "Dados do grupo em JSON (parte multipart 'grupo': nome, lista de ids de usuários, etc.)", required = true)
-            @RequestPart("grupo") GrupoCreateDTO grupoCreateDTO,
+            @RequestPart("grupo") @Valid GrupoCreateDTO grupoCreateDTO,
             @Parameter(description = "Arquivo de imagem para o avatar do grupo (parte multipart opcional)")
             @RequestPart(value = "foto", required = false) MultipartFile foto,
             @Parameter(description = "Arquivo de imagem para o plano de fundo do grupo (parte multipart opcional)")
@@ -135,14 +136,14 @@ public class ChatGrupoController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Grupo atualizado com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Grupo ou usuário(s) não encontrado(s), ou falha no upload/remoção da imagem no S3 (resposta em texto puro, não JSON estruturado; mensagem varia conforme a causa, ex.: \"grupo nao encontrado\", \"Usuário(s) com ID [3] não encontrado(s)\" ou \"Falha na deleção do objeto: ...\")",
+            @ApiResponse(responseCode = "400", description = "Grupo ou usuário(s) não encontrado(s), ou falha no upload/remoção da imagem no S3 (resposta em JSON estruturado — StandardError; mensagem varia conforme a causa, ex.: \"grupo nao encontrado\", \"Usuário(s) com ID [3] não encontrado(s)\" ou \"Falha na deleção do objeto: ...\")",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "grupo nao encontrado")))
     })
     @PutMapping(value = "/{id}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     public ResponseEntity<?> update(
             @Parameter(description = "Id do grupo a ser atualizado", required = true) @PathVariable String id,
             @Parameter(description = "Dados do grupo em JSON (parte multipart 'grupo')", required = true)
-            @RequestPart("grupo") GrupoCreateDTO grupo,
+            @RequestPart("grupo") @Valid GrupoCreateDTO grupo,
             @Parameter(description = "Novo arquivo de imagem para o avatar do grupo (parte multipart opcional)")
             @RequestPart(value = "foto", required = false) MultipartFile file,
             @Parameter(description = "Novo arquivo de imagem para o plano de fundo do grupo (parte multipart opcional)")

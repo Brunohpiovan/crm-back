@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -98,8 +99,8 @@ public class UsuarioController {
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Usuário encontrado", content = @Content(schema = @Schema(implementation = UsuarioResponseNoAuthDto.class))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Usuário não encontrado para o id informado (resposta em texto puro, não JSON estruturado — cai no handler genérico de RuntimeException)",
-                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Usuário não encontrado"))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Usuário não encontrado para o id informado. Resposta em JSON estruturado (StandardError) — cai no handler genérico de RuntimeException.",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = StandardError.class))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "O usuário autenticado não é ADMINISTRADOR nem o dono do cadastro solicitado",
                     content = @Content(schema = @Schema(implementation = ApiResponse.class)))
     })
@@ -120,8 +121,8 @@ public class UsuarioController {
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Usuário encontrado", content = @Content(schema = @Schema(implementation = UsuarioResponseDto.class))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Usuário não encontrado para o id informado (resposta em texto puro, não JSON estruturado — cai no handler genérico de RuntimeException)",
-                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Usuário não encontrado"))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Usuário não encontrado para o id informado. Resposta em JSON estruturado (StandardError) — cai no handler genérico de RuntimeException.",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = StandardError.class))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "O usuário autenticado não é ADMINISTRADOR nem o dono do cadastro solicitado",
                     content = @Content(schema = @Schema(implementation = ApiResponse.class)))
     })
@@ -147,7 +148,7 @@ public class UsuarioController {
                     content = @Content(schema = @Schema(implementation = StandardError.class)))
     })
     @PostMapping
-    public ResponseEntity<?> post(@Parameter(description = "Dados do usuário a ser criado", required = true) @RequestPart("usuario") UsuarioCreateDTO usuarioRequest,
+    public ResponseEntity<?> post(@Parameter(description = "Dados do usuário a ser criado", required = true) @RequestPart("usuario") @Valid UsuarioCreateDTO usuarioRequest,
                                         @Parameter(description = "Foto/avatar do usuário (opcional)") @RequestPart(value = "foto", required = false) MultipartFile foto) {
         UsuarioAllDTO dto = usuarioService.save(usuarioRequest,foto);
         return ResponseEntity.ok(dto);
@@ -168,17 +169,14 @@ public class UsuarioController {
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Usuário atualizado; retorna novo token JWT", content = @Content(schema = @Schema(implementation = LoginResponseDTO.class))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Duas formas possíveis: (1) usuário não encontrado ou senhas não coincidem — texto puro (RuntimeException/ResponseStatusException genéricos); (2) login/CPF já cadastrado em outro usuário — JSON StandardError (DataIntegrityViolationException dedicada)",
-                    content = {
-                            @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "As senhas não coincidem")),
-                            @Content(mediaType = "application/json", schema = @Schema(implementation = StandardError.class))
-                    }),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Duas causas possíveis, ambas em JSON estruturado (StandardError): (1) usuário não encontrado ou senhas não coincidem (RuntimeException/ResponseStatusException genéricos); (2) login/CPF já cadastrado em outro usuário (DataIntegrityViolationException dedicada)",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = StandardError.class))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "O usuário autenticado não é o dono do cadastro informado",
                     content = @Content(schema = @Schema(implementation = ApiResponse.class)))
     })
     @PutMapping(value = "/{id}")
     public ResponseEntity<?> update(@Parameter(description = "Id do usuário", required = true) @PathVariable String id,
-                                    @Parameter(description = "Dados pessoais atualizados", required = true) @RequestPart("usuario") UsuarioSelfUpdateDTO usuarioRequest,
+                                    @Parameter(description = "Dados pessoais atualizados", required = true) @RequestPart("usuario") @Valid UsuarioSelfUpdateDTO usuarioRequest,
                                     @Parameter(description = "Nova foto/avatar (opcional)") @RequestPart(value = "foto", required = false) MultipartFile foto) {
         LoginResponseDTO responseDTO = usuarioService.update(id, usuarioRequest, foto);
         return ResponseEntity.ok(responseDTO);
@@ -195,15 +193,12 @@ public class UsuarioController {
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Usuário atualizado", content = @Content(schema = @Schema(implementation = UsuarioAllDTO.class))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Duas formas possíveis: (1) usuário não encontrado — texto puro (UserNotFoundException, sem handler dedicado, cai no handler genérico de RuntimeException); (2) login/CPF já cadastrado em outro usuário — JSON StandardError (DataIntegrityViolationException dedicada)",
-                    content = {
-                            @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Usuario nao encontrado")),
-                            @Content(mediaType = "application/json", schema = @Schema(implementation = StandardError.class))
-                    })
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Duas causas possíveis, ambas em JSON estruturado (StandardError): (1) usuário não encontrado (UserNotFoundException, cai no handler genérico de RuntimeException); (2) login/CPF já cadastrado em outro usuário (DataIntegrityViolationException dedicada)",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = StandardError.class)))
     })
     @PutMapping(value = "/all/{id}")
     public ResponseEntity<?> updateAll(@Parameter(description = "Id do usuário", required = true) @PathVariable String id,
-                                    @Parameter(description = "Dados administrativos atualizados (inclui cargo e bloqueado)", required = true) @RequestPart("usuario") UsuarioAdminUpdateDTO usuarioRequest,
+                                    @Parameter(description = "Dados administrativos atualizados (inclui cargo e bloqueado)", required = true) @RequestPart("usuario") @Valid UsuarioAdminUpdateDTO usuarioRequest,
                                     @Parameter(description = "Nova foto/avatar (opcional)") @RequestPart(value = "foto", required = false) MultipartFile foto) {
         UsuarioAllDTO responseDTO = usuarioService.updateAll(id, usuarioRequest, foto);
         return ResponseEntity.ok(responseDTO);
@@ -221,8 +216,8 @@ public class UsuarioController {
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Usuário inativado (bloqueado) com sucesso"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Usuário não encontrado para o id informado (resposta em texto puro, não JSON estruturado — UserNotFoundException sem handler dedicado, cai no handler genérico de RuntimeException)",
-                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Usuario nao encontrado")))
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Usuário não encontrado para o id informado. Resposta em JSON estruturado (StandardError) — UserNotFoundException cai no handler genérico de RuntimeException.",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = StandardError.class)))
     })
     @DeleteMapping(value = "/{id}")
     public ResponseEntity<?> delete(@Parameter(description = "Id do usuário", required = true) @PathVariable String id) {
