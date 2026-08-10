@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -17,6 +18,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class ChatInternoService {
@@ -31,6 +33,20 @@ public class ChatInternoService {
 
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
+
+    /**
+     * Ids públicos dos membros do grupo, usado para o fan-out da notificação de mensagem nova
+     * (ver ChatInternoController.sendMensagem). @Transactional aqui é necessário: usuarios é uma
+     * coleção LAZY, e o handler STOMP que chama isso não tem sessão Hibernate aberta por padrão
+     * fora do escopo desta transação — sem isso, o acesso à coleção lançaria
+     * LazyInitializationException.
+     */
+    @Transactional(readOnly = true)
+    public List<String> getMembrosPublicIds(String grupoPublicId) {
+        ChatGrupo grupo = chatGrupoRepository.findByPublicId(grupoPublicId)
+                .orElseThrow(() -> new RuntimeException("chatGrupo nao encontrado"));
+        return grupo.getUsuarios().stream().map(Usuario::getPublicId).collect(Collectors.toList());
+    }
 
     public MensagemInterna recieveRequest(MensagemInternoDto mensagem){
         MensagemInterna savedMessage;

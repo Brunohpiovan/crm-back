@@ -3,6 +3,7 @@ package com.juridiqsystem.crm.service;
 import com.juridiqsystem.crm.infra.security.TenantContext;
 import com.juridiqsystem.crm.model.*;
 import com.juridiqsystem.crm.model.dtos.MensagemResponseDTO;
+import com.juridiqsystem.crm.model.dtos.NovaMensagemNotificacaoDTO;
 import com.juridiqsystem.crm.model.dtos.UsuarioContatoDto;
 import com.juridiqsystem.crm.model.enums.StatusProtocolo;
 import com.juridiqsystem.crm.model.enums.TipoParticipante;
@@ -353,11 +354,28 @@ public class WhatsAppService {
             List<Mensagem> savedMessage = mensagemService.sendMessage(protocolo, participante, body, media);
             savedMessage.forEach(mensagemNew ->
                     publicarNoWebSocket("/topic/empresa/" + empresaId + "/messages/" + protocolo.getPublicId(), new MensagemResponseDTO(mensagemNew)));
+
+            // Notifica o admin responsável pelo protocolo mesmo que ele não esteja com essa
+            // conversa aberta (ou nem esteja na tela de Chat) — o frontend mantém uma conexão
+            // WebSocket global assinando esse tópico pra tocar o som de notificação em qualquer
+            // página. protocolo.getAdmin() vem via JOIN FETCH em findByCelularAndStatus, então é
+            // seguro acessar aqui sem risco de LazyInitializationException.
+            NovaMensagemNotificacaoDTO notificacao = new NovaMensagemNotificacaoDTO(
+                    protocolo.getPublicId(), participante.getPublicId(), participante.getNome(), buildPreview(body, media));
+            publicarNoWebSocket("/topic/empresa/" + empresaId + "/notificacoes/" + protocolo.getAdmin().getPublicId(), notificacao);
         } else {
             List<Mensagem> savedMessages = mensagemService.sendMessagePublico(participante, body, media);
             savedMessages.forEach(mensagemNew ->
                     publicarNoWebSocket("/topic/empresa/" + empresaId + "/messages/public", new MensagemResponseDTO(mensagemNew)));
         }
+    }
+
+    private String buildPreview(String body, String media) {
+        if (body != null && !body.isBlank()) {
+            String trimmed = body.trim();
+            return trimmed.length() > 80 ? trimmed.substring(0, 80) + "…" : trimmed;
+        }
+        return media != null ? "Enviou um anexo" : "Nova mensagem";
     }
 
     private void publicarNoWebSocket(String destino, Object payload) {
