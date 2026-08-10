@@ -9,8 +9,10 @@ import com.juridiqsystem.crm.repository.OportunidadeRepository;
 import com.juridiqsystem.crm.repository.ParticipanteRepository;
 import com.juridiqsystem.crm.repository.ProtocoloRepository;
 import com.juridiqsystem.crm.repository.WhatsappWebhookEventoRepository;
+import com.juridiqsystem.crm.service.auth.SlidingWindowRateLimiter;
 import com.juridiqsystem.crm.service.exceptions.AccessDeniedException;
 import com.juridiqsystem.crm.service.exceptions.IntegrationException;
+import com.juridiqsystem.crm.service.exceptions.TooManyRequestsException;
 import com.twilio.exception.ApiConnectionException;
 import com.twilio.http.TwilioRestClient;
 import com.twilio.rest.api.v2010.account.Message;
@@ -26,6 +28,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
@@ -33,6 +36,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
@@ -77,6 +81,14 @@ public class WhatsAppService {
     @Autowired
     private TwilioRestClient twilioRestClient;
 
+    @Autowired
+    private SlidingWindowRateLimiter rateLimiter;
+
+    // Cada mensagem custa dinheiro (Twilio cobra por envio) e uma conta comprometida poderia
+    // usar isso pra enviar spam em massa via WhatsApp — limite por usuário autenticado.
+    private static final int MAX_MESSAGES_PER_WINDOW = 30;
+    private static final Duration RATE_LIMIT_WINDOW = Duration.ofMinutes(1);
+
     /**
      * Retry só em falha de conectividade (ApiConnectionException) — não em ApiException, que
      * representa uma resposta de erro válida da Twilio (ex.: número inválido) e não se resolveria
@@ -84,6 +96,11 @@ public class WhatsAppService {
      */
     @Retryable(retryFor = ApiConnectionException.class, maxAttempts = 3, backoff = @Backoff(delay = 500, multiplier = 2))
     public Message sendWhatsAppMessage(MensagemRequest mensagemRequest) {
+        String actor = SecurityContextHolder.getContext().getAuthentication().getName();
+        if (!rateLimiter.tryAcquire("whatsapp-send:" + actor, MAX_MESSAGES_PER_WINDOW, RATE_LIMIT_WINDOW)) {
+            throw new TooManyRequestsException("Muitas mensagens enviadas em um curto intervalo. Tente novamente em instantes.");
+        }
+
         String to = mensagemRequest.getTo();
         String media = mensagemRequest.getMedia();
 

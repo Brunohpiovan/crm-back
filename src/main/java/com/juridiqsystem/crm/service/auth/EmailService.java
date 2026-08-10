@@ -5,6 +5,7 @@ import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.EmailRequestDTO;
 import com.juridiqsystem.crm.repository.EmailRepository;
 import com.juridiqsystem.crm.repository.UsuarioRepository;
+import com.juridiqsystem.crm.service.exceptions.TooManyRequestsException;
 import com.resend.Resend;
 import com.resend.core.exception.ResendException;
 import com.resend.services.emails.model.Attachment;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -24,6 +26,12 @@ import java.util.List;
 
 @Service
 public class EmailService {
+
+    // Envio de e-mail avulso custa dinheiro (Resend cobra por envio) e pode ser abusado por uma
+    // conta comprometida pra disparar spam em massa — limite por remetente, não por IP (endpoint
+    // autenticado, várias pessoas podem legitimamente usar o mesmo IP de escritório).
+    private static final int MAX_EMAILS_PER_WINDOW = 20;
+    private static final Duration RATE_LIMIT_WINDOW = Duration.ofMinutes(1);
 
     @Autowired
     private Resend resend;
@@ -36,6 +44,9 @@ public class EmailService {
 
     @Autowired
     private EmailRepository emailRepository;
+
+    @Autowired
+    private SlidingWindowRateLimiter rateLimiter;
 
     /**
      * Único efeito colateral deste método é o envio em si (sem persistência), então é seguro
@@ -56,6 +67,10 @@ public class EmailService {
     }
 
     public void enviarEmail(EmailRequestDTO email) throws ResendException {
+        if (!rateLimiter.tryAcquire("email-enviar:" + email.getId_remetente(), MAX_EMAILS_PER_WINDOW, RATE_LIMIT_WINDOW)) {
+            throw new TooManyRequestsException("Muitos e-mails enviados em um curto intervalo. Tente novamente em instantes.");
+        }
+
         Usuario remetente = usuarioRepository.findByPublicId(email.getId_remetente())
                 .orElseThrow(() -> new RuntimeException("Remetente não encontrado"));
 

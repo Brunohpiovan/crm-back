@@ -3,6 +3,8 @@ package com.juridiqsystem.crm.controller;
 import com.juridiqsystem.crm.service.AudioConvertor;
 import com.juridiqsystem.crm.service.MediaService;
 import com.juridiqsystem.crm.service.S3Service;
+import com.juridiqsystem.crm.service.auth.SlidingWindowRateLimiter;
+import com.juridiqsystem.crm.service.exceptions.TooManyRequestsException;
 import io.jsonwebtoken.io.IOException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -15,6 +17,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -23,6 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.nio.file.Files;
+import java.time.Duration;
 import java.util.Collections;
 
 import org.springframework.web.multipart.MultipartFile;
@@ -34,6 +38,12 @@ import org.springframework.mock.web.MockMultipartFile;
 @RequestMapping("/api")
 public class MediaController {
 
+    // Upload custa armazenamento/banda (S3) e é um vetor clássico de abuso (encher o bucket,
+    // martelar o endpoint) — limite generoso o bastante pra não atrapalhar uso normal (anexar
+    // um arquivo em um template, mandar um áudio no chat), mas que barra automação/abuso.
+    private static final int MAX_UPLOADS_PER_WINDOW = 30;
+    private static final Duration RATE_LIMIT_WINDOW = Duration.ofMinutes(1);
+
     @Autowired
     private S3Service s3Service;
 
@@ -42,6 +52,16 @@ public class MediaController {
 
     @Autowired
     private AudioConvertor audioConvertor;
+
+    @Autowired
+    private SlidingWindowRateLimiter rateLimiter;
+
+    private void checkRateLimit(String namespace) {
+        String actor = SecurityContextHolder.getContext().getAuthentication().getName();
+        if (!rateLimiter.tryAcquire(namespace + ":" + actor, MAX_UPLOADS_PER_WINDOW, RATE_LIMIT_WINDOW)) {
+            throw new TooManyRequestsException("Muitos uploads em um curto intervalo. Tente novamente em instantes.");
+        }
+    }
 
     @Operation(
             summary = "Upload de áudio",
@@ -63,6 +83,7 @@ public class MediaController {
     public ResponseEntity<?> uploadAudio(
             @Parameter(description = "Arquivo de áudio a ser convertido e armazenado (multipart)", required = true)
             @RequestParam("file") MultipartFile file) throws Exception {
+        checkRateLimit("upload-audio");
         String fileUrl = audioConvertor.convertAndUpload(file);
         return ResponseEntity.ok(Collections.singletonMap("url", fileUrl));
     }
@@ -70,22 +91,24 @@ public class MediaController {
     @Operation(
             summary = "Upload de anexo genérico",
             description = """
-                    Recebe um arquivo qualquer (imagem, documento — pdf/docx/doc/txt — ou csv) e envia \
-                    para o S3, em uma subpasta escolhida conforme a extensão (`imagem/` ou `documentos/`); \
-                    outras extensões são enviadas na raiz. Limite de tamanho de 50MB (rejeitado com erro \
-                    de negócio antes mesmo do upload ao S3). Retorna um JSON `{"url": "..."}` com a URL \
-                    pública do arquivo no S3.
+                    Recebe uma imagem (jpg/jpeg/png/gif), documento (pdf/doc/docx/odt/xls/xlsx/ppt/pptx/txt) \
+                    ou csv e envia \
+                    para o S3, em uma subpasta escolhida conforme a extensão (`imagem/` ou `documentos/`). \
+                    Extensões fora dessa lista são rejeitadas. Para imagens, o conteúdo real do arquivo \
+                    (assinatura de bytes) também é conferido — não basta a extensão do nome. Limite de \
+                    tamanho de 50MB. Retorna um JSON `{"url": "..."}` com a URL pública do arquivo no S3.
                     """
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Arquivo enviado com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Arquivo excede o limite de 50MB",
+            @ApiResponse(responseCode = "400", description = "Arquivo excede o limite de 50MB, extensão não permitida, ou conteúdo não corresponde a uma imagem válida",
                     content = @Content(schema = @Schema(implementation = com.juridiqsystem.crm.model.dtos.ApiResponse.class)))
     })
     @PostMapping("/anexo/upload")
     public ResponseEntity<?> uploadAnexo(
             @Parameter(description = "Arquivo a ser armazenado no S3 (multipart, limite de 50MB)", required = true)
             @RequestParam("file") MultipartFile file) {
+        checkRateLimit("upload-anexo");
         String fileUrl = mediaService.uploadAnexo(file);
         return ResponseEntity.ok(Collections.singletonMap("url", fileUrl));
     }
