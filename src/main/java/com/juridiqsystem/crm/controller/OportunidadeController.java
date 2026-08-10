@@ -24,8 +24,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
-
 @Tag(name = "Oportunidade", description = "Oportunidades de venda (cards do funil): CRUD com upload opcional de anexo (multipart) e movimentação entre etapas/funis. A maioria das operações de escrita publica o novo estado em tópicos WebSocket para atualização em tempo real de outros clientes conectados.")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
@@ -65,17 +63,15 @@ public class OportunidadeController {
         return ResponseEntity.ok(oportunidadeService.findByClienteAndCriadorNull(id));
     }
 
-    @Operation(summary = "Histórico de eventos de uma oportunidade",
-            description = "Requer JWT. Retorna a lista de eventos (criação, edição, movimentação entre etapas, envio para lixeira, restauração) registrados para a oportunidade, do mais recente para o mais antigo. Exibido no frontend como \"Detalhes da oportunidade\" no modal de edição.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Lista de eventos do histórico",
-                    content = @Content(array = @io.swagger.v3.oas.annotations.media.ArraySchema(schema = @Schema(implementation = OportunidadeHistoricoDTO.class)))),
-            @ApiResponse(responseCode = "400", description = "Oportunidade não encontrada para o id informado (resposta em JSON estruturado — StandardError)",
-                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Oportunidade com id 1 nao encontrada")))
-    })
+    @Operation(summary = "Histórico de eventos de uma oportunidade (paginado)",
+            description = "Requer JWT. Retorna, paginados, os eventos (criação, edição, movimentação entre etapas, envio para lixeira, restauração) registrados para a oportunidade, do mais recente para o mais antigo. Exibido no frontend como \"Detalhes da oportunidade\" no modal de edição, com botão \"Carregar mais\" para as páginas seguintes. Tamanho de página padrão: 10.")
+    @ApiResponse(responseCode = "200", description = "Página de eventos do histórico",
+            content = @Content(schema = @Schema(implementation = OportunidadeHistoricoDTO.class)))
     @GetMapping(value = "/{id}/historico")
-    public ResponseEntity<List<OportunidadeHistoricoDTO>> getHistorico(@Parameter(description = "Id da oportunidade", required = true) @PathVariable String id) {
-        return ResponseEntity.ok(oportunidadeService.getHistorico(id));
+    public Page<OportunidadeHistoricoDTO> getHistorico(
+            @Parameter(description = "Id da oportunidade", required = true) @PathVariable String id,
+            @Parameter(description = "Parâmetros de paginação (page, size)") @PageableDefault(size = 10) Pageable pageable) {
+        return oportunidadeService.getHistorico(id, pageable);
     }
 
     @Operation(summary = "Criar uma nova oportunidade",

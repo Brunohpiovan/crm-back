@@ -477,12 +477,11 @@ public class OportunidadeService {
         return "Cadência automática";
     }
 
-    public List<OportunidadeHistoricoDTO> getHistorico(String oportunidadeId) {
+    public Page<OportunidadeHistoricoDTO> getHistorico(String oportunidadeId, Pageable pageable) {
         Oportunidade oportunidade = oportunidadeRepository.findByPublicId(oportunidadeId)
                 .orElseThrow(() -> new RuntimeException("Oportunidade com id " + oportunidadeId + " nao encontrada"));
-        return oportunidadeHistoricoRepository.findByOportunidadeIdOrderByCriadoEmDesc(oportunidade.getId()).stream()
-                .map(OportunidadeHistoricoDTO::new)
-                .collect(Collectors.toList());
+        return oportunidadeHistoricoRepository.findByOportunidadeIdOrderByCriadoEmDesc(oportunidade.getId(), pageable)
+                .map(OportunidadeHistoricoDTO::new);
     }
 
     private void afterCommit(Runnable action) {
