@@ -7,6 +7,7 @@ import com.juridiqsystem.crm.model.dtos.AcessoResponseDto;
 import com.juridiqsystem.crm.model.dtos.UsuarioLogDto;
 import com.juridiqsystem.crm.repository.AcessoRepository;
 import com.juridiqsystem.crm.repository.UsuarioRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -71,14 +72,25 @@ public class AcessoService {
         return savedLog.getPublicId();
     }
 
+    /**
+     * @Transactional pra manter a mesma sessão do Hibernate durante o método inteiro — sem isso
+     * (open-in-view=false), o lazy-load de log.getUsuario() abaixo lançaria
+     * LazyInitializationException, já que a query que buscou o Acesso já teria fechado a sessão.
+     */
+    @Transactional
     public void updateExitTime(String id) {
         Acesso log = acessoRepository.findByPublicId(id).orElseThrow(() -> new RuntimeException("Log não encontrado"));
-        if(log.getData_saida()==null){
-            log.setData_saida(LocalDateTime.now());
-        }else {
+        if (log.getData_saida() != null) {
             return;
         }
+        log.setData_saida(LocalDateTime.now());
         acessoRepository.save(log);
+
+        // Revoga qualquer JWT emitido antes deste logout (ver SecurityFilter/TokenService) —
+        // sem isso, o token continuaria válido até a expiração natural (12h) mesmo depois de sair.
+        Usuario usuario = log.getUsuario();
+        usuario.setSessaoVersao(usuario.getSessaoVersao() + 1);
+        usuarioRepository.save(usuario);
     }
 
 

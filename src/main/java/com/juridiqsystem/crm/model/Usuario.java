@@ -81,6 +81,15 @@ public class Usuario implements UserDetails {
     @JsonIgnore
     private String senha;
 
+    /**
+     * Incrementado no logout e na troca de senha; embutido como claim no JWT (ver TokenService) e
+     * conferido a cada requisição autenticada (ver SecurityFilter). Um token com versão diferente
+     * da atual do usuário é tratado como inválido — é assim que logout/troca de senha revogam
+     * sessões que, de outra forma, continuariam válidas até a expiração natural do token (12h).
+     */
+    @Column(name = "sessao_versao", nullable = false)
+    private Integer sessaoVersao = 0;
+
     @NotBlank(message = "Informe um rg")
     @Column(name = "rg",nullable = false)
     @Size(max = 12, message = "O rg deve ter no maximo 12 caracteres")

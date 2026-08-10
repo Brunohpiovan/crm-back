@@ -2,6 +2,8 @@ package com.juridiqsystem.crm.service;
 
 import com.juridiqsystem.crm.infra.security.TenantContext;
 import com.juridiqsystem.crm.infra.security.TokenService;
+import com.juridiqsystem.crm.infra.security.logging.SecurityEventType;
+import com.juridiqsystem.crm.infra.security.logging.SecurityLogger;
 import com.juridiqsystem.crm.model.Participante;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.*;
@@ -48,6 +50,12 @@ public class UsuarioService {
     @Autowired
     private ParticipanteService participanteService;
 
+    @Autowired
+    private SecurityLogger securityLogger;
+
+    @Autowired
+    private ImageContentValidator imageContentValidator;
+
     public UsuarioResponseNoAuthDto findByIdParaEdicao(String publicId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String authenticatedUsername = authentication.getName();
@@ -58,6 +66,9 @@ public class UsuarioService {
                 new UsernameNotFoundException("Usuário não encontrado"));
 
         if (!isAdmin && !usuario.getLogin().equals(authenticatedUsername)) {
+            securityLogger.log(SecurityEventType.RESOURCE_ACCESS_DENIED,
+                    "Tentativa de acessar cadastro de outro usuário para edição: alvo=" + usuario.getLogin(),
+                    authenticatedUsername, null, "/usuario/" + publicId + "/edicao");
             throw new AccessDeniedException("Você não tem permissão para acessar este usuário.");
         }
 
@@ -99,6 +110,9 @@ public class UsuarioService {
                 new UsernameNotFoundException("Usuário não encontrado"));
 
         if (!isAdmin && !usuario.getLogin().equals(authenticatedUsername)) {
+            securityLogger.log(SecurityEventType.RESOURCE_ACCESS_DENIED,
+                    "Tentativa de acessar cadastro de outro usuário: alvo=" + usuario.getLogin(),
+                    authenticatedUsername, null, "/usuario/" + publicId);
             throw new AccessDeniedException("Você não tem permissão para acessar este usuário.");
         }
 
@@ -111,6 +125,7 @@ public class UsuarioService {
         Usuario usuario = new Usuario(dto);
         String key = "user-avatar/" + dto.getNome().replaceAll("\\s+", "") + "pic";
         if (foto != null) {
+            imageContentValidator.validar(foto);
             String url = s3Service.uploadFile(foto, key);
             usuario.setUrlPicture(url);
         }
@@ -166,7 +181,7 @@ public class UsuarioService {
      * completos e sincroniza um Participante que o master não possui). Não mexe em nenhum
      * outro campo do cadastro.
      */
-    public void alterarSenhaPropria(AlterarSenhaDTO dto) {
+    public LoginResponseDTO alterarSenhaPropria(AlterarSenhaDTO dto) {
         if (!dto.getNovaSenha().equals(dto.getNovaSenha2())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "As senhas não coincidem");
         }
@@ -180,8 +195,17 @@ public class UsuarioService {
         }
 
         usuario.setSenha(encoder.encode(dto.getNovaSenha()));
+        usuario.setSessaoVersao(usuario.getSessaoVersao() + 1);
         usuario.setAtualizadoEm(LocalDateTime.now());
         usuarioRepository.save(usuario);
+
+        securityLogger.log(SecurityEventType.PASSWORD_CHANGED, null, usuario.getLogin(), null, "/usuario/senha");
+
+        // sessaoVersao mudou (linha acima), então o token da requisição atual acabou de virar
+        // inválido pro próprio SecurityFilter — sem devolver um novo aqui, o usuário seria
+        // deslogado no ato de trocar a própria senha.
+        String novoToken = tokenService.generateToken(usuario);
+        return new LoginResponseDTO(novoToken, null);
     }
 
     public LoginResponseDTO update(String publicId, UsuarioSelfUpdateDTO dto, MultipartFile foto) {
@@ -191,6 +215,9 @@ public class UsuarioService {
         Usuario usuarioDoBanco = buscarUsuarioPorPublicId(publicId);
 
         if (!usuarioDoBanco.getLogin().equals(authenticatedUsername)) {
+            securityLogger.log(SecurityEventType.RESOURCE_ACCESS_DENIED,
+                    "Tentativa de editar cadastro de outro usuário: alvo=" + usuarioDoBanco.getLogin(),
+                    authenticatedUsername, null, "/usuario/" + publicId);
             throw new AccessDeniedException("Você não tem permissão para alterar este usuário.");
         }
 
@@ -208,6 +235,11 @@ public class UsuarioService {
         usuarioDoBanco.setCargo(dto.getCargo());
         usuarioDoBanco.setBloqueado(dto.getBloqueado());
         usuarioRepository.save(usuarioDoBanco);
+
+        securityLogger.log(SecurityEventType.ADMIN_ACTION,
+                "Atualização administrativa de usuário-alvo=" + usuarioDoBanco.getLogin()
+                        + "; cargo=" + dto.getCargo() + "; bloqueado=" + dto.getBloqueado(),
+                currentActorLogin(), null, "/usuario/all/" + publicId);
 
         return new UsuarioAllDTO(usuarioDoBanco);
     }
@@ -255,6 +287,7 @@ public class UsuarioService {
             deleteOldPhoto(usuarioDoBanco);
         }
         if (foto != null) {
+            imageContentValidator.validar(foto);
             String key = generatePhotoKey(dto.getNome());
             return s3Service.uploadFile(foto, key);
         }
@@ -282,6 +315,18 @@ public class UsuarioService {
         usuarioDoBanco.setBloqueado(true);
         usuarioDoBanco.setAtualizadoEm(LocalDateTime.now());
         usuarioRepository.save(usuarioDoBanco);
+
+        securityLogger.log(SecurityEventType.ADMIN_ACTION, "Usuário inativado (bloqueado)=" + usuarioDoBanco.getLogin(),
+                currentActorLogin(), null, "/usuario/" + publicId);
+    }
+
+    /**
+     * Login de quem está fazendo a chamada, pra registrar nos eventos ADMIN_ACTION quem executou
+     * a ação administrativa (diferente do usuário-alvo, que pode ser outra pessoa).
+     */
+    private String currentActorLogin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null ? authentication.getName() : null;
     }
 
     private void sincronizarParticipante(Usuario usuario, String loginAntigo) {
@@ -313,6 +358,11 @@ public class UsuarioService {
         usuario.setLogin(dto.getLogin().toLowerCase());
         if (dto.getSenha() != null && !dto.getSenha().isEmpty()) {
             usuario.setSenha(encoder.encode(dto.getSenha()));
+            // Revoga sessões antigas desse usuário (ver SecurityFilter). Em self-update (PUT
+            // /usuario/{id}) o chamador é o próprio usuário e ganha um token novo logo depois,
+            // no fim de update(); em admin-update (PUT /usuario/all/{id}) quem muda é um admin
+            // trocando a senha de outra pessoa, então só a sessão do usuário-alvo é revogada.
+            usuario.setSessaoVersao(usuario.getSessaoVersao() + 1);
         }
         usuario.setRg(dto.getRg());
         usuario.setCpf(dto.getCpf());

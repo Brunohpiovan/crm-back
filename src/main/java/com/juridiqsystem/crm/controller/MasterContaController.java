@@ -1,6 +1,7 @@
 package com.juridiqsystem.crm.controller;
 
 import com.juridiqsystem.crm.model.dtos.AlterarSenhaDTO;
+import com.juridiqsystem.crm.model.dtos.LoginResponseDTO;
 import com.juridiqsystem.crm.service.UsuarioService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -25,15 +26,14 @@ public class MasterContaController {
 
     @Operation(
             summary = "Trocar a própria senha",
-            description = "Requer JWT com cargo ROLE_MASTER. Exige a senha atual; não altera nenhum outro dado do cadastro."
+            description = "Requer JWT com cargo ROLE_MASTER. Exige a senha atual; não altera nenhum outro dado do cadastro. Invalida o token atual (a troca de senha revoga sessões antigas) e retorna um novo token JWT já válido."
     )
     @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Senha alterada com sucesso"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Senha alterada com sucesso; retorna novo token JWT"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Senha atual incorreta, ou nova senha e confirmação não coincidem")
     })
     @PutMapping("/senha")
-    public ResponseEntity<?> alterarSenha(@RequestBody @Valid AlterarSenhaDTO dto) {
-        usuarioService.alterarSenhaPropria(dto);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<LoginResponseDTO> alterarSenha(@RequestBody @Valid AlterarSenhaDTO dto) {
+        return ResponseEntity.ok(usuarioService.alterarSenhaPropria(dto));
     }
 }

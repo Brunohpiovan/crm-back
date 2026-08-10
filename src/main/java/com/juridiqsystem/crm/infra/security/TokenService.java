@@ -38,6 +38,7 @@ public class TokenService {
                     .withClaim("empresaId", user.getEmpresaId())
                     .withClaim("nome",user.getNome())
                     .withClaim("roles", String.valueOf(user.getCargo()))
+                    .withClaim("sessionVersion", user.getSessaoVersao())
                     .withExpiresAt(generateExpirationDate())
                     .sign(algorithm);
             return token;
