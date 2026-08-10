@@ -44,8 +44,8 @@ public class MensagemInternaController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Página de mensagens do grupo",
                     content = @Content(array = @ArraySchema(schema = @Schema(implementation = MensagemInternaResponseDTO.class)))),
-            @ApiResponse(responseCode = "400", description = "Grupo não encontrado, usuário autenticado não encontrado, ou usuário não é participante do grupo (resposta em texto puro, não JSON estruturado; mensagem varia conforme a causa, ex.: \"Grupo não encontrado\", \"Admin não encontrado\" ou \"Usuário não autorizado a acessar este protocolo.\")",
-                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Usuário não autorizado a acessar este protocolo.")))
+            @ApiResponse(responseCode = "400", description = "Grupo não encontrado, usuário autenticado não encontrado, ou usuário não é participante do grupo. Resposta em JSON estruturado (StandardError); mensagem varia conforme a causa, ex.: \"Grupo não encontrado\", \"Admin não encontrado\" ou \"Usuário não autorizado a acessar este protocolo.\"",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = com.juridiqsystem.crm.service.exceptions.StandardError.class)))
     })
     @GetMapping("/messagesInterna/{grupoId}")
     public List<MensagemInternaResponseDTO> getMessagesLimit(

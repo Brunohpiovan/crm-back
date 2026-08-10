@@ -53,7 +53,7 @@ public class EtapaController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Etapa encontrada",
                     content = @Content(schema = @Schema(implementation = EtapaDto.class))),
-            @ApiResponse(responseCode = "400", description = "Etapa não encontrada para o id informado (resposta em texto puro, não JSON estruturado)",
+            @ApiResponse(responseCode = "400", description = "Etapa não encontrada para o id informado (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Etapa com id 1 não encontrado")))
     })
     @GetMapping(value = "/{id}")
@@ -66,7 +66,7 @@ public class EtapaController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Etapa criada com sucesso",
                     content = @Content(schema = @Schema(implementation = EtapaDto.class))),
-            @ApiResponse(responseCode = "400", description = "Já existe uma etapa com o mesmo nome neste funil, ou o funil informado não foi encontrado (resposta em texto puro, não JSON estruturado)",
+            @ApiResponse(responseCode = "400", description = "Já existe uma etapa com o mesmo nome neste funil, ou o funil informado não foi encontrado (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Já existe um etapa com o mesmo nome neste funil.")))
     })
     @PostMapping
@@ -78,7 +78,7 @@ public class EtapaController {
     @Operation(summary = "Atualizar uma etapa", description = "Requer JWT com cargo ROLE_ADMIN. Atualiza o nome (e, opcionalmente, o funil) de uma etapa existente. Não é permitido renomear para um nome já usado por outra etapa do mesmo funil. Após a atualização, o backend publica a etapa atualizada no canal WebSocket /topic/updateEtapa.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Etapa atualizada com sucesso (resposta sem corpo)"),
-            @ApiResponse(responseCode = "400", description = "Etapa/funil não encontrado, ou já existe outra etapa com o mesmo nome neste funil (resposta em texto puro, não JSON estruturado)",
+            @ApiResponse(responseCode = "400", description = "Etapa/funil não encontrado, ou já existe outra etapa com o mesmo nome neste funil (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Etapa com id 1 nao encontrada")))
     })
     @PutMapping(value = "/{id}")
@@ -90,7 +90,7 @@ public class EtapaController {
     @Operation(summary = "Excluir uma etapa", description = "Requer JWT com cargo ROLE_ADMIN. Remove a etapa somente se ela não tiver oportunidades (mova ou envie para a lixeira antes). Após a exclusão, o backend publica o id da etapa removida no canal WebSocket /topic/deleteetapa.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Etapa excluída com sucesso (resposta sem corpo)"),
-            @ApiResponse(responseCode = "400", description = "Etapa não encontrada para o id informado (resposta em texto puro, não JSON estruturado)",
+            @ApiResponse(responseCode = "400", description = "Etapa não encontrada para o id informado (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Etapa com id 1 nao encontrada"))),
             @ApiResponse(responseCode = "409", description = "Etapa possui oportunidades e não pode ser excluída")
     })

@@ -46,7 +46,7 @@ public class CadenciaFunilController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Cadência encontrada",
                     content = @Content(schema = @Schema(implementation = CadenciaFunilDto.class))),
-            @ApiResponse(responseCode = "400", description = "Cadência não encontrada para o id informado (resposta em texto puro, não JSON estruturado)",
+            @ApiResponse(responseCode = "400", description = "Cadência não encontrada para o id informado (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Cadencia de Funil nao encontrada")))
     })
     @GetMapping(value = "/{id}")
@@ -58,7 +58,7 @@ public class CadenciaFunilController {
             description = "Requer JWT. Cadastra uma regra que, quando ativa (`situacao = ATIVA`), move automaticamente oportunidades da etapa/funil de origem para a etapa/funil de destino após permanecerem `diasNaEtapa` dias na etapa de origem, no horário `horarioMovimentacao` (execução por um scheduler que roda em segundo plano).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Cadência criada com sucesso (resposta sem corpo)"),
-            @ApiResponse(responseCode = "400", description = "Funil ou etapa de origem/destino informado não encontrado (resposta em texto puro, não JSON estruturado; este endpoint não usa @Valid, então não há erro de validação em formato de mapa)",
+            @ApiResponse(responseCode = "400", description = "Funil ou etapa de origem/destino informado não encontrado (resposta em JSON estruturado — StandardError; este endpoint não usa @Valid, então não há erro de validação em formato de mapa)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil de origem nao encontrado")))
     })
     @PostMapping
@@ -71,7 +71,7 @@ public class CadenciaFunilController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Cadência apagada com sucesso",
                     content = @Content(schema = @Schema(type = "object", example = "{\"message\": \"Cadencia apagada com sucesso\"}"))),
-            @ApiResponse(responseCode = "400", description = "Cadência não encontrada para o id informado (resposta em texto puro, não JSON estruturado). Observação: a mensagem lançada pelo serviço, por um erro de copiar/colar no código-fonte, é \"Tag nao encontrada\" mesmo sendo uma cadência de funil.",
+            @ApiResponse(responseCode = "400", description = "Cadência não encontrada para o id informado (resposta em JSON estruturado — StandardError). Observação: a mensagem lançada pelo serviço, por um erro de copiar/colar no código-fonte, é \"Tag nao encontrada\" mesmo sendo uma cadência de funil.",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Tag nao encontrada")))
     })
     @DeleteMapping(value = "/{id}")
@@ -85,13 +85,11 @@ public class CadenciaFunilController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Cadência atualizada com sucesso (resposta sem corpo)"),
             @ApiResponse(responseCode = "400",
-                    description = "Duas causas possíveis, com formatos de corpo diferentes: (1) erro de validação Bean Validation dos campos do corpo da requisição (mapa simples campo -> mensagem); ou (2) cadência/funil/etapa de origem ou destino não encontrado (resposta em texto puro). " +
-                            "Observação sobre a causa (2): o serviço lança a condição de \"cadência não encontrada\" como um erro HTTP 404 (ResponseStatusException(HttpStatus.NOT_FOUND, ...)), mas o " +
-                            "@RestControllerAdvice global desta aplicação (ResourceExceptionHandler) tem um @ExceptionHandler(RuntimeException.class) que intercepta qualquer RuntimeException sem handler mais específico — e como ResponseStatusException é uma RuntimeException, esse handler genérico a captura antes que o status 404 pretendido seja aplicado. Na prática a resposta observada é sempre 400, em texto puro (o corpo é o retorno de ex.getMessage(), por exemplo \"404 NOT_FOUND \\\"Cadencia de Funil não encontrada\\\"\" para o caso de não encontrado, ou a mensagem simples \"Funil de origem nao encontrado\" para os outros casos), nunca 404 e nunca um StandardError.",
-                    content = {
-                            @Content(mediaType = "application/json", schema = @Schema(type = "object", example = "{\"campo\": \"mensagem de erro\"}")),
-                            @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil de origem nao encontrado"))
-                    })
+                    description = "Erro de validação Bean Validation dos campos do corpo da requisição (mapa simples campo -> mensagem).",
+                    content = @Content(mediaType = "application/json", schema = @Schema(type = "object", example = "{\"campo\": \"mensagem de erro\"}"))),
+            @ApiResponse(responseCode = "404",
+                    description = "Cadência, funil ou etapa de origem/destino não encontrado. O serviço lança ResponseStatusException(HttpStatus.NOT_FOUND, ...), tratado por um handler dedicado no ResourceExceptionHandler que preserva o status real e responde em JSON estruturado (StandardError).",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = com.juridiqsystem.crm.service.exceptions.StandardError.class)))
     })
     @PutMapping(value = "/{id}")
     public ResponseEntity<?> update(@Parameter(description = "Id da cadência de funil", required = true) @PathVariable String id, @RequestBody @Valid CadenciaFunilRequestDto cadenciaFunil) {

@@ -41,9 +41,10 @@ public class AuthenticationController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Autenticado com sucesso",
                     content = @Content(schema = @Schema(implementation = LoginResponseDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Login ou senha inválidos. Resposta em **texto puro** (não é um JSON estruturado) — " +
-                    "corpo é diretamente a mensagem de erro, ex.: \"Bad credentials\".",
-                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Bad credentials"))),
+            @ApiResponse(responseCode = "400", description = "Login ou senha inválidos.",
+                    content = @Content(schema = @Schema(implementation = com.juridiqsystem.crm.service.exceptions.StandardError.class))),
+            @ApiResponse(responseCode = "429", description = "Muitas tentativas de login para este IP/usuário em um curto intervalo. Tente novamente em instantes.",
+                    content = @Content(schema = @Schema(implementation = com.juridiqsystem.crm.model.dtos.ApiResponse.class))),
             @ApiResponse(responseCode = "403", description = "Usuário bloqueado pelo administrador (campo `bloqueado` do usuário)",
                     content = @Content(schema = @Schema(implementation = com.juridiqsystem.crm.model.dtos.ApiResponse.class)))
     })

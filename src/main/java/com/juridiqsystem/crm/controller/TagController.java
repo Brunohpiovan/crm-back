@@ -51,7 +51,7 @@ public class TagController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Tag encontrada",
                     content = @Content(schema = @Schema(implementation = TagDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Tag não encontrada para o id informado (resposta em texto puro, não JSON estruturado)",
+            @ApiResponse(responseCode = "400", description = "Tag não encontrada para o id informado (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Tag nao encontrada")))
     })
     @GetMapping(value = "/{id}")
@@ -63,12 +63,11 @@ public class TagController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Tag criada com sucesso (resposta sem corpo)"),
             @ApiResponse(responseCode = "400",
-                    description = "Duas causas possíveis, com formatos de corpo diferentes: (1) erro de validação Bean Validation dos campos do corpo da requisição (mapa simples campo -> mensagem); ou (2) já existe uma tag com o mesmo nome (resposta em texto puro). " +
-                            "Observação sobre a causa (2): o serviço lança um ResponseStatusException(HttpStatus.BAD_REQUEST, ...), que é capturado pelo @ExceptionHandler(RuntimeException.class) genérico do ResourceExceptionHandler (pois ResponseStatusException é uma RuntimeException e não há handler mais específico para ela); o corpo retornado é o texto de ex.getMessage(), por exemplo \"400 BAD_REQUEST \\\"Já existe uma tag com este nome.\\\"\", não um StandardError.",
-                    content = {
-                            @Content(mediaType = "application/json", schema = @Schema(type = "object", example = "{\"campo\": \"mensagem de erro\"}")),
-                            @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "400 BAD_REQUEST \"Já existe uma tag com este nome.\""))
-                    })
+                    description = "Erro de validação Bean Validation dos campos do corpo da requisição (mapa simples campo -> mensagem).",
+                    content = @Content(mediaType = "application/json", schema = @Schema(type = "object", example = "{\"campo\": \"mensagem de erro\"}"))),
+            @ApiResponse(responseCode = "409",
+                    description = "Já existe uma tag com o mesmo nome. O serviço lança ResponseStatusException(HttpStatus.BAD_REQUEST, ...), tratado por um handler dedicado no ResourceExceptionHandler que responde em JSON estruturado (StandardError).",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = com.juridiqsystem.crm.service.exceptions.StandardError.class)))
     })
     @PostMapping
     public ResponseEntity<?> create(@Valid @RequestBody TagRequestDTO tag) {
@@ -80,8 +79,8 @@ public class TagController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Tag apagada com sucesso",
                     content = @Content(schema = @Schema(type = "object", example = "{\"message\": \"Tag apagada com sucesso\"}"))),
-            @ApiResponse(responseCode = "400", description = "Tag não encontrada para o id informado (resposta em texto puro, não JSON estruturado)",
-                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Tag nao encontrada")))
+            @ApiResponse(responseCode = "404", description = "Tag não encontrada para o id informado (resposta em JSON estruturado — StandardError)",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = com.juridiqsystem.crm.service.exceptions.StandardError.class)))
     })
     @DeleteMapping(value = "/{id}")
     public ResponseEntity<?> delete(@Parameter(description = "Id da tag", required = true) @PathVariable String id) {
@@ -93,12 +92,14 @@ public class TagController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Tag atualizada com sucesso (resposta sem corpo)"),
             @ApiResponse(responseCode = "400",
-                    description = "Três causas possíveis, com formatos de corpo diferentes: (1) erro de validação Bean Validation dos campos do corpo da requisição (mapa simples campo -> mensagem); (2) tag não encontrada para o id informado; ou (3) já existe outra tag com o mesmo nome (as duas últimas em texto puro). " +
-                            "Observação sobre as causas (2) e (3): o serviço lança ResponseStatusException (HttpStatus.NOT_FOUND para \"não encontrada\", HttpStatus.BAD_REQUEST para \"nome duplicado\"), mas o @ExceptionHandler(RuntimeException.class) genérico do ResourceExceptionHandler intercepta ambas antes de qualquer tratamento específico de status (pois ResponseStatusException é uma RuntimeException e não há handler dedicado para ela) — logo a resposta observada é sempre 400, nunca 404, com o corpo em texto puro igual a ex.getMessage() (ex.: \"404 NOT_FOUND \\\"Tag não encontrada\\\"\" ou \"400 BAD_REQUEST \\\"Já existe uma tag com este nome.\\\"\"), nunca um StandardError.",
-                    content = {
-                            @Content(mediaType = "application/json", schema = @Schema(type = "object", example = "{\"campo\": \"mensagem de erro\"}")),
-                            @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "404 NOT_FOUND \"Tag não encontrada\""))
-                    })
+                    description = "Erro de validação Bean Validation dos campos do corpo da requisição (mapa simples campo -> mensagem).",
+                    content = @Content(mediaType = "application/json", schema = @Schema(type = "object", example = "{\"campo\": \"mensagem de erro\"}"))),
+            @ApiResponse(responseCode = "404",
+                    description = "Tag não encontrada para o id informado. Resposta em JSON estruturado (StandardError).",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = com.juridiqsystem.crm.service.exceptions.StandardError.class))),
+            @ApiResponse(responseCode = "409",
+                    description = "Já existe outra tag com o mesmo nome. Resposta em JSON estruturado (StandardError).",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = com.juridiqsystem.crm.service.exceptions.StandardError.class)))
     })
     @PutMapping(value = "/{id}")
     public ResponseEntity<?> update(@Parameter(description = "Id da tag", required = true) @PathVariable String id, @RequestBody @Valid TagRequestDTO tag) {

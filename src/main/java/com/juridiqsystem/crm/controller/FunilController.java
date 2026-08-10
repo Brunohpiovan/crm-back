@@ -45,7 +45,7 @@ public class FunilController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lista de usuários disponíveis para o funil",
                     content = @Content(array = @ArraySchema(schema = @Schema(implementation = UsuarioContatoDto.class)))),
-            @ApiResponse(responseCode = "400", description = "Funil não encontrado (resposta em texto puro, não JSON estruturado)",
+            @ApiResponse(responseCode = "400", description = "Funil não encontrado (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil não encontrado")))
     })
     @GetMapping("/no-funil/{funilId}")
@@ -59,7 +59,7 @@ public class FunilController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Funil encontrado",
                     content = @Content(schema = @Schema(implementation = FunilDto.class))),
-            @ApiResponse(responseCode = "400", description = "Funil não encontrado para o id informado (resposta em texto puro, não JSON estruturado)",
+            @ApiResponse(responseCode = "400", description = "Funil não encontrado para o id informado (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil com id 1 não encontrado")))
     })
     @GetMapping(value = "/{id}")
@@ -99,7 +99,7 @@ public class FunilController {
             description = "Requer JWT. Associa o usuário (funcionário) informado ao funil informado, liberando o acesso dele a esse pipeline. A operação é idempotente: se o funcionário já pertencer ao funil, nada é alterado.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Funcionário adicionado ao funil com sucesso (resposta sem corpo)"),
-            @ApiResponse(responseCode = "400", description = "Funil ou funcionário não encontrado (resposta em texto puro, não JSON estruturado)",
+            @ApiResponse(responseCode = "400", description = "Funil ou funcionário não encontrado (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil não encontrado")))
     })
     @PostMapping("/add-funcionario/{funilId}/{funcionarioId}")
@@ -113,7 +113,7 @@ public class FunilController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Funil atualizado com sucesso",
                     content = @Content(schema = @Schema(implementation = FunilAllDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Funil não encontrado para o id informado (resposta em texto puro, não JSON estruturado)",
+            @ApiResponse(responseCode = "400", description = "Funil não encontrado para o id informado (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil com id 1 não encontrado")))
     })
     @PutMapping(value = "/{id}")
@@ -125,7 +125,7 @@ public class FunilController {
     @Operation(summary = "Excluir um funil", description = "Requer JWT com cargo ROLE_ADMIN. Remove o funil somente se nenhuma de suas etapas tiver oportunidades (mova ou envie para a lixeira antes).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Funil excluído com sucesso (resposta sem corpo)"),
-            @ApiResponse(responseCode = "400", description = "Funil não encontrado para o id informado (resposta em texto puro, não JSON estruturado)",
+            @ApiResponse(responseCode = "400", description = "Funil não encontrado para o id informado (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil com id 1 não encontrado"))),
             @ApiResponse(responseCode = "409", description = "Funil possui etapas com oportunidades e não pode ser excluído")
     })

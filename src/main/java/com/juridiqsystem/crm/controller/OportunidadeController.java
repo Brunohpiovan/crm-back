@@ -45,7 +45,7 @@ public class OportunidadeController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Oportunidade encontrada",
                     content = @Content(schema = @Schema(implementation = OportunidadeDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Oportunidade não encontrada para o id informado (resposta em texto puro, não JSON estruturado)",
+            @ApiResponse(responseCode = "400", description = "Oportunidade não encontrada para o id informado (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Oportunidade com id 1 nao encontrada")))
     })
     @GetMapping(value = "/{id}")
@@ -68,7 +68,7 @@ public class OportunidadeController {
             @ApiResponse(responseCode = "200", description = "Oportunidade criada com sucesso",
                     content = @Content(schema = @Schema(implementation = OportunidadeDTO.class))),
             @ApiResponse(responseCode = "400",
-                    description = "Duas causas possíveis, com formatos de corpo diferentes: (1) erro de validação Bean Validation dos campos de `oportunidade` (mapa simples campo -> mensagem); ou (2) etapa/criador/tag não encontrado, ou arquivo de anexo inválido — tamanho acima de 100 MB ou tipo de imagem não permitido (resposta em texto puro, pois são RuntimeException genéricas capturadas pelo @ExceptionHandler(RuntimeException.class) do ResourceExceptionHandler, não um StandardError).",
+                    description = "Duas causas possíveis, com formatos de corpo diferentes: (1) erro de validação Bean Validation dos campos de `oportunidade` (mapa simples campo -> mensagem); ou (2) etapa/criador/tag não encontrado, ou arquivo de anexo inválido — tamanho acima de 100 MB ou tipo de imagem não permitido (resposta em JSON estruturado — StandardError, capturado pelo @ExceptionHandler(RuntimeException.class) do ResourceExceptionHandler).",
                     content = {
                             @Content(mediaType = "application/json", schema = @Schema(type = "object", example = "{\"campo\": \"mensagem de erro\"}")),
                             @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Tipo de arquivo não permitido. Envie uma imagem (PNG, JPG, JPEG, WEBP ou GIF)."))
@@ -89,7 +89,7 @@ public class OportunidadeController {
             @ApiResponse(responseCode = "200", description = "Oportunidade atualizada com sucesso",
                     content = @Content(schema = @Schema(implementation = OportunidadeDTO.class))),
             @ApiResponse(responseCode = "400",
-                    description = "Duas causas possíveis, com formatos de corpo diferentes: (1) erro de validação Bean Validation dos campos de `oportunidade` (mapa simples campo -> mensagem); ou (2) oportunidade/etapa/criador/cliente/tag não encontrado, ou arquivo de anexo inválido — tamanho acima de 100 MB ou tipo de imagem não permitido (resposta em texto puro, pois são RuntimeException genéricas capturadas pelo @ExceptionHandler(RuntimeException.class) do ResourceExceptionHandler, não um StandardError).",
+                    description = "Duas causas possíveis, com formatos de corpo diferentes: (1) erro de validação Bean Validation dos campos de `oportunidade` (mapa simples campo -> mensagem); ou (2) oportunidade/etapa/criador/cliente/tag não encontrado, ou arquivo de anexo inválido — tamanho acima de 100 MB ou tipo de imagem não permitido (resposta em JSON estruturado — StandardError, capturado pelo @ExceptionHandler(RuntimeException.class) do ResourceExceptionHandler).",
                     content = {
                             @Content(mediaType = "application/json", schema = @Schema(type = "object", example = "{\"campo\": \"mensagem de erro\"}")),
                             @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Oportunidade com id 1 nao encontrada"))
@@ -110,7 +110,7 @@ public class OportunidadeController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Oportunidade movida com sucesso (resposta sem corpo)"),
             @ApiResponse(responseCode = "400",
-                    description = "Duas causas possíveis, com formatos de corpo diferentes: (1) erro de validação Bean Validation dos campos do corpo da requisição (mapa simples campo -> mensagem); ou (2) oportunidade/etapa não encontrada, ou oportunidade sem etapa definida (resposta em texto puro, pois são RuntimeException genéricas capturadas pelo @ExceptionHandler(RuntimeException.class) do ResourceExceptionHandler, não um StandardError).",
+                    description = "Duas causas possíveis, com formatos de corpo diferentes: (1) erro de validação Bean Validation dos campos do corpo da requisição (mapa simples campo -> mensagem); ou (2) oportunidade/etapa não encontrada, ou oportunidade sem etapa definida (resposta em JSON estruturado — StandardError, capturado pelo @ExceptionHandler(RuntimeException.class) do ResourceExceptionHandler).",
                     content = {
                             @Content(mediaType = "application/json", schema = @Schema(type = "object", example = "{\"campo\": \"mensagem de erro\"}")),
                             @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Oportunidade não encontrada"))
@@ -126,7 +126,7 @@ public class OportunidadeController {
             description = "Requer JWT. Remove a oportunidade e desconta seu valor do total acumulado da etapa em que estava. Após a exclusão, o backend publica o id da oportunidade removida no canal WebSocket /topic/deletedoportunidade, para atualização em tempo real de outros clientes conectados.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Oportunidade excluída com sucesso (resposta sem corpo)"),
-            @ApiResponse(responseCode = "400", description = "Oportunidade não encontrada para o id informado (resposta em texto puro, não JSON estruturado)",
+            @ApiResponse(responseCode = "400", description = "Oportunidade não encontrada para o id informado (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Oportunidade com id 1 nao encontrada")))
     })
     @DeleteMapping(value = "/{id}")
@@ -139,7 +139,7 @@ public class OportunidadeController {
             description = "Requer JWT. Soft delete: marca a oportunidade com situação LIXEIRA e desconta seu valor do total acumulado da etapa em que estava, sem apagar a linha do banco (o board não lista oportunidades LIXEIRA por padrão, então ela some da tela). Após a operação, o backend publica o id da oportunidade no canal WebSocket /topic/deletedoportunidade, para atualização em tempo real de outros clientes conectados.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Oportunidade movida para a lixeira com sucesso (resposta sem corpo)"),
-            @ApiResponse(responseCode = "400", description = "Oportunidade não encontrada para o id informado (resposta em texto puro, não JSON estruturado)",
+            @ApiResponse(responseCode = "400", description = "Oportunidade não encontrada para o id informado (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Oportunidade com id 1 nao encontrada")))
     })
     @PutMapping(value = "/{id}/lixeira")
@@ -152,7 +152,7 @@ public class OportunidadeController {
             description = "Requer JWT. Marca a oportunidade novamente como ABERTO e devolve seu valor ao total acumulado da etapa em que estava. Após a operação, o backend publica a oportunidade no canal WebSocket /topic/newoportunidade, para que volte a aparecer em tempo real no board de outros clientes conectados.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Oportunidade restaurada com sucesso (resposta sem corpo)"),
-            @ApiResponse(responseCode = "400", description = "Oportunidade não encontrada para o id informado (resposta em texto puro, não JSON estruturado)",
+            @ApiResponse(responseCode = "400", description = "Oportunidade não encontrada para o id informado (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Oportunidade com id 1 nao encontrada")))
     })
     @PutMapping(value = "/{id}/restaurar")

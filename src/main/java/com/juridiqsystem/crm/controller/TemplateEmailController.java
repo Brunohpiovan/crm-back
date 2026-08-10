@@ -48,7 +48,7 @@ public class TemplateEmailController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Template encontrado",
                     content = @Content(schema = @Schema(implementation = TemplateEmailIdDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Template não encontrado para o id informado (resposta em texto puro, não JSON estruturado)",
+            @ApiResponse(responseCode = "400", description = "Template não encontrado para o id informado (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Template não encontrada")))
     })
     @GetMapping(value = "/{id}")
@@ -70,7 +70,7 @@ public class TemplateEmailController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Template criado com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Valor de 'situacao' inválido, ou falha no upload de algum anexo para o S3 (resposta em texto puro, não JSON estruturado; mensagem varia conforme a causa, ex.: \"Valor inválido para situação: ...\" ou \"A transferência falhou: ...\")",
+            @ApiResponse(responseCode = "400", description = "Valor de 'situacao' inválido, ou falha no upload de algum anexo para o S3 (resposta em JSON estruturado — StandardError; mensagem varia conforme a causa, ex.: \"Valor inválido para situação: ...\" ou \"A transferência falhou: ...\")",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Valor inválido para situação: Foo")))
     })
     @PostMapping(value = "/create", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -89,7 +89,7 @@ public class TemplateEmailController {
     @Operation(summary = "Excluir template de e-mail", description = "Remove definitivamente o template identificado por `id`. Não remove os anexos já enviados ao S3.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Template apagado com sucesso"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Template não encontrado para o id informado (resposta em texto puro, não JSON estruturado)",
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Template não encontrado para o id informado (resposta em JSON estruturado — StandardError)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Template nao encontrada")))
     })
     @DeleteMapping(value = "/{id}")
@@ -109,7 +109,7 @@ public class TemplateEmailController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Template atualizado com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Template não encontrado, valor de 'situacao' inválido, ou falha no upload/remoção de algum anexo no S3 (resposta em texto puro, não JSON estruturado; mensagem varia conforme a causa, ex.: \"Template não encontrado\", \"Valor inválido para situação: ...\" ou \"Falha na deleção do objeto: ...\")",
+            @ApiResponse(responseCode = "400", description = "Template não encontrado, valor de 'situacao' inválido, ou falha no upload/remoção de algum anexo no S3 (resposta em JSON estruturado — StandardError; mensagem varia conforme a causa, ex.: \"Template não encontrado\", \"Valor inválido para situação: ...\" ou \"Falha na deleção do objeto: ...\")",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Template não encontrado")))
     })
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

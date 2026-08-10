@@ -60,8 +60,8 @@ public class ParticipanteController {
     @Operation(summary = "Buscar participante por id", description = "Requer JWT.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Participante encontrado", content = @Content(schema = @Schema(implementation = ParticipanteDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Participante não encontrado para o id informado (resposta em texto puro, não JSON estruturado — UsernameNotFoundException sem handler dedicado, cai no handler genérico de RuntimeException)",
-                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Participante não encontrado")))
+            @ApiResponse(responseCode = "400", description = "Participante não encontrado para o id informado. Resposta em JSON estruturado (StandardError) — UsernameNotFoundException cai no handler genérico de RuntimeException.",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = StandardError.class)))
     })
     @GetMapping(value = "/{id}")
     public ResponseEntity<?> findById(@Parameter(description = "Id do participante", required = true) @PathVariable String id) {
@@ -84,11 +84,8 @@ public class ParticipanteController {
     @Operation(summary = "Atualizar participante", description = "Requer JWT. Atualiza os dados cadastrais do participante identificado por `id`.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Participante atualizado", content = @Content(schema = @Schema(implementation = ParticipanteDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Três formas possíveis: (1) dados inválidos — JSON de erros de validação por campo; (2) participante não encontrado — texto puro (UsernameNotFoundException, sem handler dedicado); (3) login/CPF em conflito com outro registro — JSON StandardError (org.springframework.dao.DataIntegrityViolationException)",
-                    content = {
-                            @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Participante não encontrado")),
-                            @Content(mediaType = "application/json", schema = @Schema(implementation = StandardError.class))
-                    })
+            @ApiResponse(responseCode = "400", description = "Três causas possíveis, todas em JSON: (1) dados inválidos — mapa simples campo -> mensagem; (2) participante não encontrado — StandardError (UsernameNotFoundException, capturado pelo handler genérico de RuntimeException); (3) login/CPF em conflito com outro registro — StandardError (org.springframework.dao.DataIntegrityViolationException)",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = StandardError.class)))
     })
     @PutMapping(value = "/{id}")
     public ResponseEntity<?> update(@Parameter(description = "Id do participante", required = true) @PathVariable String id, @Parameter(description = "Dados atualizados do participante", required = true) @RequestBody @Valid ParticipanteUpdateRequest participante) {
@@ -99,8 +96,8 @@ public class ParticipanteController {
     @Operation(summary = "Excluir participante", description = "Requer JWT. Exclusão física (hard delete) do participante identificado por `id`.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Participante excluído com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Participante não encontrado para o id informado (resposta em texto puro, não JSON estruturado — UsernameNotFoundException sem handler dedicado)",
-                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Participante não encontrado")))
+            @ApiResponse(responseCode = "400", description = "Participante não encontrado para o id informado. Resposta em JSON estruturado (StandardError).",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = StandardError.class)))
     })
     @DeleteMapping(value = "/{id}")
     public ResponseEntity<?> delete(@Parameter(description = "Id do participante", required = true) @PathVariable String id) {
@@ -111,8 +108,8 @@ public class ParticipanteController {
     @Operation(summary = "Buscar participante por celular", description = "Requer JWT.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Participante encontrado", content = @Content(schema = @Schema(implementation = ParticipanteDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Nenhum participante cadastrado com esse celular (resposta em texto puro, não JSON estruturado — RuntimeException genérica sem handler dedicado)",
-                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Nao existe participante com esse celular cadastrado")))
+            @ApiResponse(responseCode = "400", description = "Nenhum participante cadastrado com esse celular. Resposta em JSON estruturado (StandardError).",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = StandardError.class)))
     })
     @GetMapping(value = "/celular/{celular}")
     public ResponseEntity<?> findByCelular(@Parameter(description = "Número de celular do participante", required = true) @PathVariable String celular) {
@@ -122,8 +119,8 @@ public class ParticipanteController {
     @Operation(summary = "Buscar participante por login", description = "Requer JWT.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Participante encontrado", content = @Content(schema = @Schema(implementation = ParticipanteDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Nenhum participante cadastrado com esse login (resposta em texto puro, não JSON estruturado — RuntimeException genérica sem handler dedicado)",
-                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Nao existe participante com esse login cadastrado")))
+            @ApiResponse(responseCode = "400", description = "Nenhum participante cadastrado com esse login. Resposta em JSON estruturado (StandardError).",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = StandardError.class)))
     })
     @GetMapping(value = "/login/{login}")
     public ResponseEntity<?> findByLogin(@Parameter(description = "Login (e-mail) do participante", required = true) @PathVariable String login) {

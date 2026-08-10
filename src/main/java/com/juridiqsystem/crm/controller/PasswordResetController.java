@@ -33,7 +33,7 @@ public class PasswordResetController {
             content = @Content(schema = @Schema(implementation = ApiResponse.class)))
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Três formatos possíveis dependendo da causa: " +
             "(1) token inválido/expirado ou senhas não coincidem → JSON `{\"message\": \"...\"}` (schema ApiResponse, mostrado abaixo); " +
-            "(2) usuário do token não encontrado (caso raro) → **texto puro** com a mensagem de erro; " +
+            "(2) usuário do token não encontrado (caso raro) → JSON estruturado (StandardError, capturado pelo handler genérico de RuntimeException); " +
             "(3) campos ausentes ou com menos de 8 caracteres (falha de `@Valid`) → mapa simples `{\"campo\": \"mensagem\"}`.",
             content = @Content(schema = @Schema(implementation = ApiResponse.class)))
     @PostMapping("/reset-password")

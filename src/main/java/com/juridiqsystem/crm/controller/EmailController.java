@@ -41,8 +41,10 @@ public class EmailController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "E-mail enviado com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Remetente (id_remetente) não encontrado, ou falha ao anexar algum dos arquivos enviados (resposta em texto puro, não JSON estruturado; mensagem varia conforme a causa, ex.: \"Remetente não encontrado\" ou \"Erro ao anexar arquivo: ...\")",
-                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Remetente não encontrado"))),
+            @ApiResponse(responseCode = "400", description = "Remetente (id_remetente) não encontrado, ou falha ao anexar algum dos arquivos enviados. Resposta em JSON estruturado (StandardError); mensagem varia conforme a causa, ex.: \"Remetente não encontrado\" ou \"Erro ao anexar arquivo: ...\"",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = com.juridiqsystem.crm.service.exceptions.StandardError.class))),
+            @ApiResponse(responseCode = "429", description = "Limite de 20 e-mails/min por remetente excedido.",
+                    content = @Content(schema = @Schema(implementation = com.juridiqsystem.crm.model.dtos.ApiResponse.class))),
             @ApiResponse(responseCode = "500", description = "Falha inesperada ao enviar o e-mail (ex.: erro de comunicação com a API do Resend)")
     })
     @PostMapping(value = "/enviar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
