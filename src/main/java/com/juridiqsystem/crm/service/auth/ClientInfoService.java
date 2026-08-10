@@ -12,12 +12,22 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @Service
 public class ClientInfoService {
 
     private static final int CONNECT_TIMEOUT_MS = 3_000;
     private static final int READ_TIMEOUT_MS = 5_000;
+
+    /**
+     * Charset válido pra IPv4 e IPv6 (dígitos, ponto, dois-pontos), com limite de tamanho. Não é
+     * uma validação RFC completa, mas impede que um header espoofado (X-Forwarded-For etc., que
+     * qualquer cliente pode enviar) injete algo diferente de um endereço — esse valor é usado tanto
+     * na chamada HTTP de geolocalização (GeoLocationService) quanto persistido como o IP "de
+     * verdade" no log de acesso (auditoria de segurança), então precisa ser confiável nos dois usos.
+     */
+    private static final Pattern IP_LIKE = Pattern.compile("^[0-9a-fA-F:.]{1,45}$");
 
     @Value("${api.ip-location.url}")
     private String ipApiUrl;
@@ -26,34 +36,30 @@ public class ClientInfoService {
     private GeoLocationService geoLocationService;
 
     public String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
+        String ip = firstValidHeaderIp(request, "X-Forwarded-For");
+        if (ip == null) ip = firstValidHeaderIp(request, "X-Real-IP");
+        if (ip == null) ip = firstValidHeaderIp(request, "Proxy-Client-IP");
+        if (ip == null) ip = firstValidHeaderIp(request, "WL-Proxy-Client-IP");
 
-        if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
-            return ip.split(",")[0].trim();
+        if (ip == null) {
+            ip = request.getRemoteAddr();
         }
-
-        ip = request.getHeader("X-Real-IP");
-        if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
-            return ip;
-        }
-
-        ip = request.getHeader("Proxy-Client-IP");
-        if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
-            return ip;
-        }
-
-        ip = request.getHeader("WL-Proxy-Client-IP");
-        if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
-            return ip;
-        }
-
-        ip = request.getRemoteAddr();
 
         if ("0:0:0:0:0:0:0:1".equals(ip) || "127.0.0.1".equals(ip) || "0.0.0.0".equals(ip)) {
             ip = getPublicIp();
         }
 
         return ip;
+    }
+
+    private String firstValidHeaderIp(HttpServletRequest request, String headerName) {
+        String headerValue = request.getHeader(headerName);
+        if (headerValue == null || headerValue.isEmpty() || "unknown".equalsIgnoreCase(headerValue)) {
+            return null;
+        }
+        // X-Forwarded-For pode vir como lista "cliente, proxy1, proxy2" — o primeiro é o cliente.
+        String candidate = headerValue.split(",")[0].trim();
+        return IP_LIKE.matcher(candidate).matches() ? candidate : null;
     }
 
     public UserAgent getUserAgent(HttpServletRequest request) {
