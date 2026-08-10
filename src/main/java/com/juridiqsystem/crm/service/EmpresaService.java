@@ -1,5 +1,7 @@
 package com.juridiqsystem.crm.service;
 
+import com.juridiqsystem.crm.infra.security.logging.SecurityEventType;
+import com.juridiqsystem.crm.infra.security.logging.SecurityLogger;
 import com.juridiqsystem.crm.model.Empresa;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.EmpresaCreateDTO;
@@ -38,6 +40,12 @@ public class EmpresaService {
     @Autowired
     private S3Service s3Service;
 
+    @Autowired
+    private ImageContentValidator imageContentValidator;
+
+    @Autowired
+    private SecurityLogger securityLogger;
+
     public Page<EmpresaResponseDTO> findAll(String search, Pageable pageable) {
         String termoBusca = (search == null || search.isBlank())
                 ? null
@@ -63,8 +71,8 @@ public class EmpresaService {
                 .collect(Collectors.toMap(EmpresaUsuarioCountProjection::getEmpresaId, Function.identity()));
     }
 
-    public EmpresaResponseDTO findById(Long id) {
-        return new EmpresaResponseDTO(buscarEmpresaGerenciavel(id));
+    public EmpresaResponseDTO findById(String publicId) {
+        return new EmpresaResponseDTO(buscarEmpresaGerenciavel(publicId));
     }
 
     public EmpresaResponseDTO create(EmpresaCreateDTO dto) {
@@ -76,17 +84,28 @@ public class EmpresaService {
         empresa.setCriadoEm(LocalDateTime.now());
         empresa.setAtualizadoEm(LocalDateTime.now());
 
-        return new EmpresaResponseDTO(empresaRepository.save(empresa));
+        Empresa salva = empresaRepository.save(empresa);
+        securityLogger.log(SecurityEventType.ADMIN_ACTION, "Empresa criada: codigo=" + salva.getCodigo(),
+                currentActorLogin(), null, "/master/empresas");
+        return new EmpresaResponseDTO(salva);
     }
 
-    public EmpresaResponseDTO update(Long id, EmpresaCreateDTO dto) {
-        Empresa empresa = buscarEmpresaGerenciavel(id);
-        validarCodigoDisponivel(dto.getCodigo(), id);
+    public EmpresaResponseDTO update(String publicId, EmpresaCreateDTO dto) {
+        Empresa empresa = buscarEmpresaGerenciavel(publicId);
+        validarCodigoDisponivel(dto.getCodigo(), publicId);
 
         aplicarDados(empresa, dto);
         empresa.setAtualizadoEm(LocalDateTime.now());
 
-        return new EmpresaResponseDTO(empresaRepository.save(empresa));
+        Empresa salva = empresaRepository.save(empresa);
+        securityLogger.log(SecurityEventType.ADMIN_ACTION, "Empresa editada: codigo=" + salva.getCodigo(),
+                currentActorLogin(), null, "/master/empresas/" + publicId);
+        return new EmpresaResponseDTO(salva);
+    }
+
+    private String currentActorLogin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null ? authentication.getName() : null;
     }
 
     /**
@@ -130,6 +149,7 @@ public class EmpresaService {
             s3Service.deleteFile(logoUrlAtual.substring(logoUrlAtual.indexOf(".com/") + 5));
         }
         if (logo != null) {
+            imageContentValidator.validar(logo);
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
             String key = "logo/" + empresaDoBanco.getCodigo() + "_" + LocalDateTime.now().format(formatter);
             return s3Service.uploadFile(logo, key);
@@ -147,9 +167,9 @@ public class EmpresaService {
         empresa.setNotificacaoSonoraHabilitada(dto.getNotificacaoSonoraHabilitada());
     }
 
-    private void validarCodigoDisponivel(String codigo, Long idAtual) {
+    private void validarCodigoDisponivel(String codigo, String publicIdAtual) {
         empresaRepository.findByCodigo(codigo).ifPresent(existente -> {
-            if (!existente.getId().equals(idAtual)) {
+            if (!existente.getPublicId().equals(publicIdAtual)) {
                 throw new DataIntegrityViolationException("Já existe uma empresa com este código.");
             }
         });
@@ -159,12 +179,21 @@ public class EmpresaService {
      * Empresas marcadas como `interna` (a "casa" do usuário master) nunca são retornadas nem
      * editáveis por este service — só existem para o master ter uma empresa própria pra logar.
      */
-    private Empresa buscarEmpresaGerenciavel(Long id) {
-        Empresa empresa = empresaRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Empresa com id " + id + " não encontrada"));
+    private Empresa buscarEmpresaGerenciavel(String publicId) {
+        Empresa empresa = empresaRepository.findByPublicId(publicId)
+                .orElseThrow(() -> new ResourceNotFoundException("Empresa com id " + publicId + " não encontrada"));
         if (Boolean.TRUE.equals(empresa.getInterna())) {
-            throw new ResourceNotFoundException("Empresa com id " + id + " não encontrada");
+            throw new ResourceNotFoundException("Empresa com id " + publicId + " não encontrada");
         }
         return empresa;
+    }
+
+    /**
+     * Resolve o publicId (exposto na URL) pro id sequencial interno, usado pelo
+     * MasterUsuarioController pra delegar em UsuarioService/TenantContext, que continuam
+     * operando em Long — igual ao @TenantId de todas as outras entidades multi-tenant.
+     */
+    public Long resolverIdInterno(String publicId) {
+        return buscarEmpresaGerenciavel(publicId).getId();
     }
 }
