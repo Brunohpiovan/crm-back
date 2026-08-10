@@ -13,6 +13,7 @@ import com.juridiqsystem.crm.repository.OportunidadeRepository;
 import com.juridiqsystem.crm.repository.TagRepository;
 import com.juridiqsystem.crm.repository.UsuarioRepository;
 import com.juridiqsystem.crm.service.exceptions.ConflictException;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -73,6 +74,7 @@ public class FunilService {
     }
 
 
+    @Transactional
     public void adicionarFuncionarioFunil(String funcionarioId,String funilId){
         Funil funil = funilRepository.findByPublicId(funilId)
                 .orElseThrow(() -> new RuntimeException("Funil não encontrado"));
