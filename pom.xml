@@ -175,7 +175,17 @@
 			<scope>compile</scope>
 		</dependency>
 
-
+		<!--
+			Sanitizacao de HTML rico (template de e-mail): allowlist de tags/atributos antes de
+			persistir, defesa em profundidade contra HTML malicioso gravado via chamada direta a
+			API (o frontend ja sanitiza no editor, mas isso e so client-side). jsoup e a lib padrao
+			de mercado pra isso em Java, sem dependencias transitivas pesadas.
+		-->
+		<dependency>
+			<groupId>org.jsoup</groupId>
+			<artifactId>jsoup</artifactId>
+			<version>1.18.1</version>
+		</dependency>
 
 	</dependencies>
 

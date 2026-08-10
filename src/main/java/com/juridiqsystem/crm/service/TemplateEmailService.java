@@ -28,6 +28,9 @@ public class TemplateEmailService {
     @Autowired
     private S3Service s3Service;
 
+    @Autowired
+    private HtmlSanitizer htmlSanitizer;
+
     @Value("${aws.s3.bucket-name}")
     private String bucketName;
 
@@ -57,7 +60,7 @@ public class TemplateEmailService {
         TemplateEmail templateEmail = new TemplateEmail();
         templateEmail.setNome(dto.getNome());
         templateEmail.setAssunto(dto.getAssunto());
-        templateEmail.setMensagem(dto.getMensagem());
+        templateEmail.setMensagem(htmlSanitizer.sanitizeTemplateMensagem(dto.getMensagem()));
         try {
             templateEmail.setSituacao(Situacao.valueOf(dto.getSituacao().toUpperCase().replace(" ", "_")));
         } catch (IllegalArgumentException e) {
@@ -85,7 +88,7 @@ public class TemplateEmailService {
 
         templateEmailBanco.setNome(dto.getNome());
         templateEmailBanco.setAssunto(dto.getAssunto());
-        templateEmailBanco.setMensagem(dto.getMensagem());
+        templateEmailBanco.setMensagem(htmlSanitizer.sanitizeTemplateMensagem(dto.getMensagem()));
 
         try {
             templateEmailBanco.setSituacao(Situacao.valueOf(dto.getSituacao().toUpperCase().replace(" ", "_")));
