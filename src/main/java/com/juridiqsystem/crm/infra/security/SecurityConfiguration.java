@@ -97,6 +97,12 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/usuario").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/usuario/all/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/usuario/**").hasAuthority("ROLE_ADMIN")
+                        // Listagem paginada (tela "Usuários", gestão de toda a equipe) é só pra
+                        // ADMIN; os demais GETs de /usuario/** (perfil próprio, contatos, listas
+                        // de apoio a outras telas como "criador"/"admin") continuam liberados a
+                        // qualquer autenticado — regra específica precisa vir antes da genérica
+                        // abaixo, senão nunca seria alcançada.
+                        .requestMatchers(HttpMethod.GET, "/usuario").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/usuario/**").hasAuthority("ROLE_VENDEDOR")
                         // Autoatendimento da empresa (aba Configurações): qualquer usuário logado
                         // pode ver, só ROLE_ADMIN pode editar (afeta toda a empresa, não só o
@@ -109,20 +115,32 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/funil").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/funil/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/funil/**").hasAuthority("ROLE_ADMIN")
+                        // Adicionar vendedor a um funil é gestão de equipe, não uso básico do
+                        // funil — só ADMIN. Não bate no matcher exato "/funil" (POST) acima.
+                        .requestMatchers(HttpMethod.POST, "/funil/add-funcionario/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.POST, "/etapa").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/etapa/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/etapa/**").hasAuthority("ROLE_ADMIN")
+                        // Oportunidade continua liberada de propósito: é o card individual de
+                        // trabalho do vendedor (criar, editar, mover entre etapas, excluir) — só
+                        // a estrutura do funil/etapa em si (acima) é restrita a ADMIN.
                         // Exclusão física (hard delete) de participante/cliente: sem uso hoje no
                         // frontend (não há botão de excluir participante na UI), então restringir
                         // não quebra nenhum fluxo existente — só fecha a porta pra chamada direta
                         // à API por um usuário comum apagar o cadastro de qualquer cliente.
                         .requestMatchers(HttpMethod.DELETE, "/participante/**").hasAuthority("ROLE_ADMIN")
                         // Cadência, template de e-mail e tag são configuração compartilhada da
-                        // empresa inteira (não um card individual de um vendedor, como Oportunidade
-                        // — essa continua liberada de propósito). Mesmo padrão já usado em
-                        // Funil/Etapa: só ADMIN exclui.
+                        // empresa inteira (diferente de Oportunidade, que é liberada de propósito
+                        // — ver comentário acima). Mesmo padrão já usado em Funil/Etapa: só ADMIN
+                        // cria/edita/exclui.
+                        .requestMatchers(HttpMethod.POST, "/cadencia").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/cadencia/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/cadencia/**").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/template/create").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/template/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/template/**").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/tag").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/tag/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/tag/**").hasAuthority("ROLE_ADMIN")
                         // Editar grupo de chat (renomear, trocar foto, adicionar/remover membros)
                         // não tinha nenhuma checagem — qualquer autenticado podia mexer em
