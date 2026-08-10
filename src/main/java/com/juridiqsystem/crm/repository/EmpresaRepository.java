@@ -15,6 +15,8 @@ public interface EmpresaRepository extends JpaRepository<Empresa, Long> {
 
     Optional<Empresa> findByCodigo(String codigo);
 
+    Optional<Empresa> findByPublicId(String publicId);
+
     @Query("""
     SELECT e FROM Empresa e
     WHERE e.interna = false

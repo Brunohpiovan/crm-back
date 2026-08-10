@@ -1,12 +1,14 @@
 package com.juridiqsystem.crm.controller;
 
 import com.juridiqsystem.crm.model.dtos.*;
+import com.juridiqsystem.crm.service.EmpresaService;
 import com.juridiqsystem.crm.service.UsuarioService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -25,21 +27,24 @@ public class MasterUsuarioController {
     @Autowired
     private UsuarioService usuarioService;
 
+    @Autowired
+    private EmpresaService empresaService;
+
     @Operation(summary = "Listar usuários de uma empresa (paginado, com busca opcional)", description = "Requer JWT com cargo ROLE_MASTER.")
     @GetMapping
     public Page<UsuarioAllDTO> findAll(
-            @Parameter(description = "Id da empresa", required = true) @PathVariable Long empresaId,
+            @Parameter(description = "Id da empresa", required = true) @PathVariable String empresaId,
             @Parameter(description = "Termo de busca opcional (nome/login)") @RequestParam(required = false) String search,
             @ParameterObject @PageableDefault(size = 10, sort = "nome") Pageable pageable) {
-        return usuarioService.findAllParaEmpresa(empresaId, search, pageable);
+        return usuarioService.findAllParaEmpresa(empresaService.resolverIdInterno(empresaId), search, pageable);
     }
 
     @Operation(summary = "Buscar usuário por id, para edição", description = "Requer JWT com cargo ROLE_MASTER.")
     @GetMapping("/{id}/edicao")
     public UsuarioResponseNoAuthDto findByIdParaEdicao(
-            @Parameter(description = "Id da empresa", required = true) @PathVariable Long empresaId,
+            @Parameter(description = "Id da empresa", required = true) @PathVariable String empresaId,
             @Parameter(description = "Id do usuário", required = true) @PathVariable String id) {
-        return usuarioService.findByIdParaEdicaoMaster(empresaId, id);
+        return usuarioService.findByIdParaEdicaoMaster(empresaService.resolverIdInterno(empresaId), id);
     }
 
     @Operation(
@@ -58,10 +63,10 @@ public class MasterUsuarioController {
     })
     @PostMapping
     public ResponseEntity<?> post(
-            @Parameter(description = "Id da empresa", required = true) @PathVariable Long empresaId,
-            @Parameter(description = "Dados do usuário a ser criado", required = true) @RequestPart("usuario") UsuarioCreateDTO usuarioRequest,
+            @Parameter(description = "Id da empresa", required = true) @PathVariable String empresaId,
+            @Parameter(description = "Dados do usuário a ser criado", required = true) @RequestPart("usuario") @Valid UsuarioCreateDTO usuarioRequest,
             @Parameter(description = "Foto/avatar do usuário (opcional)") @RequestPart(value = "foto", required = false) MultipartFile foto) {
-        UsuarioAllDTO dto = usuarioService.saveParaEmpresa(empresaId, usuarioRequest, foto);
+        UsuarioAllDTO dto = usuarioService.saveParaEmpresa(empresaService.resolverIdInterno(empresaId), usuarioRequest, foto);
         return ResponseEntity.ok(dto);
     }
 
@@ -71,11 +76,11 @@ public class MasterUsuarioController {
     )
     @PutMapping("/{id}")
     public ResponseEntity<?> update(
-            @Parameter(description = "Id da empresa", required = true) @PathVariable Long empresaId,
+            @Parameter(description = "Id da empresa", required = true) @PathVariable String empresaId,
             @Parameter(description = "Id do usuário", required = true) @PathVariable String id,
-            @Parameter(description = "Dados administrativos atualizados", required = true) @RequestPart("usuario") UsuarioAdminUpdateDTO usuarioRequest,
+            @Parameter(description = "Dados administrativos atualizados", required = true) @RequestPart("usuario") @Valid UsuarioAdminUpdateDTO usuarioRequest,
             @Parameter(description = "Nova foto/avatar (opcional)") @RequestPart(value = "foto", required = false) MultipartFile foto) {
-        UsuarioAllDTO responseDTO = usuarioService.updateAllParaEmpresa(empresaId, id, usuarioRequest, foto);
+        UsuarioAllDTO responseDTO = usuarioService.updateAllParaEmpresa(empresaService.resolverIdInterno(empresaId), id, usuarioRequest, foto);
         return ResponseEntity.ok(responseDTO);
     }
 
@@ -85,9 +90,9 @@ public class MasterUsuarioController {
     )
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(
-            @Parameter(description = "Id da empresa", required = true) @PathVariable Long empresaId,
+            @Parameter(description = "Id da empresa", required = true) @PathVariable String empresaId,
             @Parameter(description = "Id do usuário", required = true) @PathVariable String id) {
-        usuarioService.deleteParaEmpresa(empresaId, id);
+        usuarioService.deleteParaEmpresa(empresaService.resolverIdInterno(empresaId), id);
         return ResponseEntity.ok().build();
     }
 }

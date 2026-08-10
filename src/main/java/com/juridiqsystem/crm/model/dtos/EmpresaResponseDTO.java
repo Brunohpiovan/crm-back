@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 @Getter
 public class EmpresaResponseDTO {
 
-    private final Long id;
+    private final String id;
     private final String codigo;
     private final String nome;
     private final String logoUrl;
@@ -33,7 +33,7 @@ public class EmpresaResponseDTO {
     }
 
     public EmpresaResponseDTO(Empresa empresa, Long quantidadeUsuarios, Long quantidadeAdmins) {
-        this.id = empresa.getId();
+        this.id = empresa.getPublicId();
         this.codigo = empresa.getCodigo();
         this.nome = empresa.getNome();
         this.logoUrl = empresa.getLogoUrl();

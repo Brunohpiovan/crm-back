@@ -41,7 +41,7 @@ public class EmpresaController {
             @ApiResponse(responseCode = "404", description = "Empresa não encontrada para o id informado")
     })
     @GetMapping("/{id}")
-    public EmpresaResponseDTO findById(@Parameter(description = "Id da empresa", required = true) @PathVariable Long id) {
+    public EmpresaResponseDTO findById(@Parameter(description = "Id da empresa", required = true) @PathVariable String id) {
         return empresaService.findById(id);
     }
 
@@ -62,7 +62,7 @@ public class EmpresaController {
             @ApiResponse(responseCode = "404", description = "Empresa não encontrada para o id informado")
     })
     @PutMapping("/{id}")
-    public EmpresaResponseDTO update(@Parameter(description = "Id da empresa", required = true) @PathVariable Long id,
+    public EmpresaResponseDTO update(@Parameter(description = "Id da empresa", required = true) @PathVariable String id,
                                       @RequestBody @Valid EmpresaCreateDTO dto) {
         return empresaService.update(id, dto);
     }
