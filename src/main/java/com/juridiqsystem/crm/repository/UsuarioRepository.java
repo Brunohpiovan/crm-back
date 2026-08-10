@@ -64,6 +64,15 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     List<UsuarioContatoDto> findDisponiveisParaFunil(@Param("funilId") Long funilId, @Param("cargo") UserRole cargo);
 
     @Query("""
+    SELECT new com.juridiqsystem.crm.model.dtos.UsuarioContatoDto(u.publicId, u.nome, u.urlPicture)
+    FROM Usuario u
+    WHERE u.id IN (
+        SELECT f.id FROM Funil fn JOIN fn.funcionarios f WHERE fn.id = :funilId
+    )
+    """)
+    List<UsuarioContatoDto> findFuncionariosDoFunil(@Param("funilId") Long funilId);
+
+    @Query("""
     SELECT new com.juridiqsystem.crm.model.dtos.UsuarioAllDTO(u.publicId, u.nome, u.login, u.celular, u.cargo, u.bloqueado)
     FROM Usuario u
     WHERE (:search IS NULL OR LOWER(u.nome) LIKE :search OR LOWER(u.login) LIKE :search)

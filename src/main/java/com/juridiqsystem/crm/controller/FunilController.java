@@ -54,6 +54,20 @@ public class FunilController {
         return ResponseEntity.ok(funcionarios);
     }
 
+    @Operation(summary = "Listar funcionários já pertencentes a um funil",
+            description = "Requer JWT. Retorna os usuários atualmente associados ao funil informado, candidatos a serem removidos via DELETE /funil/remove-funcionario/{funilId}/{funcionarioId}.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de usuários pertencentes ao funil",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = UsuarioContatoDto.class)))),
+            @ApiResponse(responseCode = "400", description = "Funil não encontrado (resposta em JSON estruturado — StandardError)",
+                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil não encontrado")))
+    })
+    @GetMapping("/funcionarios/{funilId}")
+    public ResponseEntity<List<UsuarioContatoDto>> findFuncionariosNoFunil(@Parameter(description = "Id do funil", required = true) @PathVariable String funilId) {
+        List<UsuarioContatoDto> funcionarios = funilService.findFuncionariosNoFunil(funilId);
+        return ResponseEntity.ok(funcionarios);
+    }
+
     @Operation(summary = "Buscar funil por id",
             description = "Requer JWT. Retorna o funil com suas etapas e, dentro de cada etapa, as oportunidades correspondentes.")
     @ApiResponses({
@@ -106,6 +120,20 @@ public class FunilController {
     public ResponseEntity<FunilDto> addFuncionario(@Parameter(description = "Id do funil", required = true) @PathVariable String funilId,
                                                     @Parameter(description = "Id do usuário/funcionário a ser adicionado", required = true) @PathVariable String funcionarioId) {
         funilService.adicionarFuncionarioFunil(funcionarioId,funilId);
+        return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "Remover um funcionário de um funil",
+            description = "Requer JWT com cargo ROLE_ADMIN (regra geral de DELETE /funil/**). Desassocia o usuário (funcionário) informado do funil informado, revogando o acesso dele a esse pipeline. A operação é idempotente: se o funcionário já não pertencer ao funil, nada é alterado.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Funcionário removido do funil com sucesso (resposta sem corpo)"),
+            @ApiResponse(responseCode = "400", description = "Funil ou funcionário não encontrado (resposta em JSON estruturado — StandardError)",
+                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil não encontrado")))
+    })
+    @DeleteMapping("/remove-funcionario/{funilId}/{funcionarioId}")
+    public ResponseEntity<FunilDto> removeFuncionario(@Parameter(description = "Id do funil", required = true) @PathVariable String funilId,
+                                                       @Parameter(description = "Id do usuário/funcionário a ser removido", required = true) @PathVariable String funcionarioId) {
+        funilService.removerFuncionarioFunil(funcionarioId, funilId);
         return ResponseEntity.ok().build();
     }
 
