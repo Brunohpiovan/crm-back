@@ -1,5 +1,7 @@
 package com.juridiqsystem.crm.service.auth;
 
+import com.juridiqsystem.crm.infra.security.logging.SecurityEventType;
+import com.juridiqsystem.crm.infra.security.logging.SecurityLogger;
 import com.juridiqsystem.crm.model.PasswordResetToken;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.ApiResponse;
@@ -48,6 +50,9 @@ public class PasswordSendService {
     @Autowired
     private PasswordRecoveryRateLimiter rateLimiter;
 
+    @Autowired
+    private SecurityLogger securityLogger;
+
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
@@ -92,6 +97,12 @@ public class PasswordSendService {
                     + "Equipe JuridiqSystem\n";
             emailService.sendEmail(decodedEmail, "Recuperação de Senha - JuridiqSystem", recoveryMessage);
         }
+
+        // Loga a tentativa independentemente de o e-mail existir ou não — o canal do Discord é
+        // interno (não é a resposta HTTP, que continua genérica), então não há risco de
+        // enumeração aqui, só valor de auditoria (padrão de pedidos de reset por IP/empresa).
+        securityLogger.log(SecurityEventType.PASSWORD_RESET_REQUEST, "codigoEmpresa=" + mail.codigoEmpresa(), decodedEmail,
+                clientInfoService.getClientIp(request), "/recover-password");
 
         return new ApiResponse(GENERIC_RESPONSE_MESSAGE);
     }
