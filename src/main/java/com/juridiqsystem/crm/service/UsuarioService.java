@@ -221,8 +221,14 @@ public class UsuarioService {
             throw new AccessDeniedException("Você não tem permissão para alterar este usuário.");
         }
 
+        boolean trocouSenha = dto.getSenha() != null && !dto.getSenha().isEmpty();
+
         aplicarAtualizacao(usuarioDoBanco, dto, foto);
         usuarioRepository.save(usuarioDoBanco);
+
+        if (trocouSenha) {
+            securityLogger.log(SecurityEventType.PASSWORD_CHANGED, null, usuarioDoBanco.getLogin(), null, "/usuario/" + publicId);
+        }
 
         var token = tokenService.generateToken(usuarioDoBanco);
         return new LoginResponseDTO(token, null);
