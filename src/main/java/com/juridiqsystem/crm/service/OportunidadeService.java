@@ -155,6 +155,7 @@ public class OportunidadeService {
             dadosRequest.setNome(clienteRequest.nome());
             dadosRequest.setLogin(clienteRequest.login());
             dadosRequest.setCelular(clienteRequest.celular());
+            dadosRequest.setTipoParticipante(TipoParticipante.PARTICIPANTE);
             return participanteService.preencheParticipante(dadosRequest, existente);
         }
         Participante novo = new Participante();
