@@ -73,6 +73,13 @@ public class FunilService {
         return usuariosNaoNoFunil;
     }
 
+    public List<UsuarioContatoDto> findFuncionariosNoFunil(String funilId) {
+        Funil funil = funilRepository.findByPublicId(funilId)
+                .orElseThrow(() -> new RuntimeException("Funil não encontrado"));
+
+        return usuarioRepository.findFuncionariosDoFunil(funil.getId());
+    }
+
 
     @Transactional
     public void adicionarFuncionarioFunil(String funcionarioId,String funilId){
@@ -85,6 +92,17 @@ public class FunilService {
         if (!funcionario.getFunisPermitidos().contains(funil)) {
             funcionario.getFunisPermitidos().add(funil);
         }
+        funilRepository.save(funil);
+        usuarioRepository.save(funcionario);
+    }
+
+    @Transactional
+    public void removerFuncionarioFunil(String funcionarioId, String funilId) {
+        Funil funil = funilRepository.findByPublicId(funilId)
+                .orElseThrow(() -> new RuntimeException("Funil não encontrado"));
+        Usuario funcionario = usuarioRepository.findByPublicId(funcionarioId).orElseThrow(() -> new RuntimeException("Funcionario não encontrado"));
+        funil.getFuncionarios().remove(funcionario);
+        funcionario.getFunisPermitidos().remove(funil);
         funilRepository.save(funil);
         usuarioRepository.save(funcionario);
     }
