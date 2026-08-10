@@ -1,5 +1,7 @@
 package com.juridiqsystem.crm.controller;
 
+import com.juridiqsystem.crm.infra.security.logging.SecurityEventType;
+import com.juridiqsystem.crm.infra.security.logging.SecurityLogger;
 import com.juridiqsystem.crm.model.dtos.AcessoResponseDto;
 import com.juridiqsystem.crm.service.AcessoService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,6 +29,9 @@ public class AcessoController {
     @Autowired
     private AcessoService acessoService;
 
+    @Autowired
+    private SecurityLogger securityLogger;
+
     /*
     @PostMapping("/acesso")
     public ResponseEntity<Long> logAccess(@RequestBody LogAcessoDTO log) {
@@ -48,12 +53,13 @@ public class AcessoController {
     @SecurityRequirements
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Horário de saída registrado com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Log de acesso não encontrado para o id informado. Resposta em **texto puro** (não é um JSON estruturado)",
-                    content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Log não encontrado")))
+            @ApiResponse(responseCode = "400", description = "Log de acesso não encontrado para o id informado. Resposta em JSON estruturado (StandardError).",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = com.juridiqsystem.crm.service.exceptions.StandardError.class)))
     })
     @PutMapping("/finalizar/{id}")
     public ResponseEntity<Void> updateLogExit(@Parameter(description = "Id do log de acesso (retornado como logId no login)", required = true) @PathVariable String id) {
         acessoService.updateExitTime(id);
+        securityLogger.log(SecurityEventType.LOGOUT, "logId=" + id, null, null, "/log/finalizar/" + id);
         return ResponseEntity.ok().build();
     }
 
