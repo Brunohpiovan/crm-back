@@ -4,11 +4,14 @@ import com.juridiqsystem.crm.infra.security.TenantContext;
 import com.juridiqsystem.crm.infra.security.TokenService;
 import com.juridiqsystem.crm.infra.security.logging.SecurityEventType;
 import com.juridiqsystem.crm.infra.security.logging.SecurityLogger;
+import com.juridiqsystem.crm.model.MensagemInterna;
 import com.juridiqsystem.crm.model.Participante;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.*;
 import com.juridiqsystem.crm.model.enums.TipoParticipante;
 import com.juridiqsystem.crm.model.enums.UserRole;
+import com.juridiqsystem.crm.repository.ChatGrupoRepository;
+import com.juridiqsystem.crm.repository.MensagemInternaRepository;
 import com.juridiqsystem.crm.repository.UsuarioRepository;
 import com.juridiqsystem.crm.service.exceptions.DataIntegrityViolationException;
 import com.juridiqsystem.crm.service.exceptions.UserNotFoundException;
@@ -30,6 +33,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -56,6 +60,12 @@ public class UsuarioService {
     @Autowired
     private ImageContentValidator imageContentValidator;
 
+    @Autowired
+    private ChatGrupoRepository chatGrupoRepository;
+
+    @Autowired
+    private MensagemInternaRepository mensagemInternaRepository;
+
     public UsuarioResponseNoAuthDto findByIdParaEdicao(String publicId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String authenticatedUsername = authentication.getName();
@@ -77,12 +87,47 @@ public class UsuarioService {
 
     public List<UsuarioAllContactsDTO> findAllContacts(String userPublicId) {
         Usuario usuario = buscarUsuarioPorPublicId(userPublicId);
-        return usuarioRepository.findAllContactsWithPrivateGroups(usuario.getId());
+        List<UsuarioAllContactsDTO> contatos = usuarioRepository.findAllContactsWithPrivateGroups(usuario.getId());
+        preencherUltimaMensagem(usuario.getId(), contatos);
+        return contatos;
     }
 
     public List<UsuarioAllContactsDTO> findAllContactsDispo(String userPublicId) {
         Usuario usuario = buscarUsuarioPorPublicId(userPublicId);
+        // Sem "última mensagem" aqui de propósito: por definição, /dispo lista quem ainda NÃO
+        // compartilha grupo privado com o usuário, então nunca existe mensagem pra buscar.
         return usuarioRepository.findUsuariosSemGrupoPrivadoComum(usuario.getId());
+    }
+
+    /**
+     * Preenche lastMessage/lastMessageAt em cada contato, em 2 queries batched (não N+1): primeiro
+     * o grupo privado com cada contato, depois a última mensagem de cada um desses grupos.
+     */
+    private void preencherUltimaMensagem(Long usuarioId, List<UsuarioAllContactsDTO> contatos) {
+        if (contatos.isEmpty()) return;
+
+        List<String> outrosPublicIds = contatos.stream().map(UsuarioAllContactsDTO::getId).toList();
+        Map<String, Long> grupoIdPorContato = chatGrupoRepository
+                .findGruposPrivadosPorUsuarioEOutros(usuarioId, outrosPublicIds).stream()
+                .collect(Collectors.toMap(
+                        ChatGrupoRepository.GrupoPrivadoProjection::getOtherUserPublicId,
+                        ChatGrupoRepository.GrupoPrivadoProjection::getGrupoId));
+
+        if (grupoIdPorContato.isEmpty()) return;
+
+        List<Long> grupoIds = List.copyOf(grupoIdPorContato.values());
+        Map<Long, MensagemInterna> ultimaMensagemPorGrupo = mensagemInternaRepository
+                .findUltimasMensagensPorGrupos(grupoIds).stream()
+                .collect(Collectors.toMap(m -> m.getChatGrupo().getId(), m -> m));
+
+        for (UsuarioAllContactsDTO contato : contatos) {
+            Long grupoId = grupoIdPorContato.get(contato.getId());
+            MensagemInterna ultimaMensagem = grupoId == null ? null : ultimaMensagemPorGrupo.get(grupoId);
+            if (ultimaMensagem != null) {
+                contato.setLastMessage(ultimaMensagem.getConteudo());
+                contato.setLastMessageAt(ultimaMensagem.getDataEnvio());
+            }
+        }
     }
 
     public Page<UsuarioAllDTO> findAll(String search, Pageable pageable) {
@@ -221,14 +266,16 @@ public class UsuarioService {
             throw new AccessDeniedException("Você não tem permissão para alterar este usuário.");
         }
 
-        boolean trocouSenha = dto.getSenha() != null && !dto.getSenha().isEmpty();
+        // Troca de senha não é permitida por este endpoint (dados pessoais em geral): existe
+        // PUT /usuario/senha, dedicado, que exige confirmar a senha atual antes de trocar (ver
+        // alterarSenhaPropria) — mais seguro que aceitar uma senha nova aqui sem checar a atual.
+        // Zera os dois campos antes de aplicarAtualizacao pra garantir isso mesmo que o
+        // frontend algum dia volte a mandá-los.
+        dto.setSenha(null);
+        dto.setSenha2(null);
 
         aplicarAtualizacao(usuarioDoBanco, dto, foto);
         usuarioRepository.save(usuarioDoBanco);
-
-        if (trocouSenha) {
-            securityLogger.log(SecurityEventType.PASSWORD_CHANGED, null, usuarioDoBanco.getLogin(), null, "/usuario/" + publicId);
-        }
 
         var token = tokenService.generateToken(usuarioDoBanco);
         return new LoginResponseDTO(token, null);
@@ -236,6 +283,11 @@ public class UsuarioService {
 
     public UsuarioAllDTO updateAll(String publicId, UsuarioAdminUpdateDTO dto, MultipartFile foto) {
         Usuario usuarioDoBanco = buscarUsuarioPorPublicId(publicId);
+        Usuario requisitante = validarPodeGerenciar(usuarioDoBanco, "/usuario/all/" + publicId);
+
+        if (dto.getCargo() == UserRole.MASTER && requisitante.getCargo() != UserRole.MASTER) {
+            throw new AccessDeniedException("Você não tem permissão para definir o cargo MASTER.");
+        }
 
         aplicarAtualizacao(usuarioDoBanco, dto, foto);
         usuarioDoBanco.setCargo(dto.getCargo());
@@ -248,6 +300,39 @@ public class UsuarioService {
                 currentActorLogin(), null, "/usuario/all/" + publicId);
 
         return new UsuarioAllDTO(usuarioDoBanco);
+    }
+
+    /**
+     * Restringe quem pode ser alvo de updateAll/delete — ações administrativas privilegiadas,
+     * que além de cargo/bloqueado também podem alterar login e senha de outra conta
+     * (UsuarioAdminUpdateDTO tem ambos os campos). Duas regras: (1) ninguém pode se auto-alterar
+     * por essa via — existe /usuario/{id} (self-service) pra isso, que não expõe cargo/bloqueado;
+     * (2) um ADMINISTRADOR não pode alterar outro ADMINISTRADOR nem um MASTER, só um MASTER pode.
+     * Funciona também no fluxo master gerenciando uma empresa-cliente (TenantContext.runAs): esse
+     * runAs só troca o tenant de dados, a autenticação continua sendo a do MASTER que fez a
+     * requisição, então authentication.getPrincipal() aqui é sempre o ator real, nunca afetado
+     * pela troca de tenant.
+     */
+    private Usuario validarPodeGerenciar(Usuario usuarioAlvo, String path) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        Usuario requisitante = (Usuario) authentication.getPrincipal();
+
+        if (usuarioAlvo.getLogin().equals(requisitante.getLogin())) {
+            securityLogger.log(SecurityEventType.RESOURCE_ACCESS_DENIED,
+                    "Tentativa de autoalterar cargo/bloqueio/dados administrativos: alvo=" + usuarioAlvo.getLogin(),
+                    requisitante.getLogin(), null, path);
+            throw new AccessDeniedException("Você não pode alterar sua própria conta por aqui. Use a tela \"Minha conta\".");
+        }
+
+        boolean alvoPrivilegiado = usuarioAlvo.getCargo() == UserRole.ADMINISTRADOR || usuarioAlvo.getCargo() == UserRole.MASTER;
+        if (alvoPrivilegiado && requisitante.getCargo() != UserRole.MASTER) {
+            securityLogger.log(SecurityEventType.RESOURCE_ACCESS_DENIED,
+                    "Tentativa de administrador alterar outro administrador: alvo=" + usuarioAlvo.getLogin(),
+                    requisitante.getLogin(), null, path);
+            throw new AccessDeniedException("Você não tem permissão para alterar outro administrador.");
+        }
+
+        return requisitante;
     }
 
     private Usuario buscarUsuarioPorPublicId(String publicId) {
@@ -315,6 +400,7 @@ public class UsuarioService {
     @Transactional
     public void delete(String publicId) {
         Usuario usuarioDoBanco = buscarUsuarioPorPublicId(publicId);
+        validarPodeGerenciar(usuarioDoBanco, "/usuario/" + publicId);
         // Hard delete violaria as FKs de protocolo, e-mail, oportunidade, mensagem interna,
         // log de acesso etc. (ON DELETE RESTRICT). Excluir passa a inativar o usuário,
         // preservando o histórico e impedindo login (ver AuthenticationService).

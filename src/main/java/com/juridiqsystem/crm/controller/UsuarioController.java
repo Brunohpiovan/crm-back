@@ -184,6 +184,19 @@ public class UsuarioController {
     }
 
     @Operation(
+            summary = "Trocar a própria senha",
+            description = "Requer JWT (qualquer cargo autenticado). Exige a senha atual; não altera nenhum outro dado do cadastro. Invalida o token atual (a troca de senha revoga sessões antigas) e retorna um novo token JWT já válido. Mesma capacidade usada por PUT /master/senha (ROLE_MASTER), aqui liberada para qualquer usuário comum."
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Senha alterada com sucesso; retorna novo token JWT", content = @Content(schema = @Schema(implementation = LoginResponseDTO.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Senha atual incorreta, ou nova senha e confirmação não coincidem")
+    })
+    @PutMapping(value = "/senha")
+    public ResponseEntity<LoginResponseDTO> alterarSenha(@RequestBody @Valid AlterarSenhaDTO dto) {
+        return ResponseEntity.ok(usuarioService.alterarSenhaPropria(dto));
+    }
+
+    @Operation(
             summary = "Atualizar usuário (administrativo, inclui cargo e bloqueado)",
             description = """
                     Requer JWT com cargo ROLE_ADMIN. É o único endpoint de atualização que pode \

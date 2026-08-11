@@ -41,11 +41,11 @@ public class UsuarioSelfUpdateDTO implements UsuarioDadosPessoaisDTO {
     @Size(max = 150, message = "O login deve ter no maximo 255 caracteres")
     private String login;
 
-    @Schema(description = "Nova senha em texto plano (opcional; se informada, deve coincidir com 'senha2'). Deixe em branco para manter a senha atual.")
+    @Schema(description = "Ignorado por este endpoint — troca de senha não é mais feita aqui. Use PUT /usuario/senha (exige a senha atual).")
     @Size(min = 8, max = 255, message = "A Senha deve ter entre 6 e 100 caracteres")
     private String senha;
 
-    @Schema(description = "Confirmação da nova senha; obrigatória apenas quando 'senha' é informada")
+    @Schema(description = "Ignorado por este endpoint — troca de senha não é mais feita aqui. Use PUT /usuario/senha (exige a senha atual).")
     @Size(min = 8, max = 255, message = "A senha de confirmação deve ter entre 6 e 100 caracteres")
     private String senha2;
 
