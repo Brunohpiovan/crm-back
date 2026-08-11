@@ -91,6 +91,11 @@ public class MensagemService{
         return lista;
     }
 
+    private boolean isAdmin(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+    }
+
     private boolean autorizadoParaProtocolo(Protocolo protocolo, Usuario usuario) {
         boolean isAdminAtual = protocolo.getAdmin().getLogin().equals(usuario.getLogin());
         boolean isParticipante = usuario.getLogin().equals(protocolo.getParticipante().getLogin());
@@ -127,7 +132,10 @@ public class MensagemService{
         Protocolo protocolo = protocoloRepository.findByPublicId(protocoloId).orElseThrow(()-> new RuntimeException("Protocolo nao encontrado"));
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         Usuario usuario = (Usuario) authentication.getPrincipal();
-        if (!autorizadoParaProtocolo(protocolo, usuario)) {
+        // Bypass de admin só aqui (tela de detalhes de protocolo/exportação de PDF), não em
+        // getMessagesForProtocolLimit (chat ao vivo), para que outro admin não veja mensagens
+        // de uma conversa em andamento que não é dele — só o histórico via Protocolos > Detalhes.
+        if (!isAdmin(authentication) && !autorizadoParaProtocolo(protocolo, usuario)) {
             throw new RuntimeException("Usuário não autorizado a acessar este protocolo.");
         }
 
