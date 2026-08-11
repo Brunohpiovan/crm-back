@@ -42,4 +42,29 @@ public interface ChatGrupoRepository extends JpaRepository<ChatGrupo, Long> {
 """)
     List<ChatGrupo> findGruposPublicosByUsuario(@Param("idUsuario") Long idUsuario);
 
+    /**
+     * Para o usuário idUsuario, o id do grupo privado (1-a-1) com cada um dos outrosPublicIds —
+     * batched (uma query), usado para resolver a "última mensagem" na lista de contatos do chat
+     * interno. Contatos sem grupo em comum (ex.: lista de "disponíveis") simplesmente não aparecem
+     * no resultado.
+     */
+    @Query("""
+    SELECT u2.publicId AS otherUserPublicId, g.id AS grupoId
+    FROM ChatGrupo g
+    JOIN g.usuarios u1
+    JOIN g.usuarios u2
+    WHERE g.privado = true
+      AND u1.id = :idUsuario
+      AND u2.publicId IN :outrosPublicIds
+      AND u2.id <> :idUsuario
+      AND SIZE(g.usuarios) = 2
+    """)
+    List<GrupoPrivadoProjection> findGruposPrivadosPorUsuarioEOutros(@Param("idUsuario") Long idUsuario,
+                                                                       @Param("outrosPublicIds") List<String> outrosPublicIds);
+
+    interface GrupoPrivadoProjection {
+        String getOtherUserPublicId();
+        Long getGrupoId();
+    }
+
 }

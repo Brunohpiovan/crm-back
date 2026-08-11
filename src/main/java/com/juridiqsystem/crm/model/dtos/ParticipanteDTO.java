@@ -9,6 +9,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Schema(description = "Resumo de participante (id, nome, login, celular, foto, tipo), usado nas listagens e buscas de /participante.")
 @Getter
 @Setter
@@ -25,6 +27,10 @@ public class ParticipanteDTO {
     private TipoParticipante tipoParticipante;
     @Schema(description = "true quando este participante tem um protocolo ABERTO com o administrador que fez a requisição")
     private boolean openProtocol;
+    @Schema(description = "Conteúdo da última mensagem trocada com este participante (via seu protocolo mais recente, aberto ou fechado). Nulo se o participante nunca teve um protocolo.")
+    private String lastMessage;
+    @Schema(description = "Data/hora de envio de `lastMessage`. Nulo se `lastMessage` for nulo.")
+    private LocalDateTime lastMessageAt;
 
     public ParticipanteDTO(Participante participante) {
         this(participante, false);

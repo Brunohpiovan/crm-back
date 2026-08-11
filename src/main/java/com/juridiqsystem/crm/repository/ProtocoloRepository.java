@@ -45,6 +45,27 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
     """)
     List<Long> findParticipanteIdsComProtocoloAbertoPorAdmin(@Param("adminId") Long adminId);
 
+    /**
+     * Para cada participante em participanteIds, o id do seu protocolo mais recente (aberto ou
+     * fechado) — usado para resolver a "última mensagem" na listagem de contatos do chat externo.
+     * Uma query batched (não N+1): a subquery correlacionada por participante encontra o máximo
+     * de dataCriacao, sem round-trip por participante.
+     */
+    @Query("""
+    SELECT p.participante.id AS participanteId, p.id AS protocoloId
+    FROM Protocolo p
+    WHERE p.participante.id IN :participanteIds
+      AND p.dataCriacao = (
+        SELECT MAX(p2.dataCriacao) FROM Protocolo p2 WHERE p2.participante.id = p.participante.id
+      )
+    """)
+    List<UltimoProtocoloProjection> findUltimosProtocoloIdsPorParticipantes(@Param("participanteIds") List<Long> participanteIds);
+
+    interface UltimoProtocoloProjection {
+        Long getParticipanteId();
+        Long getProtocoloId();
+    }
+
     @Query(value = """
     SELECT p FROM Protocolo p JOIN FETCH p.admin JOIN FETCH p.participante LEFT JOIN FETCH p.adminAnterior
     WHERE (p.admin.login = :login OR p.participante.login = :login OR p.adminAnterior.login = :login)

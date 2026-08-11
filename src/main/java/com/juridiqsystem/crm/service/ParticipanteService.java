@@ -1,5 +1,6 @@
 package com.juridiqsystem.crm.service;
 
+import com.juridiqsystem.crm.model.Mensagem;
 import com.juridiqsystem.crm.model.Participante;
 import com.juridiqsystem.crm.model.dtos.ParticipanteCreateRequest;
 import com.juridiqsystem.crm.model.dtos.ParticipanteDTO;
@@ -7,6 +8,7 @@ import com.juridiqsystem.crm.model.dtos.ParticipanteUpdateRequest;
 import com.juridiqsystem.crm.model.enums.StatusProtocolo;
 import com.juridiqsystem.crm.model.enums.TipoParticipante;
 import com.juridiqsystem.crm.model.Usuario;
+import com.juridiqsystem.crm.repository.MensagemRepository;
 import com.juridiqsystem.crm.repository.ParticipanteRepository;
 import com.juridiqsystem.crm.repository.ProtocoloRepository;
 import com.juridiqsystem.crm.repository.UsuarioRepository;
@@ -17,9 +19,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class ParticipanteService {
@@ -33,15 +39,57 @@ public class ParticipanteService {
     @Autowired
     private UsuarioRepository usuarioRepository;
 
+    @Autowired
+    private MensagemRepository mensagemRepository;
+
     public List<ParticipanteDTO> findAllFilter(String id){
         Usuario admin = usuarioRepository.findByPublicId(id)
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
         List<Participante> participantes = participanteRepository.findAllWithoutOpenProtocoloFromOtherAdmins(admin.getId());
         Set<Long> comProtocoloAbertoComigo = new HashSet<>(protocoloRepository.findParticipanteIdsComProtocoloAbertoPorAdmin(admin.getId()));
+        Map<Long, Mensagem> ultimaMensagemPorParticipante = buscarUltimasMensagensPorParticipante(participantes);
 
         return participantes.stream()
-                .map(p -> new ParticipanteDTO(p, comProtocoloAbertoComigo.contains(p.getId())))
+                .map(p -> {
+                    ParticipanteDTO dto = new ParticipanteDTO(p, comProtocoloAbertoComigo.contains(p.getId()));
+                    Mensagem ultimaMensagem = ultimaMensagemPorParticipante.get(p.getId());
+                    if (ultimaMensagem != null) {
+                        dto.setLastMessage(ultimaMensagem.getConteudo());
+                        dto.setLastMessageAt(ultimaMensagem.getData_envio());
+                    }
+                    return dto;
+                })
                 .toList();
+    }
+
+    /**
+     * Resolve a última mensagem de cada participante em 2 queries batched (não N+1): primeiro o
+     * protocolo mais recente de cada um, depois a última mensagem de cada um desses protocolos.
+     * Participantes sem nenhum protocolo (ainda não atendidos) ficam de fora do mapa retornado.
+     */
+    private Map<Long, Mensagem> buscarUltimasMensagensPorParticipante(List<Participante> participantes) {
+        if (participantes.isEmpty()) return Collections.emptyMap();
+
+        List<Long> participanteIds = participantes.stream().map(Participante::getId).toList();
+        Map<Long, Long> ultimoProtocoloIdPorParticipante = protocoloRepository
+                .findUltimosProtocoloIdsPorParticipantes(participanteIds).stream()
+                .collect(Collectors.toMap(
+                        ProtocoloRepository.UltimoProtocoloProjection::getParticipanteId,
+                        ProtocoloRepository.UltimoProtocoloProjection::getProtocoloId));
+
+        if (ultimoProtocoloIdPorParticipante.isEmpty()) return Collections.emptyMap();
+
+        List<Long> protocoloIds = List.copyOf(ultimoProtocoloIdPorParticipante.values());
+        Map<Long, Mensagem> ultimaMensagemPorProtocolo = mensagemRepository
+                .findUltimasMensagensPorProtocolos(protocoloIds).stream()
+                .collect(Collectors.toMap(m -> m.getProtocolo().getId(), m -> m));
+
+        Map<Long, Mensagem> resultado = new HashMap<>();
+        ultimoProtocoloIdPorParticipante.forEach((participanteId, protocoloId) -> {
+            Mensagem mensagem = ultimaMensagemPorProtocolo.get(protocoloId);
+            if (mensagem != null) resultado.put(participanteId, mensagem);
+        });
+        return resultado;
     }
 
 

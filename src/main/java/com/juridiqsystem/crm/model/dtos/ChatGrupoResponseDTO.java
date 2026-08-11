@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Schema(description = "Dados resumidos de um grupo de chat, usados em listagens e nas notificações WebSocket de criação/atualização de grupo.")
 @Getter
 @Setter
@@ -22,7 +24,24 @@ public class ChatGrupoResponseDTO {
     private String imagemFundoUrl;
     @Schema(description = "Indica se o grupo é privado (conversa 1-a-1) ou público.")
     private Boolean privado;
+    @Schema(description = "Conteúdo da última mensagem enviada neste grupo. Nulo se o grupo ainda não tem mensagens.")
+    private String lastMessage;
+    @Schema(description = "Data/hora de envio de `lastMessage`. Nulo se `lastMessage` for nulo.")
+    private LocalDateTime lastMessageAt;
 
+
+    /**
+     * Mantido explicitamente (não é mais o gerado por @AllArgsConstructor, que agora tem 7
+     * parâmetros) porque ChatGrupoService monta este DTO por campo (sem lastMessage/lastMessageAt,
+     * preenchidos depois via setter) em getGrupoByUsuarioAndPublic.
+     */
+    public ChatGrupoResponseDTO(String id, String nome, String avatarUrl, String imagemFundoUrl, Boolean privado) {
+        this.id = id;
+        this.nome = nome;
+        this.avatarUrl = avatarUrl;
+        this.imagemFundoUrl = imagemFundoUrl;
+        this.privado = privado;
+    }
 
     public ChatGrupoResponseDTO(ChatGrupo chatGrupo){
         this.id = chatGrupo.getPublicId();;

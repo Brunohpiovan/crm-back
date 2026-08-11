@@ -29,4 +29,18 @@ public interface MensagemRepository extends JpaRepository<Mensagem, Long> {
 
     @Query("SELECT DISTINCT m.sender.publicId FROM Mensagem m WHERE m.protocolo IS NULL")
     List<String> findDistinctSenderIdsWithoutProtocol();
+
+    /**
+     * Última mensagem (por dataEnvio) de cada protocolo em protocoloIds — batched, não N+1.
+     * m.getProtocolo().getId() no lado do service não dispara select extra: protocolo é
+     * ManyToOne LAZY, mas o id fica disponível no proxy sem inicializar a entidade.
+     */
+    @Query("""
+    SELECT m FROM Mensagem m JOIN FETCH m.sender
+    WHERE m.protocolo.id IN :protocoloIds
+      AND m.data_envio = (
+        SELECT MAX(m2.data_envio) FROM Mensagem m2 WHERE m2.protocolo.id = m.protocolo.id
+      )
+    """)
+    List<Mensagem> findUltimasMensagensPorProtocolos(@Param("protocoloIds") List<Long> protocoloIds);
 }

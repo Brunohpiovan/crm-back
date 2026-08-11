@@ -1,6 +1,7 @@
 package com.juridiqsystem.crm.service;
 
 import com.juridiqsystem.crm.model.ChatGrupo;
+import com.juridiqsystem.crm.model.MensagemInterna;
 import com.juridiqsystem.crm.model.Participante;
 import com.juridiqsystem.crm.model.Protocolo;
 import com.juridiqsystem.crm.model.Usuario;
@@ -9,6 +10,7 @@ import com.juridiqsystem.crm.model.dtos.ChatGrupoResponseDTO;
 import com.juridiqsystem.crm.model.dtos.GrupoCreateDTO;
 import com.juridiqsystem.crm.model.enums.StatusProtocolo;
 import com.juridiqsystem.crm.repository.ChatGrupoRepository;
+import com.juridiqsystem.crm.repository.MensagemInternaRepository;
 import com.juridiqsystem.crm.repository.UsuarioRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -38,6 +41,9 @@ public class ChatGrupoService {
 
     @Autowired
     private ChatGrupoRepository chatGrupoRepository;
+
+    @Autowired
+    private MensagemInternaRepository mensagemInternaRepository;
 
     @Autowired
     private S3Service s3Service;
@@ -89,7 +95,28 @@ public class ChatGrupoService {
             );
         }).collect(Collectors.toList());
 
+        preencherUltimaMensagem(chatGrupos, dtoList);
+
         return Optional.of(dtoList);
+    }
+
+    /**
+     * Preenche lastMessage/lastMessageAt de cada grupo em uma query batched (não N+1) — casa cada
+     * dto pelo índice da lista de origem (mesma ordem, gerado por .map() sem reordenar).
+     */
+    private void preencherUltimaMensagem(List<ChatGrupo> chatGrupos, List<ChatGrupoResponseDTO> dtoList) {
+        List<Long> grupoIds = chatGrupos.stream().map(ChatGrupo::getId).toList();
+        Map<Long, MensagemInterna> ultimaMensagemPorGrupo = mensagemInternaRepository
+                .findUltimasMensagensPorGrupos(grupoIds).stream()
+                .collect(Collectors.toMap(m -> m.getChatGrupo().getId(), m -> m));
+
+        for (int i = 0; i < chatGrupos.size(); i++) {
+            MensagemInterna ultimaMensagem = ultimaMensagemPorGrupo.get(chatGrupos.get(i).getId());
+            if (ultimaMensagem != null) {
+                dtoList.get(i).setLastMessage(ultimaMensagem.getConteudo());
+                dtoList.get(i).setLastMessageAt(ultimaMensagem.getDataEnvio());
+            }
+        }
     }
 
 
