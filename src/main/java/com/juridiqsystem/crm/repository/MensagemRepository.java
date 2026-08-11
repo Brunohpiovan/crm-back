@@ -31,16 +31,39 @@ public interface MensagemRepository extends JpaRepository<Mensagem, Long> {
     List<String> findDistinctSenderIdsWithoutProtocol();
 
     /**
-     * Última mensagem (por dataEnvio) de cada protocolo em protocoloIds — batched, não N+1.
-     * m.getProtocolo().getId() no lado do service não dispara select extra: protocolo é
-     * ManyToOne LAZY, mas o id fica disponível no proxy sem inicializar a entidade.
+     * Última mensagem de cada protocolo em protocoloIds — batched, não N+1. Desempate por
+     * MAX(id) em vez de MAX(data_envio): duas mensagens do mesmo protocolo podem ter o mesmo
+     * timestamp (ex.: sendMessage salvando conteúdo+mídia em sequência rápida), o que fazia
+     * essa query devolver 2 linhas para o mesmo protocolo e quebrava o Collectors.toMap
+     * chamador com "Duplicate key" (mesmo padrão já corrigido em
+     * MensagemInternaRepository#findUltimasMensagensPorGrupos). m.getProtocolo().getId() no
+     * lado do service não dispara select extra: protocolo é ManyToOne LAZY, mas o id fica
+     * disponível no proxy sem inicializar a entidade.
      */
     @Query("""
     SELECT m FROM Mensagem m JOIN FETCH m.sender
-    WHERE m.protocolo.id IN :protocoloIds
-      AND m.data_envio = (
-        SELECT MAX(m2.data_envio) FROM Mensagem m2 WHERE m2.protocolo.id = m.protocolo.id
-      )
+    WHERE m.id IN (
+      SELECT MAX(m2.id) FROM Mensagem m2
+      WHERE m2.protocolo.id IN :protocoloIds
+      GROUP BY m2.protocolo.id
+    )
     """)
     List<Mensagem> findUltimasMensagensPorProtocolos(@Param("protocoloIds") List<Long> protocoloIds);
+
+    /**
+     * Última mensagem "pública" (m.protocolo IS NULL, contato ainda não atendido) de cada
+     * participante em senderIds — batched, não N+1. Mesmo desempate por MAX(id) usado em
+     * findUltimasMensagensPorProtocolos, pelo mesmo motivo (timestamps podem colidir).
+     */
+    @Query("""
+    SELECT m FROM Mensagem m JOIN FETCH m.sender
+    WHERE m.protocolo IS NULL
+      AND m.sender.id IN :senderIds
+      AND m.id IN (
+        SELECT MAX(m2.id) FROM Mensagem m2
+        WHERE m2.protocolo IS NULL AND m2.sender.id IN :senderIds
+        GROUP BY m2.sender.id
+      )
+    """)
+    List<Mensagem> findUltimasMensagensPublicasPorSenders(@Param("senderIds") List<Long> senderIds);
 }

@@ -43,7 +43,7 @@ public class ChatInternoController {
         // tópico pra tocar o som de notificação em qualquer página.
         String empresaIdStr = String.valueOf(usuarioAutenticado.getEmpresaId());
         NovaMensagemInternaNotificacaoDTO notificacao = new NovaMensagemInternaNotificacaoDTO(
-                chatId, usuarioAutenticado.getNome(), buildPreview(dto.getConteudo()));
+                chatId, usuarioAutenticado.getPublicId(), usuarioAutenticado.getNome(), buildPreview(dto.getConteudo()));
         List<String> membros = TenantContext.runAs(usuarioAutenticado.getEmpresaId(),
                 () -> service.getMembrosPublicIds(chatId));
         membros.stream()

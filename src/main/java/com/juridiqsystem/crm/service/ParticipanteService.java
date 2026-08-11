@@ -47,12 +47,27 @@ public class ParticipanteService {
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
         List<Participante> participantes = participanteRepository.findAllWithoutOpenProtocoloFromOtherAdmins(admin.getId());
         Set<Long> comProtocoloAbertoComigo = new HashSet<>(protocoloRepository.findParticipanteIdsComProtocoloAbertoPorAdmin(admin.getId()));
-        Map<Long, Mensagem> ultimaMensagemPorParticipante = buscarUltimasMensagensPorParticipante(participantes);
+
+        // Preview de lastMessage vem de fontes diferentes dependendo do estado do participante:
+        // com protocolo ABERTO comigo, mostra a última mensagem desse atendimento; sem protocolo
+        // aberto, mostra a última mensagem "pública" (ainda sem protocolo) se houver uma — nunca
+        // mensagem de um protocolo já FECHADO, senão a conversa parece "aberta" sem estar.
+        List<Participante> comProtocoloAberto = participantes.stream()
+                .filter(p -> comProtocoloAbertoComigo.contains(p.getId()))
+                .toList();
+        List<Participante> semProtocoloAberto = participantes.stream()
+                .filter(p -> !comProtocoloAbertoComigo.contains(p.getId()))
+                .toList();
+        Map<Long, Mensagem> ultimaMensagemDeProtocoloAberto = buscarUltimasMensagensPorParticipante(comProtocoloAberto);
+        Map<Long, Mensagem> ultimaMensagemPublica = buscarUltimasMensagensPublicas(semProtocoloAberto);
 
         return participantes.stream()
                 .map(p -> {
-                    ParticipanteDTO dto = new ParticipanteDTO(p, comProtocoloAbertoComigo.contains(p.getId()));
-                    Mensagem ultimaMensagem = ultimaMensagemPorParticipante.get(p.getId());
+                    boolean openProtocol = comProtocoloAbertoComigo.contains(p.getId());
+                    ParticipanteDTO dto = new ParticipanteDTO(p, openProtocol);
+                    Mensagem ultimaMensagem = openProtocol
+                            ? ultimaMensagemDeProtocoloAberto.get(p.getId())
+                            : ultimaMensagemPublica.get(p.getId());
                     if (ultimaMensagem != null) {
                         dto.setLastMessage(ultimaMensagem.getConteudo());
                         dto.setLastMessageAt(ultimaMensagem.getData_envio());
@@ -63,9 +78,9 @@ public class ParticipanteService {
     }
 
     /**
-     * Resolve a última mensagem de cada participante em 2 queries batched (não N+1): primeiro o
-     * protocolo mais recente de cada um, depois a última mensagem de cada um desses protocolos.
-     * Participantes sem nenhum protocolo (ainda não atendidos) ficam de fora do mapa retornado.
+     * Resolve a última mensagem do protocolo ABERTO de cada participante em 2 queries batched
+     * (não N+1): primeiro o protocolo mais recente de cada um (que, para quem está nesta lista,
+     * é sempre o aberto), depois a última mensagem desse protocolo.
      */
     private Map<Long, Mensagem> buscarUltimasMensagensPorParticipante(List<Participante> participantes) {
         if (participantes.isEmpty()) return Collections.emptyMap();
@@ -90,6 +105,18 @@ public class ParticipanteService {
             if (mensagem != null) resultado.put(participanteId, mensagem);
         });
         return resultado;
+    }
+
+    /**
+     * Última mensagem "pública" (sem protocolo ainda) de cada participante, batched (não N+1).
+     * Participantes sem nenhuma mensagem pública ficam de fora do mapa retornado.
+     */
+    private Map<Long, Mensagem> buscarUltimasMensagensPublicas(List<Participante> participantes) {
+        if (participantes.isEmpty()) return Collections.emptyMap();
+
+        List<Long> participanteIds = participantes.stream().map(Participante::getId).toList();
+        return mensagemRepository.findUltimasMensagensPublicasPorSenders(participanteIds).stream()
+                .collect(Collectors.toMap(m -> m.getSender().getId(), m -> m));
     }
 
 

@@ -48,16 +48,21 @@ public interface ProtocoloRepository extends JpaRepository<Protocolo, Long> {
     /**
      * Para cada participante em participanteIds, o id do seu protocolo mais recente (aberto ou
      * fechado) — usado para resolver a "última mensagem" na listagem de contatos do chat externo.
-     * Uma query batched (não N+1): a subquery correlacionada por participante encontra o máximo
-     * de dataCriacao, sem round-trip por participante.
+     * Uma query batched (não N+1). Desempate por MAX(id) em vez de MAX(dataCriacao): dois
+     * protocolos do mesmo participante podem colidir no timestamp de criação, o que faria essa
+     * query devolver 2 linhas para o mesmo participante e quebrar o Collectors.toMap chamador
+     * com "Duplicate key" (mesmo padrão corrigido em
+     * MensagemInternaRepository#findUltimasMensagensPorGrupos). id é sequencial/único, então
+     * nunca empata.
      */
     @Query("""
     SELECT p.participante.id AS participanteId, p.id AS protocoloId
     FROM Protocolo p
-    WHERE p.participante.id IN :participanteIds
-      AND p.dataCriacao = (
-        SELECT MAX(p2.dataCriacao) FROM Protocolo p2 WHERE p2.participante.id = p.participante.id
-      )
+    WHERE p.id IN (
+      SELECT MAX(p2.id) FROM Protocolo p2
+      WHERE p2.participante.id IN :participanteIds
+      GROUP BY p2.participante.id
+    )
     """)
     List<UltimoProtocoloProjection> findUltimosProtocoloIdsPorParticipantes(@Param("participanteIds") List<Long> participanteIds);
 

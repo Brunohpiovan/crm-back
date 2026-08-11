@@ -27,7 +27,7 @@ public class ParticipanteDTO {
     private TipoParticipante tipoParticipante;
     @Schema(description = "true quando este participante tem um protocolo ABERTO com o administrador que fez a requisição")
     private boolean openProtocol;
-    @Schema(description = "Conteúdo da última mensagem trocada com este participante (via seu protocolo mais recente, aberto ou fechado). Nulo se o participante nunca teve um protocolo.")
+    @Schema(description = "Conteúdo da última mensagem trocada com este participante: do protocolo ABERTO com o administrador que fez a requisição, se houver um; senão, da última mensagem pública (sem protocolo), se houver. Nunca vem de um protocolo já FECHADO. Nulo se não houver nenhuma dessas.")
     private String lastMessage;
     @Schema(description = "Data/hora de envio de `lastMessage`. Nulo se `lastMessage` for nulo.")
     private LocalDateTime lastMessageAt;
