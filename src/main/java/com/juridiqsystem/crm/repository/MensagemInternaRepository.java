@@ -22,15 +22,20 @@ public interface MensagemInternaRepository extends JpaRepository<MensagemInterna
     Page<MensagemInterna> findByChatGrupo(@Param("chatGrupo") ChatGrupo chatGrupo, Pageable pageable);
 
     /**
-     * Última mensagem (por dataEnvio) de cada grupo em chatGrupoIds — batched, não N+1. Usado
-     * tanto pelos contatos ativos (via grupo privado) quanto pelos grupos públicos.
+     * Última mensagem de cada grupo em chatGrupoIds — batched, não N+1. Usado tanto pelos
+     * contatos ativos (via grupo privado) quanto pelos grupos públicos. Desempate por MAX(id)
+     * em vez de MAX(dataEnvio): duas mensagens do mesmo grupo podem ter o mesmo timestamp
+     * (resolução do relógio), o que fazia essa query devolver 2 linhas para o mesmo grupo e
+     * quebrava o Collectors.toMap chamador com "Duplicate key". O id é IDENTITY (sequencial e
+     * único), então nunca empata.
      */
     @Query("""
     SELECT m FROM MensagemInterna m JOIN FETCH m.sender
-    WHERE m.chatGrupo.id IN :chatGrupoIds
-      AND m.dataEnvio = (
-        SELECT MAX(m2.dataEnvio) FROM MensagemInterna m2 WHERE m2.chatGrupo.id = m.chatGrupo.id
-      )
+    WHERE m.id IN (
+      SELECT MAX(m2.id) FROM MensagemInterna m2
+      WHERE m2.chatGrupo.id IN :chatGrupoIds
+      GROUP BY m2.chatGrupo.id
+    )
     """)
     List<MensagemInterna> findUltimasMensagensPorGrupos(@Param("chatGrupoIds") List<Long> chatGrupoIds);
 
