@@ -48,7 +48,10 @@ public class AuthenticationService {
 
     public LoginResponseDTO login(AuthenticationDTO data) {
         String clientIp = clientInfoService.getClientIp(request);
-        String rateLimitKey = clientIp + "|" + data.codigoEmpresa() + "|" + data.login().trim().toLowerCase();
+        // Chave por IP+empresa (sem o login): ver javadoc de LoginRateLimiter — de propósito não
+        // isola por conta, senão bastaria trocar de e-mail a cada 5 tentativas erradas pra nunca
+        // ser bloqueado.
+        String rateLimitKey = clientIp + "|" + data.codigoEmpresa();
         if (loginRateLimiter.isBlocked(rateLimitKey)) {
             securityLogger.log(SecurityEventType.RATE_LIMIT_TRIGGERED, "Login bloqueado por excesso de tentativas",
                     data.codigoEmpresa() + "|" + data.login(), clientIp, "/auth/login");

@@ -10,10 +10,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Limiter por IP+empresa+login, em memória, para POST /auth/login: contém brute-force de senha
- * contra uma conta específica sem punir outros usuários logando com sucesso do mesmo IP (ex.:
- * escritório atrás de um NAT). Só tentativas malsucedidas contam pro limite — login correto reseta
- * a janela. Mesma ressalva de PasswordRecoveryRateLimiter: é por instância, não global entre réplicas.
+ * Limiter por IP+empresa (não por conta), em memória, para POST /auth/login: 5 tentativas
+ * malsucedidas contra QUALQUER conta daquela empresa, vindas do mesmo IP, bloqueiam novas
+ * tentativas de login para aquela empresa a partir daquele IP — inclusive com credenciais
+ * válidas de outra conta — até a janela expirar. De propósito não isola por login: se a chave
+ * incluísse a conta tentada, bastaria trocar de e-mail a cada 5 erros pra nunca ser bloqueado.
+ * Um login bem-sucedido reseta a janela inteira do IP+empresa. Mesma ressalva de
+ * PasswordRecoveryRateLimiter: é por instância, não global entre réplicas.
  */
 @Component
 public class LoginRateLimiter {
