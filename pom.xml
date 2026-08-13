@@ -142,13 +142,7 @@
 			<artifactId>regions</artifactId>
 			<version>2.20.0</version>
 		</dependency>
-		<dependency>
-			<groupId>com.twilio.sdk</groupId>
-			<artifactId>twilio</artifactId>
-			<version>9.0.0</version>
-		</dependency>
-
-		<!-- Retry com backoff para chamadas a servicos externos (Resend, Twilio) sujeitas a falha transitoria -->
+		<!-- Retry com backoff para chamadas a servicos externos (Resend, Meta Graph API) sujeitas a falha transitoria -->
 		<dependency>
 			<groupId>org.springframework.retry</groupId>
 			<artifactId>spring-retry</artifactId>

@@ -26,9 +26,9 @@ public class WhatsappWebhookEvento {
     @Column(name = "empresa_id", nullable = false)
     private Long empresaId;
 
-    /** SID do Twilio — globalmente único por natureza (é a própria Twilio quem garante isso, não faz sentido escopar por empresa). */
-    @Column(name = "message_sid", nullable = false, unique = true, length = 64)
-    private String messageSid;
+    /** wamid da Meta — globalmente único por natureza, não faz sentido escopar por empresa. Antes "messageSid" (SID da Twilio). */
+    @Column(name = "external_message_id", nullable = false, unique = true, length = 128)
+    private String externalMessageId;
 
     @Column(name = "processado_em", nullable = false)
     private LocalDateTime processadoEm;

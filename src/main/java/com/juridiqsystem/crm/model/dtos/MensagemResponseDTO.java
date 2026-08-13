@@ -1,6 +1,7 @@
 package com.juridiqsystem.crm.model.dtos;
 
 import com.juridiqsystem.crm.model.Mensagem;
+import com.juridiqsystem.crm.model.enums.MessageStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -23,6 +24,8 @@ public class MensagemResponseDTO {
     private LocalDateTime data_envio;
     @Schema(description = "Resumo do protocolo ao qual esta mensagem está vinculada; null quando a mensagem ainda não foi associada a nenhum protocolo (mensagem \"pública\")")
     private ProtocoloMessageDTO protocolo;
+    @Schema(description = "Status de entrega (sent/delivered/read/failed) — só preenchido para mensagens enviadas por nós via WhatsApp; null em mensagens recebidas ou no histórico pré-migração Meta.")
+    private MessageStatus status;
 
     public MensagemResponseDTO(Mensagem mensagem){
         this.id = mensagem.getPublicId();
@@ -30,5 +33,6 @@ public class MensagemResponseDTO {
         this.conteudo = mensagem.getConteudo();
         this.data_envio = mensagem.getData_envio();
         this.protocolo = mensagem.getProtocolo() != null ? new ProtocoloMessageDTO(mensagem.getProtocolo()) : null;
+        this.status = mensagem.getStatus();
     }
 }

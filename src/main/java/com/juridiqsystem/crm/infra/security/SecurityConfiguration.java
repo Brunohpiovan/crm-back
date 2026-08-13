@@ -92,6 +92,7 @@ public class SecurityConfiguration {
                         // alguém implementar o endpoint sem lembrar de checar esta linha.
                         .requestMatchers(HttpMethod.POST, "/recover-password").permitAll()
                         .requestMatchers(HttpMethod.POST, "/reset-password").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/whatsapp/webhook").permitAll()
                         .requestMatchers(HttpMethod.POST, "/whatsapp/webhook").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/contato").permitAll()
                         .requestMatchers(HttpMethod.POST, "/usuario").hasAuthority("ROLE_ADMIN")
@@ -109,6 +110,10 @@ public class SecurityConfiguration {
                         // próprio cadastro).
                         .requestMatchers(HttpMethod.GET, "/empresa").hasAuthority("ROLE_VENDEDOR")
                         .requestMatchers(HttpMethod.PUT, "/empresa").hasAuthority("ROLE_ADMIN")
+                        // Conexão do WhatsApp da própria empresa (Embedded Signup): exclusividade de
+                        // ADMIN, mesmo padrão de PUT /empresa — nenhum vendedor gerencia essa integração.
+                        .requestMatchers(HttpMethod.GET, "/empresa/whatsapp-integration/**").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/empresa/whatsapp-integration/**").hasAuthority("ROLE_ADMIN")
                         // Só ADMINISTRADOR cria/atualiza/exclui funil e etapa (afeta o pipeline
                         // de vendas de todos os vendedores). Match exato em "/funil" (POST) não
                         // pega POST /funil/filtro (consulta) nem POST /funil/add-funcionario/**.

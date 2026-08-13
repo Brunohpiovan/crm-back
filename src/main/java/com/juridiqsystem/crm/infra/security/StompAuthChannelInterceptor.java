@@ -70,7 +70,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     }
 
     /**
-     * Tópicos do chat de atendimento (WhatsApp/Twilio) são escopados por empresa no formato
+     * Tópicos do chat de atendimento (WhatsApp/Meta Cloud API) são escopados por empresa no formato
      * "/topic/empresa/{empresaId}/...". Não basta o frontend montar a URL certa — sem essa
      * checagem, qualquer usuário autenticado (de qualquer empresa) poderia assinar o tópico de
      * outra empresa só sabendo o empresaId dela (é um Long sequencial, fácil de adivinhar).

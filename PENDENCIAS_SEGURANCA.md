@@ -63,7 +63,8 @@ foi possível rodar a aplicação para validar.
 
 - [ ] **AWS SDK** (`software.amazon.awssdk`) — fixado em `2.20.0` no `pom.xml`, versão antiga da
       série 2.x.
-- [ ] **Twilio SDK** (`com.twilio.sdk:twilio`) — fixado em `9.0.0`.
+- [x] **Twilio SDK** (`com.twilio.sdk:twilio`) — resolvido: dependência removida por completo na
+      migração para a Meta WhatsApp Cloud API (2026-08-13), ver `docs/whatsapp/ARCHITECTURE.md`.
 - [ ] **`react-quill-new` / `quill`** (frontend) — `npm audit` encontrou XSS conhecido
       (GHSA-v3m3-f69x-jf25). Mitigado por sanitização (DOMPurify no frontend + jsoup no backend,
       as duas já implementadas), mas o pacote em si continua vulnerável. Avaliar downgrade
