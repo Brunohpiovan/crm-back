@@ -1,5 +1,7 @@
 package com.juridiqsystem.crm.service;
 
+import com.juridiqsystem.crm.infra.security.logging.SecurityEventType;
+import com.juridiqsystem.crm.infra.security.logging.SecurityLogger;
 import com.juridiqsystem.crm.model.Mensagem;
 import com.juridiqsystem.crm.model.Participante;
 import com.juridiqsystem.crm.model.dtos.ParticipanteCreateRequest;
@@ -16,6 +18,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +36,9 @@ public class ParticipanteService {
 
     @Autowired
     private ParticipanteRepository participanteRepository;
+
+    @Autowired
+    private SecurityLogger securityLogger;
 
     @Autowired
     private ProtocoloRepository protocoloRepository;
@@ -232,6 +239,15 @@ public class ParticipanteService {
         Participante optionalParticipante = participanteRepository.findByPublicId(id).orElseThrow(() ->
                 new UsernameNotFoundException("Participante não encontrado"));
         participanteRepository.delete(optionalParticipante);
+
+        securityLogger.log(SecurityEventType.ADMIN_ACTION,
+                "Participante excluído (hard delete): nome=" + optionalParticipante.getNome(),
+                currentActorLogin(), null, "/participante/" + id);
+    }
+
+    private String currentActorLogin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null ? authentication.getName() : null;
     }
 
     public Participante findByCelular(String celular){

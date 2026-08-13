@@ -130,7 +130,10 @@ public class EmpresaService {
         empresa.setNotificacaoSonoraHabilitada(dto.getNotificacaoSonoraHabilitada());
         empresa.setAtualizadoEm(LocalDateTime.now());
 
-        return new EmpresaResponseDTO(empresaRepository.save(empresa));
+        Empresa salva = empresaRepository.save(empresa);
+        securityLogger.log(SecurityEventType.ADMIN_ACTION, "Configurações da empresa atualizadas: codigo=" + salva.getCodigo(),
+                currentActorLogin(), null, "/empresa");
+        return new EmpresaResponseDTO(salva);
     }
 
     private Empresa buscarEmpresaDoUsuarioAutenticado() {

@@ -187,6 +187,10 @@ public class UsuarioService {
         usuario.setBloqueado(false);
         usuario = usuarioRepository.save(usuario);
 
+        securityLogger.log(SecurityEventType.ADMIN_ACTION,
+                "Usuário criado: login=" + usuario.getLogin() + "; cargo=" + usuario.getCargo(),
+                currentActorLogin(), null, "/usuario");
+
         return new UsuarioAllDTO(usuario);
     }
 
