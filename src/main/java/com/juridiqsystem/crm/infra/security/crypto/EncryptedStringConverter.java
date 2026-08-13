@@ -13,7 +13,7 @@ import java.security.SecureRandom;
 import java.util.Base64;
 
 /**
- * Criptografa em repouso campos sensíveis reversíveis (ex.: EmpresaTwilioConfig.authToken) — não
+ * Criptografa em repouso campos sensíveis reversíveis (ex.: WhatsAppIntegration.accessToken) — não
  * serve para senha de login (essa continua BCrypt, one-way). AES/GCM com chave única da aplicação
  * (APP_ENCRYPTION_KEY), no mesmo padrão de toda outra credencial do projeto (vem de env var, nunca
  * hardcoded). GCM inclui autenticação (tag), então um valor cifrado adulterado falha ao decifrar em

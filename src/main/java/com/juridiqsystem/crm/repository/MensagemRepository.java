@@ -17,6 +17,9 @@ public interface MensagemRepository extends JpaRepository<Mensagem, Long> {
 
     Optional<Mensagem> findByPublicId(String publicId);
 
+    /** Usado para localizar a Mensagem correspondente a um evento de status recebido no webhook da Meta. */
+    Optional<Mensagem> findByExternalMessageId(String externalMessageId);
+
     @Query(value = "SELECT m FROM Mensagem m JOIN FETCH m.sender JOIN FETCH m.protocolo WHERE m.protocolo = :protocolo",
            countQuery = "SELECT COUNT(m) FROM Mensagem m WHERE m.protocolo = :protocolo")
     Page<Mensagem> findByProtocolo(@Param("protocolo") Protocolo protocolo, Pageable pageable);

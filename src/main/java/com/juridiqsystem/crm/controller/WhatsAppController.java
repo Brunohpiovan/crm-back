@@ -1,7 +1,9 @@
 package com.juridiqsystem.crm.controller;
+
 import com.juridiqsystem.crm.model.MensagemRequest;
+import com.juridiqsystem.crm.model.dtos.WhatsAppSendResultDTO;
+import com.juridiqsystem.crm.model.dtos.WhatsAppSendTemplateRequestDTO;
 import com.juridiqsystem.crm.service.WhatsAppService;
-import com.twilio.rest.api.v2010.account.Message;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -9,13 +11,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-
-@Tag(name = "WhatsApp", description = "Envio e recebimento de mensagens WhatsApp via Twilio.")
+@Tag(name = "WhatsApp", description = "Envio e recebimento de mensagens WhatsApp via Meta Cloud API.")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/whatsapp")
@@ -25,54 +26,65 @@ public class WhatsAppController {
     private WhatsAppService whatsAppService;
 
     @Operation(
-            summary = "Enviar mensagem via WhatsApp (Twilio)",
+            summary = "Enviar mensagem via WhatsApp (Meta Cloud API)",
             description = """
-                    Requer JWT (diferente do /webhook, este endpoint É chamado pelo frontend \
-                    Angular). Envia uma mensagem de texto (e, opcionalmente, mídia via `media`, \
-                    uma URL) para o número informado em `to`, usando a conta Twilio configurada. \
-                    O número de destino é normalizado automaticamente para o formato \
-                    "whatsapp:+55DDDNNNNNNNN" esperado pela API da Twilio. Retorna o objeto de \
-                    mensagem criado pelo SDK da Twilio (com sid, status, etc.).
+                    Requer JWT (diferente do /webhook, este endpoint é chamado pelo frontend). \
+                    Envia uma mensagem de texto (e, opcionalmente, mídia via `media`, uma URL \
+                    pública) para o número informado em `to`, usando a integração Meta conectada \
+                    da empresa autenticada. Retorna um DTO interno — nunca o payload cru da Graph API.
                     """
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Mensagem enviada com sucesso; retorna o objeto Message do SDK da Twilio"),
-            @ApiResponse(responseCode = "400", description = "Falha ao enviar (número/parâmetros inválidos ou erro retornado pela API da Twilio)")
+            @ApiResponse(responseCode = "200", description = "Mensagem enviada com sucesso"),
+            @ApiResponse(responseCode = "409", description = "Empresa sem integração WhatsApp conectada"),
+            @ApiResponse(responseCode = "502", description = "Falha ao enviar via Graph API")
     })
     @PostMapping("/send")
-    public Message sendMessage(@Parameter(description = "Destinatário (to), texto (message) e URL de mídia opcional (media)", required = true) @RequestBody MensagemRequest mensagemRequest) {
+    public WhatsAppSendResultDTO sendMessage(@Parameter(description = "Destinatário (to), texto (message) e URL de mídia opcional (media)", required = true) @RequestBody MensagemRequest mensagemRequest) {
         return whatsAppService.sendWhatsAppMessage(mensagemRequest);
     }
 
     @Operation(
-            summary = "Webhook de recebimento de mensagens WhatsApp (uso exclusivo da Twilio)",
+            summary = "Enviar template de mensagem WhatsApp aprovado",
+            description = "Requer JWT. Necessário para iniciar conversa fora da janela de 24h (regra da Meta)."
+    )
+    @PostMapping("/send-template")
+    public WhatsAppSendResultDTO sendTemplate(@RequestBody @Valid WhatsAppSendTemplateRequestDTO request) {
+        return whatsAppService.sendTemplateMessage(request);
+    }
+
+    @Operation(
+            summary = "Verificação do webhook (uso exclusivo da Meta)",
+            description = "Endpoint público chamado uma única vez pela Meta ao cadastrar a URL de callback no painel do App, para confirmar propriedade do endpoint."
+    )
+    @SecurityRequirements
+    @GetMapping("/webhook")
+    public ResponseEntity<String> verifyWebhook(
+            @RequestParam("hub.mode") String mode,
+            @RequestParam("hub.verify_token") String verifyToken,
+            @RequestParam("hub.challenge") String challenge) {
+        return ResponseEntity.ok(whatsAppService.verifyWebhook(mode, verifyToken, challenge));
+    }
+
+    @Operation(
+            summary = "Webhook de recebimento de eventos WhatsApp (uso exclusivo da Meta)",
             description = """
-                    Endpoint PÚBLICO (não exige JWT) — é chamado diretamente pela infraestrutura \
-                    da Twilio quando um participante envia uma mensagem WhatsApp, e não pelo \
-                    frontend Angular. A autenticidade da requisição é validada "por trás dos \
-                    panos" através da assinatura enviada no header `X-Twilio-Signature` \
-                    (validada com o auth token da conta Twilio via `RequestValidator`); \
-                    requisições sem assinatura válida são rejeitadas com 403. Eventos já \
-                    processados (mesmo `MessageSid`) são ignorados para evitar duplicidade. \
-                    Suporta texto, imagem, áudio e documentos (PDF/Word) como anexo. Ao \
-                    processar, persiste a mensagem e publica no WebSocket em \
-                    `/topic/messages/{protocoloId}` (se houver protocolo ABERTO para o remetente) \
-                    ou `/topic/messages/public` (mensagem sem protocolo associado ainda).
+                    Endpoint PÚBLICO (não exige JWT) — chamado diretamente pela infraestrutura da \
+                    Meta quando um participante envia uma mensagem WhatsApp ou quando o status de \
+                    uma mensagem enviada por nós muda (sent/delivered/read/failed). A autenticidade \
+                    é validada através da assinatura enviada no header `X-Hub-Signature-256` \
+                    (HMAC-SHA256 com o App Secret do SaaS). Eventos já processados (mesmo wamid) \
+                    são ignorados para evitar duplicidade.
                     """
     )
     @SecurityRequirements
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Evento processado (ou ignorado, se já processado anteriormente)"),
-            @ApiResponse(responseCode = "403", description = "Assinatura Twilio ausente ou inválida"),
-            @ApiResponse(responseCode = "502", description = "Falha ao baixar ou reenviar mídia (imagem/áudio/documento) recebida da Twilio")
+            @ApiResponse(responseCode = "403", description = "Assinatura Meta ausente ou inválida")
     })
     @PostMapping("/webhook")
-    public void receiveWhatsAppMessage(@Parameter(description = "Parâmetros do formulário enviado pela Twilio (From, Body, ProfileName, MediaUrl0, MediaContentType0, MessageSid, etc.)") @RequestParam Map<String, String> params,
-                                        @Parameter(description = "Assinatura HMAC da requisição, usada para validar que a chamada realmente veio da Twilio") @RequestHeader(value = "X-Twilio-Signature", required = false) String twilioSignature,
-                                        HttpServletRequest request) {
-        whatsAppService.receiveRequest(params, request.getRequestURL().toString(), twilioSignature);
+    public void receiveWebhook(@RequestBody String rawBody,
+                                @RequestHeader(value = "X-Hub-Signature-256", required = false) String signature) {
+        whatsAppService.receiveWebhookEvent(rawBody, signature);
     }
 }
-
-
-

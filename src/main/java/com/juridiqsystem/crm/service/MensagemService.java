@@ -5,6 +5,7 @@ import com.juridiqsystem.crm.model.Participante;
 import com.juridiqsystem.crm.model.Protocolo;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.MensagemResponseDTO;
+import com.juridiqsystem.crm.model.enums.MessageStatus;
 import com.juridiqsystem.crm.repository.MensagemRepository;
 import com.juridiqsystem.crm.repository.ParticipanteRepository;
 import com.juridiqsystem.crm.repository.ProtocoloRepository;
@@ -35,6 +36,17 @@ public class MensagemService{
 
 
     public List<Mensagem> sendMessage(Protocolo protocolo, Participante sender, String conteudo, String media) {
+        return sendMessage(protocolo, sender, conteudo, media, null, null);
+    }
+
+    /**
+     * externalMessageId/status só fazem sentido quando esta mensagem é o resultado direto de um
+     * envio nosso via Meta (ChatService) ou o registro de uma mensagem recebida da Meta
+     * (WhatsAppService) — nos demais casos internos ficam null. Quando conteúdo+mídia geram duas
+     * linhas (lista.size() == 2), o externalMessageId/status vão só na mensagem "principal"
+     * (texto), nunca duplicados na de mídia, para não violar a constraint UNIQUE.
+     */
+    public List<Mensagem> sendMessage(Protocolo protocolo, Participante sender, String conteudo, String media, String externalMessageId, MessageStatus status) {
         List<Mensagem> lista = new ArrayList<>();
         if(conteudo==null || conteudo.isEmpty()){
             conteudo = null;
@@ -52,6 +64,8 @@ public class MensagemService{
 
         if (conteudo != null || media != null) {
             message.setData_envio(LocalDateTime.now());
+            message.setExternalMessageId(externalMessageId);
+            message.setStatus(status);
             lista.add(mensagemRepository.save(message));
         }
 
@@ -68,6 +82,10 @@ public class MensagemService{
     }
 
     public List<Mensagem> sendMessagePublico(Participante participante, String conteudo, String media) {
+        return sendMessagePublico(participante, conteudo, media, null);
+    }
+
+    public List<Mensagem> sendMessagePublico(Participante participante, String conteudo, String media, String externalMessageId) {
         List<Mensagem> lista = new ArrayList<>();
         if (conteudo == null || conteudo.isEmpty()) {
             conteudo = null;
@@ -85,6 +103,7 @@ public class MensagemService{
 
         if (conteudo != null || media != null) {
             message.setData_envio(LocalDateTime.now());
+            message.setExternalMessageId(externalMessageId);
             lista.add(mensagemRepository.save(message));
         }
 

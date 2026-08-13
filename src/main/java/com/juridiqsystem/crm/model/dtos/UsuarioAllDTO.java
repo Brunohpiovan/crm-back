@@ -32,6 +32,8 @@ public class UsuarioAllDTO {
     private UserRole cargo;
     @Schema(description = "Se true, o usuário está inativado/bloqueado (não consegue efetuar login)")
     private Boolean bloqueado;
+    @Schema(description = "URL da foto/avatar do usuário")
+    private String avatar;
 
 
     public UsuarioAllDTO(Usuario usuario){
@@ -41,6 +43,7 @@ public class UsuarioAllDTO {
         this.celular = usuario.getCelular();
         this.cargo = usuario.getCargo();
         this.bloqueado = usuario.getBloqueado();
+        this.avatar = usuario.getUrlPicture();
     }
 
 }

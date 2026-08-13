@@ -2,6 +2,7 @@ package com.juridiqsystem.crm.service;
 
 import com.juridiqsystem.crm.model.*;
 import com.juridiqsystem.crm.model.dtos.MensagemDto;
+import com.juridiqsystem.crm.model.dtos.WhatsAppSendResultDTO;
 import com.juridiqsystem.crm.repository.ParticipanteRepository;
 import com.juridiqsystem.crm.repository.ProtocoloRepository;
 import com.juridiqsystem.crm.repository.UsuarioRepository;
@@ -40,18 +41,18 @@ public class ChatService {
         mensagemRequest.setTo(protocol.getParticipante().getCelular());
         mensagemRequest.setMessage(mensagem.getConteudo());
         mensagemRequest.setMedia(mensagem.getMedia());
-        whatsAppService.sendWhatsAppMessage(mensagemRequest);
+        WhatsAppSendResultDTO resultado = whatsAppService.sendWhatsAppMessage(mensagemRequest);
         // A partir daqui a mensagem já foi enviada ao WhatsApp do cliente. Se a persistência abaixo
         // falhar, a mensagem existe no WhatsApp mas não no histórico do CRM — logamos com contexto
         // suficiente para permitir reconciliação manual, sem esconder a exceção original.
         try {
             if(mensagem.getMedia()!=null && !mensagem.getMedia().isEmpty() && mensagem.getConteudo() != null &&
             !mensagem.getConteudo().isEmpty()){
-                return mensagemService.sendMessage(protocol, sender, mensagem.getConteudo(),mensagem.getMedia());
+                return mensagemService.sendMessage(protocol, sender, mensagem.getConteudo(), mensagem.getMedia(), resultado.externalMessageId(), resultado.status());
             }else if(mensagem.getMedia()!=null && !mensagem.getMedia().isEmpty()){
-                return mensagemService.sendMessage(protocol, sender,null, mensagem.getMedia());
+                return mensagemService.sendMessage(protocol, sender, null, mensagem.getMedia(), resultado.externalMessageId(), resultado.status());
             }else{
-                return mensagemService.sendMessage(protocol, sender, mensagem.getConteudo(),null);
+                return mensagemService.sendMessage(protocol, sender, mensagem.getConteudo(), null, resultado.externalMessageId(), resultado.status());
             }
         } catch (RuntimeException e) {
             log.error("Mensagem enviada via WhatsApp para o protocolo {} (participante {}), mas a persistência no CRM falhou.",

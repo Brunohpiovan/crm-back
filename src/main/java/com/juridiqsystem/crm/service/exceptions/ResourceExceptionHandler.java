@@ -148,6 +148,58 @@ public class ResourceExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ApiResponse(ex.getMessage()));
     }
 
+    // --- Exceções da integração Meta WhatsApp Cloud API (ver ETAPA 30 da migração Twilio->Meta):
+    // nunca expõem o payload cru retornado pela Graph API ao frontend, só uma mensagem de negócio
+    // padronizada. Erros transitórios (MetaIntegrationException) já passaram por retry no
+    // MetaWhatsAppClient antes de chegar aqui.
+
+    @ExceptionHandler(MetaAuthenticationException.class)
+    public ResponseEntity<StandardError> metaAuthenticationException(MetaAuthenticationException ex, HttpServletRequest request) {
+        log.warn("Token da integracao Meta WhatsApp invalido/expirado. uri={}", request.getRequestURI());
+        StandardError error = new StandardError(System.currentTimeMillis(), HttpStatus.UNAUTHORIZED.value(),
+                "Integração WhatsApp desautorizada", ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+    }
+
+    @ExceptionHandler(MetaRateLimitException.class)
+    public ResponseEntity<StandardError> metaRateLimitException(MetaRateLimitException ex, HttpServletRequest request) {
+        StandardError error = new StandardError(System.currentTimeMillis(), HttpStatus.TOO_MANY_REQUESTS.value(),
+                "Limite de envio excedido", ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(error);
+    }
+
+    @ExceptionHandler(MetaMessageException.class)
+    public ResponseEntity<StandardError> metaMessageException(MetaMessageException ex, HttpServletRequest request) {
+        log.error("Falha ao enviar mensagem via Meta WhatsApp Cloud API", ex);
+        StandardError error = new StandardError(System.currentTimeMillis(), HttpStatus.BAD_GATEWAY.value(),
+                "Falha no envio", "Não foi possível enviar a mensagem via WhatsApp.", request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(error);
+    }
+
+    @ExceptionHandler(MetaTemplateException.class)
+    public ResponseEntity<StandardError> metaTemplateException(MetaTemplateException ex, HttpServletRequest request) {
+        StandardError error = new StandardError(System.currentTimeMillis(), HttpStatus.BAD_REQUEST.value(),
+                "Template inválido", ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(MetaWebhookException.class)
+    public ResponseEntity<StandardError> metaWebhookException(MetaWebhookException ex, HttpServletRequest request) {
+        securityLogger.log(SecurityEventType.ACCESS_DENIED, ex.getMessage(), null,
+                clientInfoService.getClientIp(request), request.getRequestURI());
+        StandardError error = new StandardError(System.currentTimeMillis(), HttpStatus.FORBIDDEN.value(),
+                "Webhook rejeitado", ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+
+    @ExceptionHandler(MetaIntegrationException.class)
+    public ResponseEntity<StandardError> metaIntegrationException(MetaIntegrationException ex, HttpServletRequest request) {
+        log.error("Falha de integracao com a Meta Graph API", ex);
+        StandardError error = new StandardError(System.currentTimeMillis(), HttpStatus.BAD_GATEWAY.value(),
+                "Erro de integração", "Não foi possível concluir a operação devido a uma falha na API do WhatsApp.", request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(error);
+    }
+
     private String currentActor() {
         var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         return authentication != null ? authentication.getName() : null;

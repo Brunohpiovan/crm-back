@@ -73,14 +73,14 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     List<UsuarioContatoDto> findFuncionariosDoFunil(@Param("funilId") Long funilId);
 
     @Query("""
-    SELECT new com.juridiqsystem.crm.model.dtos.UsuarioAllDTO(u.publicId, u.nome, u.login, u.celular, u.cargo, u.bloqueado)
+    SELECT new com.juridiqsystem.crm.model.dtos.UsuarioAllDTO(u.publicId, u.nome, u.login, u.celular, u.cargo, u.bloqueado, u.urlPicture)
     FROM Usuario u
     WHERE (:search IS NULL OR LOWER(u.nome) LIKE :search OR LOWER(u.login) LIKE :search)
     """)
     Page<UsuarioAllDTO> findAllPaginado(@Param("search") String search, Pageable pageable);
 
     @Query("""
-    SELECT new com.juridiqsystem.crm.model.dtos.UsuarioAllDTO(u.publicId, u.nome, u.login, u.celular, u.cargo, u.bloqueado)
+    SELECT new com.juridiqsystem.crm.model.dtos.UsuarioAllDTO(u.publicId, u.nome, u.login, u.celular, u.cargo, u.bloqueado, u.urlPicture)
     FROM Usuario u
     WHERE u.cargo = :cargo
     """)

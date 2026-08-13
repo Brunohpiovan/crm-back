@@ -1,5 +1,6 @@
 package com.juridiqsystem.crm.model;
 
+import com.juridiqsystem.crm.model.enums.MessageStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -41,6 +42,15 @@ public class Mensagem {
     @Column(columnDefinition = "TEXT")
     private String conteudo;
     private LocalDateTime data_envio;
+
+    /** wamid da Meta — presente em mensagens enviadas por nós (resposta do envio) e recebidas (id do evento do webhook). Nulo no histórico pré-migração Twilio->Meta. */
+    @Column(name = "external_message_id", unique = true, length = 128)
+    private String externalMessageId;
+
+    /** Só é atualizado para mensagens enviadas por nós; a Meta reporta sent/delivered/read/failed via webhook de status. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20)
+    private MessageStatus status;
 
     public String getDataEnvio() {
         if (this.data_envio == null) {

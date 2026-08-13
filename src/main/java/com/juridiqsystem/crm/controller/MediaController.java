@@ -5,7 +5,6 @@ import com.juridiqsystem.crm.service.MediaService;
 import com.juridiqsystem.crm.service.S3Service;
 import com.juridiqsystem.crm.service.auth.SlidingWindowRateLimiter;
 import com.juridiqsystem.crm.service.exceptions.TooManyRequestsException;
-import io.jsonwebtoken.io.IOException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
