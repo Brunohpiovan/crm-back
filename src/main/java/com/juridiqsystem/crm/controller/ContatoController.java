@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -41,8 +42,8 @@ public class ContatoController {
                     content = @Content(schema = @Schema(type = "object", example = "{\"nome\": \"O nome é obrigatório e não pode estar em branco\"}")))
     })
     @PostMapping(value = "/contato")
-    public ResponseEntity<?> create(@RequestBody @Valid ContatoDTO contatoDTO) {
-        contatoService.create(contatoDTO);
+    public ResponseEntity<?> create(@RequestBody @Valid ContatoDTO contatoDTO, HttpServletRequest request) {
+        contatoService.create(contatoDTO, request);
         return ResponseEntity.ok().build();
     }
 }
