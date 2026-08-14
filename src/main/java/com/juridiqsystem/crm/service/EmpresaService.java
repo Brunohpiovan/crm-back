@@ -44,6 +44,9 @@ public class EmpresaService {
     private ImageContentValidator imageContentValidator;
 
     @Autowired
+    private ImageUrlValidator imageUrlValidator;
+
+    @Autowired
     private SecurityLogger securityLogger;
 
     public Page<EmpresaResponseDTO> findAll(String search, Pageable pageable) {
@@ -157,10 +160,16 @@ public class EmpresaService {
             String key = "logo/" + empresaDoBanco.getCodigo() + "_" + LocalDateTime.now().format(formatter);
             return s3Service.uploadFile(logo, key);
         }
+        if (!imageUrlValidator.isPermitida(dto.getLogoUrl())) {
+            throw new IllegalArgumentException("URL de logo não permitida.");
+        }
         return dto.getLogoUrl();
     }
 
     private void aplicarDados(Empresa empresa, EmpresaCreateDTO dto) {
+        if (!imageUrlValidator.isPermitida(dto.getLogoUrl())) {
+            throw new IllegalArgumentException("URL de logo não permitida.");
+        }
         empresa.setCodigo(dto.getCodigo());
         empresa.setNome(dto.getNome());
         empresa.setLogoUrl(dto.getLogoUrl());

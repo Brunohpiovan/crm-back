@@ -44,6 +44,9 @@ public class ParticipanteService {
     private ProtocoloRepository protocoloRepository;
 
     @Autowired
+    private ImageUrlValidator imageUrlValidator;
+
+    @Autowired
     private UsuarioRepository usuarioRepository;
 
     @Autowired
@@ -183,6 +186,9 @@ public class ParticipanteService {
 
 
     public Participante update(ParticipanteUpdateRequest request, String id){
+        if (!imageUrlValidator.isPermitida(request.urlPicture())) {
+            throw new IllegalArgumentException("URL de foto não permitida.");
+        }
         Participante participante = new Participante();
         participante.setUrlPicture(request.urlPicture());
         participante.setNome(request.nome());
