@@ -327,10 +327,22 @@ public class WhatsAppService {
     private static final int TWILIO_MEDIA_CONNECT_TIMEOUT_MS = 10_000;
     private static final int TWILIO_MEDIA_READ_TIMEOUT_MS = 30_000;
 
+    // O parâmetro MediaUrl0 vem do corpo do próprio webhook (dado "externo", mesmo que a
+    // requisição inteira já tenha sido validada pela assinatura Twilio — ver isValidTwilioRequest)
+    // — allowlist de host como defesa em profundidade contra SSRF, para nunca deixar o backend
+    // fazer uma requisição de saída para um host arbitrário. api.twilio.com é o único host que a
+    // Twilio de fato usa para servir mídia de mensagens recebidas.
+    private static final String TWILIO_MEDIA_HOST = "api.twilio.com";
+
     private byte[] downloadMediaFromTwilio(String mediaUrl, EmpresaTwilioConfig config) throws IOException {
+        validarHostMidiaTwilio(mediaUrl);
+
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(TWILIO_MEDIA_CONNECT_TIMEOUT_MS);
         requestFactory.setReadTimeout(TWILIO_MEDIA_READ_TIMEOUT_MS);
+        // Não segue redirecionamentos automaticamente (comportamento padrão do
+        // SimpleClientHttpRequestFactory) — um 3xx apontando para fora do host confiável nunca é
+        // seguido silenciosamente, mesmo que a resposta inicial tenha vindo de api.twilio.com.
         RestTemplate restTemplate = new RestTemplate(requestFactory);
 
         HttpHeaders headers = new HttpHeaders();
@@ -340,6 +352,21 @@ public class WhatsAppService {
         ResponseEntity<byte[]> response = restTemplate.exchange(mediaUrl, HttpMethod.GET, entity, byte[].class);
 
         return response.getBody();
+    }
+
+    private void validarHostMidiaTwilio(String mediaUrl) {
+        URI uri;
+        try {
+            uri = URI.create(mediaUrl);
+        } catch (IllegalArgumentException e) {
+            throw new IntegrationException("URL de mídia do WhatsApp inválida.", e);
+        }
+        String host = uri.getHost();
+        if (!"https".equalsIgnoreCase(uri.getScheme()) || host == null
+                || !(host.equalsIgnoreCase(TWILIO_MEDIA_HOST) || host.toLowerCase().endsWith("." + TWILIO_MEDIA_HOST))) {
+            log.warn("Download de mídia do WhatsApp bloqueado: host fora da allowlist. mediaUrl={}", mediaUrl);
+            throw new IntegrationException("Origem de mídia do WhatsApp não permitida.");
+        }
     }
 
     private MultipartFile createMultipartFile(byte[] content, String fileName, String contentType) {
