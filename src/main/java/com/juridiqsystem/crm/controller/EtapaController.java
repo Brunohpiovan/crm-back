@@ -82,7 +82,7 @@ public class EtapaController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Etapa com id 1 nao encontrada")))
     })
     @PutMapping(value = "/{id}")
-    public ResponseEntity<?> update(@Parameter(description = "Id da etapa", required = true) @PathVariable String id,@RequestBody EtapaUpdateDTO etapaRequest) {
+    public ResponseEntity<?> update(@Parameter(description = "Id da etapa", required = true) @PathVariable String id,@RequestBody @Valid EtapaUpdateDTO etapaRequest) {
         etapaService.update(id, etapaRequest);
         return ResponseEntity.ok().build();
     }

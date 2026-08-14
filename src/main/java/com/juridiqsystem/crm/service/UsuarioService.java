@@ -61,6 +61,9 @@ public class UsuarioService {
     private ImageContentValidator imageContentValidator;
 
     @Autowired
+    private ImageUrlValidator imageUrlValidator;
+
+    @Autowired
     private ChatGrupoRepository chatGrupoRepository;
 
     @Autowired
@@ -168,6 +171,9 @@ public class UsuarioService {
         validarDuplicidadeCriacao(dto.getLogin(), dto.getCpf());
 
         Usuario usuario = new Usuario(dto);
+        if (!imageUrlValidator.isPermitida(usuario.getUrlPicture())) {
+            throw new IllegalArgumentException("URL de foto não permitida.");
+        }
         String key = "user-avatar/" + dto.getNome().replaceAll("\\s+", "") + "pic";
         if (foto != null) {
             imageContentValidator.validar(foto);
@@ -385,6 +391,9 @@ public class UsuarioService {
             imageContentValidator.validar(foto);
             String key = generatePhotoKey(dto.getNome());
             return s3Service.uploadFile(foto, key);
+        }
+        if (!imageUrlValidator.isPermitida(urlPictureSolicitada)) {
+            throw new IllegalArgumentException("URL de foto não permitida.");
         }
         return urlPictureSolicitada;
     }

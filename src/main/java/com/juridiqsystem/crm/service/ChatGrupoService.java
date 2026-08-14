@@ -52,6 +52,9 @@ public class ChatGrupoService {
     private ImageContentValidator imageContentValidator;
 
     @Autowired
+    private ImageUrlValidator imageUrlValidator;
+
+    @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
     @Value("${aws.s3.bucket-name}")
@@ -239,6 +242,12 @@ public class ChatGrupoService {
     }
 
     private ChatGrupo dtoToModel(GrupoCreateDTO dto){
+        if (!imageUrlValidator.isPermitida(dto.getUrlPicture())) {
+            throw new IllegalArgumentException("URL de foto não permitida.");
+        }
+        if (!imageUrlValidator.isPermitida(dto.getBackgroundImageUrl())) {
+            throw new IllegalArgumentException("URL de imagem de fundo não permitida.");
+        }
         ChatGrupo grupo = new ChatGrupo();
 
         grupo.setNome(dto.getNome());

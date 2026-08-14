@@ -64,6 +64,7 @@ public class DiscordWebhookService {
         TITLES.put(SUSPICIOUS_REQUEST, "🕵️ Requisição suspeita");
         TITLES.put(ADMIN_ACTION, "🛠️ Ação administrativa");
         TITLES.put(RESOURCE_ACCESS_DENIED, "🔐 Acesso a recurso negado");
+        TITLES.put(ADMIN_ROUTE_DENIED, "🛡️ Tentativa de acesso administrativo bloqueada");
 
         COLORS.put(LOGIN_SUCCESS, COLOR_SUCCESS);
         COLORS.put(LOGOUT, COLOR_SUCCESS);
@@ -79,6 +80,7 @@ public class DiscordWebhookService {
         COLORS.put(EXPIRED_TOKEN, COLOR_DANGER);
         COLORS.put(SUSPICIOUS_REQUEST, COLOR_DANGER);
         COLORS.put(RESOURCE_ACCESS_DENIED, COLOR_DANGER);
+        COLORS.put(ADMIN_ROUTE_DENIED, COLOR_DANGER);
         COLORS.put(ADMIN_ACTION, COLOR_INFO);
     }
 

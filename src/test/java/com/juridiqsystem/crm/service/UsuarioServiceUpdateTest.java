@@ -53,6 +53,9 @@ class UsuarioServiceUpdateTest {
     @Mock
     private ParticipanteService participanteService;
 
+    @Mock
+    private ImageUrlValidator imageUrlValidator;
+
     @InjectMocks
     private UsuarioService usuarioService;
 
@@ -64,6 +67,7 @@ class UsuarioServiceUpdateTest {
     @BeforeEach
     void stubsComuns() {
         lenient().when(s3Service.getBaseUrl()).thenReturn("https://cdn-nao-usado-neste-teste.example.com/");
+        lenient().when(imageUrlValidator.isPermitida(any())).thenReturn(true);
     }
 
     private Usuario usuarioExistente() {

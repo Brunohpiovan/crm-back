@@ -34,15 +34,21 @@ public class PasswordResetService {
 
     @Transactional
     public ApiResponse changePassord(String token, String password, String password2) {
+        if (!Objects.equals(password, password2)) {
+            throw new IllegalArgumentException("As senhas nao coincidem");
+        }
+
         PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
                 .orElseThrow(() -> new IllegalArgumentException("Token inválido ou expirado."));
 
-        if (Boolean.TRUE.equals(resetToken.getUsado()) || resetToken.getExpiraEm().isBefore(LocalDateTime.now())) {
+        // Consumo atômico (UPDATE ... WHERE usado = false ...): se duas requisições chegarem
+        // simultaneamente com o mesmo token válido, só uma consegue marcar usado=true e seguir
+        // adiante — a outra recebe 0 linhas afetadas aqui e é rejeitada, em vez de ambas lerem
+        // usado=false (SELECT) antes de qualquer uma persistir e conseguirem trocar a senha duas
+        // vezes na janela da corrida.
+        int atualizados = passwordResetTokenRepository.marcarComoUsadoSeValido(token, LocalDateTime.now());
+        if (atualizados == 0) {
             throw new IllegalArgumentException("Token inválido ou expirado.");
-        }
-
-        if (!Objects.equals(password, password2)) {
-            throw new IllegalArgumentException("As senhas nao coincidem");
         }
 
         Usuario user = usuarioRepository.findByIdIgnorandoTenant(resetToken.getUsuarioId())
@@ -62,9 +68,6 @@ public class PasswordResetService {
         } finally {
             TenantContext.clear();
         }
-
-        resetToken.setUsado(true);
-        passwordResetTokenRepository.save(resetToken);
 
         securityLogger.log(SecurityEventType.PASSWORD_RESET_SUCCESS, null, user.getLogin(), null, "/reset-password");
 
