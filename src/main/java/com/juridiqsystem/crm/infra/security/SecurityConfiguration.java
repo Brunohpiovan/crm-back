@@ -36,6 +36,9 @@ public class SecurityConfiguration {
     SecurityFilter securityFilter;
 
     @Autowired
+    private AdminRouteGuardFilter adminRouteGuardFilter;
+
+    @Autowired
     private SecurityLogger securityLogger;
 
     @Autowired
@@ -185,6 +188,11 @@ public class SecurityConfiguration {
                         })
                 )
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
+                // Antes até do SecurityFilter: /master/** nem chega a ter o JWT decodificado se
+                // o segredo/allowlist de IP (quando configurados) barrar aqui — ver
+                // AdminRouteGuardFilter. Camada adicional, não substitui a checagem de
+                // ROLE_MASTER feita mais abaixo em authorizeHttpRequests.
+                .addFilterBefore(adminRouteGuardFilter, SecurityFilter.class)
                 .build();
     }
 
