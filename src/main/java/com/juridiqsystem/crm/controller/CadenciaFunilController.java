@@ -62,7 +62,7 @@ public class CadenciaFunilController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil de origem nao encontrado")))
     })
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody CadenciaFunilRequestDto cadenciaFunil) {
+    public ResponseEntity<?> create(@RequestBody @Valid CadenciaFunilRequestDto cadenciaFunil) {
         cadenciaFunilService.create(cadenciaFunil);
         return ResponseEntity.ok().build();
     }

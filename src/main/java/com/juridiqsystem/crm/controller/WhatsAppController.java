@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,7 +41,7 @@ public class WhatsAppController {
             @ApiResponse(responseCode = "400", description = "Falha ao enviar (número/parâmetros inválidos ou erro retornado pela API da Twilio)")
     })
     @PostMapping("/send")
-    public Message sendMessage(@Parameter(description = "Destinatário (to), texto (message) e URL de mídia opcional (media)", required = true) @RequestBody MensagemRequest mensagemRequest) {
+    public Message sendMessage(@Parameter(description = "Destinatário (to), texto (message) e URL de mídia opcional (media)", required = true) @RequestBody @Valid MensagemRequest mensagemRequest) {
         return whatsAppService.sendWhatsAppMessage(mensagemRequest);
     }
 

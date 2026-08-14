@@ -90,7 +90,7 @@ public class FunilController {
             @ApiResponse(responseCode = "404", description = "Nenhum funil encontrado com o id informado no filtro (resposta sem corpo)")
     })
     @PostMapping("/filtro")
-    public ResponseEntity<?> findByIdAndSituacao(@RequestBody FiltroFunilDto filtro) {
+    public ResponseEntity<?> findByIdAndSituacao(@RequestBody @Valid FiltroFunilDto filtro) {
         FunilDto funil = funilService.findByIdAndSituacao(filtro.getId(), filtro.getSituacoes(),filtro.getTags());
         return funil != null ? ResponseEntity.ok(funil) : ResponseEntity.notFound().build();
     }
@@ -145,7 +145,7 @@ public class FunilController {
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Funil com id 1 não encontrado")))
     })
     @PutMapping(value = "/{id}")
-    public ResponseEntity<?> update(@Parameter(description = "Id do funil", required = true) @PathVariable String id,@RequestBody FunilAllDTO funilRequest ) {
+    public ResponseEntity<?> update(@Parameter(description = "Id do funil", required = true) @PathVariable String id,@RequestBody @Valid FunilAllDTO funilRequest ) {
         FunilAllDTO funil = funilService.update(id, funilRequest);
         return ResponseEntity.ok(funil);
     }
