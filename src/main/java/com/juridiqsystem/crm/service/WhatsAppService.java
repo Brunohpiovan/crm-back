@@ -124,7 +124,7 @@ public class WhatsAppService {
         String media = mensagemRequest.getMedia();
         String body = mensagemRequest.getMessage();
 
-        log.info("Enviando mensagem WhatsApp via Meta. empresaId={} phoneNumberId={}", TenantContext.get(), integration.getPhoneNumberId());
+        log.info("Enviando mensagem WhatsApp via Meta. empresaId={} phoneNumberId={} to={}", TenantContext.get(), integration.getPhoneNumberId(), to);
 
         MetaSendMessageResult result;
         if (media != null && !media.isBlank()) {
@@ -163,15 +163,19 @@ public class WhatsAppService {
 
     /**
      * A Graph API espera o destinatário como dígitos puros (sem "+", sem prefixo "whatsapp:"),
-     * incluindo o DDI 55 — diferente do formato Twilio ("whatsapp:+55DDNNNNNNNN", sem o 9º dígito
-     * do celular, que este projeto removia manualmente para compatibilidade com o sandbox antigo).
-     * Aqui mantemos o número como veio (com o 9º dígito), já que é o formato que a Meta espera
-     * hoje para números brasileiros.
+     * incluindo o DDI 55 e o 9º dígito do celular — diferente do formato Twilio antigo, que não
+     * usava o 9. Alguns números ficaram salvos no banco no formato pré-2012 (DDD + 8 dígitos, sem
+     * o 9), o que a Meta rejeita com "(#131030) Recipient phone number not in allowed list" mesmo
+     * para o número correto: 55+DDD+8 dígitos vira 12 dígitos ao todo, e sem o 9 a Meta não
+     * reconhece o número. Corrigimos isso inserindo o 9 de volta quando detectamos esse formato.
      */
     private String normalizeToE164Digits(String to) {
         String digits = to.replaceAll("\\D", "");
         if (!digits.startsWith("55")) {
             digits = "55" + digits;
+        }
+        if (digits.length() == 12) {
+            digits = digits.substring(0, 4) + "9" + digits.substring(4);
         }
         return digits;
     }
