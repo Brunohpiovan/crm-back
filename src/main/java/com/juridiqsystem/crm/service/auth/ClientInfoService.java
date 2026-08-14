@@ -1,5 +1,6 @@
 package com.juridiqsystem.crm.service.auth;
 
+import com.juridiqsystem.crm.infra.security.TrustedProxyResolver;
 import com.juridiqsystem.crm.model.Acesso;
 import com.juridiqsystem.crm.model.Usuario;
 import eu.bitwalker.useragentutils.UserAgent;
@@ -35,20 +36,38 @@ public class ClientInfoService {
     @Autowired
     private GeoLocationService geoLocationService;
 
+    @Autowired
+    private TrustedProxyResolver trustedProxyResolver;
+
+    /**
+     * IP "real" do cliente, usado tanto para rate limiting (login, recuperação de senha, envio de
+     * WhatsApp) quanto para log de auditoria — por isso NUNCA confia cegamente em
+     * X-Forwarded-For/X-Real-IP/etc., que qualquer cliente pode forjar livremente. Só olha para
+     * esses headers quando o peer TCP direto (request.getRemoteAddr(), que o cliente não
+     * controla) é um proxy/load balancer conhecido (ver TrustedProxyResolver/TRUSTED_PROXIES);
+     * caso contrário — inclusive quando nenhum proxy confiável está configurado — retorna sempre
+     * o peer direto, então mandar X-Forwarded-For: 1.2.3.4 direto pro backend não muda nada.
+     */
     public String getClientIp(HttpServletRequest request) {
+        String remoteAddr = request.getRemoteAddr();
+
+        if (!trustedProxyResolver.isTrusted(remoteAddr)) {
+            return normalizeLoopback(remoteAddr);
+        }
+
         String ip = firstValidHeaderIp(request, "X-Forwarded-For");
         if (ip == null) ip = firstValidHeaderIp(request, "X-Real-IP");
         if (ip == null) ip = firstValidHeaderIp(request, "Proxy-Client-IP");
         if (ip == null) ip = firstValidHeaderIp(request, "WL-Proxy-Client-IP");
+        if (ip == null) ip = remoteAddr;
 
-        if (ip == null) {
-            ip = request.getRemoteAddr();
-        }
+        return normalizeLoopback(ip);
+    }
 
+    private String normalizeLoopback(String ip) {
         if ("0:0:0:0:0:0:0:1".equals(ip) || "127.0.0.1".equals(ip) || "0.0.0.0".equals(ip)) {
-            ip = getPublicIp();
+            return getPublicIp();
         }
-
         return ip;
     }
 
@@ -58,6 +77,8 @@ public class ClientInfoService {
             return null;
         }
         // X-Forwarded-For pode vir como lista "cliente, proxy1, proxy2" — o primeiro é o cliente.
+        // Só chega aqui quando o remoteAddr já foi confirmado como proxy confiável (ver
+        // isTrusted acima); sem proxy confiável configurado, este método nunca é chamado.
         String candidate = headerValue.split(",")[0].trim();
         return IP_LIKE.matcher(candidate).matches() ? candidate : null;
     }
