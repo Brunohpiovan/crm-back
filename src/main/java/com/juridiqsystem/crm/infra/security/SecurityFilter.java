@@ -77,6 +77,17 @@ public class SecurityFilter extends OncePerRequestFilter {
                 return;
             }
 
+            // Usuário bloqueado (admin) DEPOIS de emitir este token: o login já rejeita usuário
+            // bloqueado (ver AuthenticationService), mas sem checar aqui também um token emitido
+            // antes do bloqueio continuaria autenticando normalmente até a expiração natural
+            // (12h) — ver auditoria "usuário ativo/bloqueado" do SecurityFilter.
+            if (Boolean.TRUE.equals(user.getBloqueado())) {
+                securityLogger.log(SecurityEventType.ACCOUNT_LOCKED, "Requisição rejeitada: usuário bloqueado pelo administrador",
+                        user.getLogin(), clientInfoService.getClientIp(request), request.getRequestURI());
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             var authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
             SecurityContextHolder.getContext().setAuthentication(authentication);
             filterChain.doFilter(request, response);
