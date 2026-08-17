@@ -11,6 +11,26 @@ durante a auditoria — sem JDK no ambiente).
 
 ---
 
+## 0. Verificação obrigatória: IP do cliente não pode ser escolhido pelo cliente (2026-08-17)
+
+`server.forward-headers-strategy` estava em `framework`, o que instala o `ForwardedHeaderFilter`
+do Spring — ele roda antes de toda a cadeia do Spring Security e **sobrescreve
+`request.getRemoteAddr()` com o `X-Forwarded-For` da requisição, sem validar de quem veio**. Como
+`TrustedProxyResolver`/`ClientInfoService` decidem "posso confiar nos headers?" olhando justamente
+`getRemoteAddr()`, a proteção anti-spoofing validava o próprio header forjado. Efeito: allowlist de
+IP administrativa, rate limit de login/recuperação de senha e log de auditoria eram todos
+contornáveis com um header. Trocado para `native` (RemoteIpValve do Tomcat, que só aceita
+`X-Forwarded-For` vindo de `server.tomcat.remoteip.internal-proxies`).
+
+- [ ] Com a app rodando, mandar `curl -H "X-Forwarded-For: 1.2.3.4" .../auth/login` (credencial
+      inválida) e confirmar no log de acesso/SecurityLogger que o IP registrado **não** é `1.2.3.4`.
+- [ ] Confirmar que, em produção, `getClientIp` devolve o IP real do usuário (e não o do proxy da
+      plataforma). Se devolver o do proxy, ajustar `server.tomcat.remoteip.internal-proxies` com a
+      faixa real — enquanto não ajustar, a allowlist administrativa não casa com ninguém
+      (fail-closed: bloqueia o master legítimo em vez de liberar geral).
+- [ ] Testar o login de MASTER com IP fora de `ADMIN_IP_ALLOWLIST`: deve devolver 403 com
+      "Você não tem acesso a essa função." e **nenhum token** (ver `AuthenticationService`).
+
 ## 1. Testar rodando de verdade (prioridade máxima)
 
 Tudo até agora foi revisão de código. Nada foi executado numa aplicação rodando. Antes de
@@ -74,6 +94,20 @@ foi possível rodar a aplicação para validar.
 ---
 
 ## 4. Menor prioridade / avaliar depois
+
+- [ ] **Sessão WebSocket ignora revogação de token** — `StompAuthChannelInterceptor.authenticate`
+      valida assinatura e expiração do JWT, mas não checa a claim `sessionVersion` nem
+      `usuario.bloqueado`, que o `SecurityFilter` checa nas rotas HTTP. Consequência: depois de um
+      logout, troca de senha ou bloqueio do usuário, uma conexão STOMP aberta continua recebendo
+      mensagens até o token expirar (12h). Vale replicar as duas checagens no CONNECT.
+- [ ] **`ADMIN_ROUTE_SECRET` não pode viver no bundle do frontend** — o header
+      `X-Admin-Route-Secret` só é exigido em `/master/**` (não no login, de propósito). Se algum dia
+      o frontend público passar a enviá-lo, o segredo estará legível no JS de qualquer visitante e
+      deixa de valer como camada. Se for usado, injetar por um proxy/gateway na frente da API.
+- [ ] **`JWT_SECRET` sem validação de força** — `TokenService` usa `Algorithm.HMAC256(secret)` com o
+      que vier da env var, sem exigir tamanho mínimo. Um segredo curto é quebrável offline a partir
+      de qualquer token capturado, e quem quebrar forja um JWT `ROLE_MASTER` válido. Garantir ≥ 32
+      bytes aleatórios e, idealmente, falhar no startup se for menor.
 
 - [ ] **Rate limiting em busca/listagem** — decisão consciente de não aplicar agora: um CRM usado
       o dia todo faz paginação/busca o tempo inteiro, e limitar isso sem poder testar throughput
