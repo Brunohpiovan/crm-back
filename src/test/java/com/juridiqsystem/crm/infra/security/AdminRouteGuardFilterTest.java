@@ -43,19 +43,24 @@ class AdminRouteGuardFilterTest {
     private FilterChain filterChain;
 
     private AdminRouteGuardFilter filter;
+    private AdminAccessPolicy policy;
 
     @BeforeEach
     void setUp() {
+        policy = new AdminAccessPolicy();
+        ReflectionTestUtils.setField(policy, "clientInfoService", clientInfoService);
+
         filter = new AdminRouteGuardFilter();
+        ReflectionTestUtils.setField(filter, "adminAccessPolicy", policy);
         ReflectionTestUtils.setField(filter, "clientInfoService", clientInfoService);
         ReflectionTestUtils.setField(filter, "securityLogger", securityLogger);
         lenient().when(request.getContextPath()).thenReturn("");
     }
 
     private void configurar(String secret, String ipAllowlist) {
-        ReflectionTestUtils.setField(filter, "configuredSecret", secret);
-        ReflectionTestUtils.setField(filter, "ipAllowlistRaw", ipAllowlist);
-        ReflectionTestUtils.invokeMethod(filter, "init");
+        ReflectionTestUtils.setField(policy, "configuredSecret", secret);
+        ReflectionTestUtils.setField(policy, "ipAllowlistRaw", ipAllowlist);
+        ReflectionTestUtils.invokeMethod(policy, "init");
     }
 
     @Test
@@ -133,6 +138,28 @@ class AdminRouteGuardFilterTest {
 
         assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_NOT_FOUND);
         verify(filterChain, never()).doFilter(any(), any());
+    }
+
+    /**
+     * A allowlist de IP também é aplicada no login (AuthenticationService), e lá o segredo de rota
+     * não vale — o frontend público não teria onde guardá-lo. isIpAllowed precisa decidir sozinho.
+     */
+    @Test
+    void isIpAllowed_ignoraSegredoDeRotaEOlhaSoOIp() {
+        configurar("segredo-correto", "10.0.0.0/8");
+        when(clientInfoService.getClientIp(request)).thenReturn("10.1.2.3");
+
+        assertThat(policy.isIpAllowed(request)).isTrue();
+
+        when(clientInfoService.getClientIp(request)).thenReturn("203.0.113.9");
+        assertThat(policy.isIpAllowed(request)).isFalse();
+    }
+
+    @Test
+    void isIpAllowed_semAllowlistConfigurada_liberaQualquerIp() {
+        configurar("", "");
+
+        assertThat(policy.isIpAllowed(request)).isTrue();
     }
 
     @Test
