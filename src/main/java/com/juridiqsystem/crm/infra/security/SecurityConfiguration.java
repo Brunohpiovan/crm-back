@@ -97,6 +97,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/reset-password").permitAll()
                         .requestMatchers(HttpMethod.GET, "/whatsapp/webhook").permitAll()
                         .requestMatchers(HttpMethod.POST, "/whatsapp/webhook").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/webhooks/escavador/callback").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/contato").permitAll()
                         .requestMatchers(HttpMethod.POST, "/usuario").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/usuario/all/**").hasAuthority("ROLE_ADMIN")

@@ -56,6 +56,10 @@ public class Empresa {
     @Column(name = "protocolo_risco_horas", nullable = false)
     private Integer protocoloRiscoHoras;
 
+    @Schema(description = "Quantos processos esta empresa pode manter monitorados simultaneamente na Escavador, conforme o plano contratado. Null = ilimitado.")
+    @Column(name = "processos_monitorados_limite")
+    private Integer processosMonitoradosLimite;
+
     @Column(name = "notificacao_visual_habilitada", nullable = false)
     private Boolean notificacaoVisualHabilitada;
 
