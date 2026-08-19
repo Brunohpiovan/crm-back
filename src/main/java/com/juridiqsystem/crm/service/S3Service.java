@@ -28,6 +28,22 @@ public class S3Service {
     }
 
     public String uploadFile(MultipartFile file, String key) {
+        return uploadFile(file, key, file.getContentType(), null);
+    }
+
+    /**
+     * Sobrecarga para quem já validou o arquivo e não quer propagar o que o cliente declarou.
+     *
+     * <p>O {@code contentType} gravado no objeto é o que o navegador vai obedecer ao abrir a URL:
+     * se vier do cliente sem validação, um arquivo enviado como {@code text/html} é servido como
+     * HTML pelo bucket — XSS armazenado. Por isso quem chama aqui passa o tipo que o servidor
+     * confirmou (ver AnexoComentarioValidator).</p>
+     *
+     * @param contentDisposition quando preenchido, força o download em vez de renderizar no
+     *                           navegador. Usado para os formatos que não fazem sentido abrir
+     *                           inline.
+     */
+    public String uploadFile(MultipartFile file, String key, String contentType, String contentDisposition) {
         if (file.isEmpty()) {
             throw new RuntimeException("O arquivo está vazio");
         }
@@ -37,11 +53,14 @@ public class S3Service {
                 safeKey = generateUniqueKey(safeKey);
             }
 
-            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+            PutObjectRequest.Builder builder = PutObjectRequest.builder()
                     .bucket(bucketName)
                     .key(safeKey)
-                    .contentType(file.getContentType())
-                    .build();
+                    .contentType(contentType);
+            if (contentDisposition != null && !contentDisposition.isBlank()) {
+                builder.contentDisposition(contentDisposition);
+            }
+            PutObjectRequest putObjectRequest = builder.build();
 
             try (InputStream inputStream = file.getInputStream()) {
                 PutObjectResponse response = s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(inputStream, file.getSize()));

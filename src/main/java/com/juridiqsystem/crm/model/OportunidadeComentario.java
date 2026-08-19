@@ -53,14 +53,31 @@ public class OportunidadeComentario {
     @Column(name = "url_anexo", length = 500)
     private String urlAnexo;
 
+    @Schema(description = "Nome original do arquivo, para exibir e baixar. Nunca é usado para montar a key no S3 — essa é sempre um UUID com a extensão derivada do tipo confirmado pelo servidor.")
+    @Column(name = "nome_anexo", length = 255)
+    private String nomeAnexo;
+
+    @Schema(description = "Content-type confirmado por assinatura de bytes (não o declarado pelo cliente). Decide se o anexo abre no navegador ou desce como download.")
+    @Column(name = "tipo_anexo", length = 120)
+    private String tipoAnexo;
+
+    @Column(name = "tamanho_anexo")
+    private Long tamanhoAnexo;
+
     @Column(name = "criado_em", nullable = false)
     private LocalDateTime criadoEm;
 
-    public OportunidadeComentario(Long oportunidadeId, Usuario autor, String conteudo, String urlAnexo) {
+    public OportunidadeComentario(Long oportunidadeId, Usuario autor, String conteudo) {
         this.oportunidadeId = oportunidadeId;
         this.autor = autor;
         this.conteudo = conteudo;
-        this.urlAnexo = urlAnexo;
         this.criadoEm = LocalDateTime.now();
+    }
+
+    public void anexar(String urlAnexo, String nomeAnexo, String tipoAnexo, long tamanhoAnexo) {
+        this.urlAnexo = urlAnexo;
+        this.nomeAnexo = nomeAnexo;
+        this.tipoAnexo = tipoAnexo;
+        this.tamanhoAnexo = tamanhoAnexo;
     }
 }

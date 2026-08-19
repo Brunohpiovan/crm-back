@@ -4,6 +4,7 @@ import com.juridiqsystem.crm.model.Oportunidade;
 import com.juridiqsystem.crm.model.OportunidadeComentario;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.OportunidadeComentarioDTO;
+import com.juridiqsystem.crm.model.enums.TipoAnexoComentario;
 import com.juridiqsystem.crm.repository.OportunidadeComentarioRepository;
 import com.juridiqsystem.crm.repository.OportunidadeRepository;
 import com.juridiqsystem.crm.repository.UsuarioRepository;
@@ -17,15 +18,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Set;
 import java.util.UUID;
 
 @Service
 public class OportunidadeComentarioService {
 
-    private static final long MAX_SIZE_BYTES = 100L * 1024 * 1024;
-    private static final Set<String> ALLOWED_CONTENT_TYPES =
-            Set.of("image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif");
+    /** Nome exibido ao usuário; o que passa disso é truncado em vez de rejeitar o envio. */
+    private static final int MAX_NOME_ANEXO = 200;
 
     @Autowired
     private OportunidadeComentarioRepository oportunidadeComentarioRepository;
@@ -38,6 +37,9 @@ public class OportunidadeComentarioService {
 
     @Autowired
     private S3Service s3Service;
+
+    @Autowired
+    private AnexoComentarioValidator anexoValidator;
 
     public Page<OportunidadeComentarioDTO> listar(String oportunidadeId, Pageable pageable) {
         Oportunidade oportunidade = oportunidadeRepository.findByPublicId(oportunidadeId)
@@ -57,13 +59,13 @@ public class OportunidadeComentarioService {
                 .orElseThrow(() -> new RuntimeException("Oportunidade com id " + oportunidadeId + " nao encontrada"));
         Usuario autor = currentUser();
 
-        String urlAnexo = null;
+        OportunidadeComentario comentario = new OportunidadeComentario(oportunidade.getId(), autor, conteudo);
         if (file != null && !file.isEmpty()) {
-            validarArquivo(file);
-            urlAnexo = uploadArquivo(file);
+            TipoAnexoComentario tipo = anexoValidator.validar(file);
+            String nomeExibicao = nomeParaExibicao(file.getOriginalFilename(), tipo);
+            comentario.anexar(uploadArquivo(file, tipo, nomeExibicao), nomeExibicao, tipo.getContentType(), file.getSize());
         }
 
-        OportunidadeComentario comentario = new OportunidadeComentario(oportunidade.getId(), autor, conteudo, urlAnexo);
         OportunidadeComentario salvo = oportunidadeComentarioRepository.save(comentario);
         return new OportunidadeComentarioDTO(salvo, true);
     }
@@ -111,26 +113,51 @@ public class OportunidadeComentarioService {
         return url.substring(idx);
     }
 
-    private void validarArquivo(MultipartFile file) {
-        if (file.getSize() > MAX_SIZE_BYTES) {
-            throw new RuntimeException("O arquivo selecionado excede o limite de 100 MB.");
-        }
-        String contentType = file.getContentType();
-        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
-            throw new RuntimeException("Tipo de arquivo não permitido. Envie uma imagem (PNG, JPG, JPEG, WEBP ou GIF).");
-        }
+    /**
+     * A key é sempre UUID + extensão do tipo confirmado pelo servidor — o nome que o cliente
+     * mandou nunca entra nela. Assim nome de arquivo malicioso não vira caminho no bucket nem
+     * troca a extensão do objeto gravado.
+     */
+    private String uploadArquivo(MultipartFile file, TipoAnexoComentario tipo, String nomeExibicao) {
+        String key = "comentarios/" + UUID.randomUUID() + tipo.getExtensao();
+        return s3Service.uploadFile(file, key, tipo.getContentType(), contentDisposition(tipo, nomeExibicao));
     }
 
-    private String uploadArquivo(MultipartFile file) {
-        String key = "comentarios/" + UUID.randomUUID() + extrairExtensao(file.getOriginalFilename());
-        return s3Service.uploadFile(file, key);
+    /**
+     * Documento desce como download em vez de renderizar no navegador; imagem e PDF abrem inline
+     * porque é isso que o usuário espera ao clicar. O filename aqui vai só em ASCII — o nome
+     * completo, com acento, fica no banco e é o que a tela exibe.
+     */
+    private String contentDisposition(TipoAnexoComentario tipo, String nomeExibicao) {
+        if (tipo.isInline()) {
+            return null;
+        }
+        String nomeAscii = nomeExibicao.replaceAll("[^A-Za-z0-9._-]", "_");
+        return "attachment; filename=\"" + nomeAscii + "\"";
     }
 
-    private String extrairExtensao(String nomeOriginal) {
-        if (nomeOriginal == null) {
-            return "";
+    /**
+     * O nome original é dado do usuário e vai ser renderizado de volta na tela: tira separador de
+     * caminho (um "..\..\x.pdf" não pode virar caminho em lugar nenhum), tira caracteres de
+     * controle e limita o tamanho. Garante também que a extensão exibida seja a do tipo real, para
+     * o usuário não confiar num ".pdf" que na verdade é outra coisa.
+     */
+    private String nomeParaExibicao(String nomeOriginal, TipoAnexoComentario tipo) {
+        String base = nomeOriginal == null ? "" : nomeOriginal;
+        base = base.substring(base.lastIndexOf('/') + 1);
+        base = base.substring(base.lastIndexOf('\\') + 1);
+        base = base.replaceAll("\\p{Cntrl}", "").trim();
+
+        int ponto = base.lastIndexOf('.');
+        if (ponto > 0) {
+            base = base.substring(0, ponto);
         }
-        int idx = nomeOriginal.lastIndexOf('.');
-        return idx >= 0 ? nomeOriginal.substring(idx) : "";
+        if (base.isBlank()) {
+            base = "anexo";
+        }
+        if (base.length() > MAX_NOME_ANEXO) {
+            base = base.substring(0, MAX_NOME_ANEXO);
+        }
+        return base + tipo.getExtensao();
     }
 }
