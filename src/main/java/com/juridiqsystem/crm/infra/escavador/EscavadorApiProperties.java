@@ -17,6 +17,13 @@ public class EscavadorApiProperties {
     private String token;
     private int connectTimeoutMs = 10_000;
     private int readTimeoutMs = 15_000;
+    /**
+     * Só para dev local: quando true, EscavadorProcessoApi devolve dados fixos/fictícios em vez de
+     * chamar a Escavador de verdade — evita gastar saldo pago testando fluxo de UI repetidamente.
+     * Nunca true em produção (default false); nem EscavadorRequisicaoRealizadaEvent é publicado
+     * nesse modo, já que nenhuma chamada real acontece.
+     */
+    private boolean mockMode = false;
 
     public String getToken() {
         return token;
@@ -24,6 +31,14 @@ public class EscavadorApiProperties {
 
     public void setToken(String token) {
         this.token = token;
+    }
+
+    public boolean isMockMode() {
+        return mockMode;
+    }
+
+    public void setMockMode(boolean mockMode) {
+        this.mockMode = mockMode;
     }
 
     public int getConnectTimeoutMs() {
