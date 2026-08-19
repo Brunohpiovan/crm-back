@@ -4,6 +4,6 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "java -jar target/crm_vincit.jar"
+    "startCommand": "java -jar target/crm.jar"
   }
 }

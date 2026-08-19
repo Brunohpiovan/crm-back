@@ -1,10 +1,10 @@
 asyncapi: 2.6.0
-id: 'urn:br.edu.faculdadevincit:crm-vincit-ws'
+id: 'urn:com.juridiqsystem:crm-ws'
 info:
-  title: CRM Vincit - Comunicação em tempo real (WebSocket / STOMP)
+  title: CRM JuridiqSystem - Comunicação em tempo real (WebSocket / STOMP)
   version: '1.0.0'
   description: |
-    Documentação dos canais de tempo real do CRM Vincit, expostos via **STOMP sobre SockJS**
+    Documentação dos canais de tempo real do CRM JuridiqSystem, expostos via **STOMP sobre SockJS**
     (biblioteca `@stomp/stompjs` + `sockjs-client` são as recomendadas no Angular).
 
     Este documento complementa a documentação OpenAPI/Swagger da API REST (`/swagger-ui.html`),

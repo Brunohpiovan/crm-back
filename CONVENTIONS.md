@@ -1,4 +1,4 @@
-# Convenções de arquitetura — crm-vincit
+# Convenções de arquitetura — crm-juridiqsystem
 
 Este documento registra as convenções adotadas na etapa de padronização da fundação
 arquitetural do backend. Ele é a base para as próximas etapas da refatoração gradual

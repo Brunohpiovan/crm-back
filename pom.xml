@@ -8,11 +8,11 @@
 		<version>3.4.1</version>
 		<relativePath/>
 	</parent>
-	<groupId>br.edu.faculdadevincit</groupId>
-	<artifactId>crm_vincit</artifactId>
+	<groupId>com.juridiqsystem</groupId>
+	<artifactId>crm</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>crm_vincit</name>
-	<description>Faculdade VINCIT - CRM</description>
+	<name>crm</name>
+	<description>JuridiqSystem - CRM</description>
 	<url/>
 	<licenses>
 		<license/>
@@ -142,13 +142,7 @@
 			<artifactId>regions</artifactId>
 			<version>2.20.0</version>
 		</dependency>
-		<dependency>
-			<groupId>com.twilio.sdk</groupId>
-			<artifactId>twilio</artifactId>
-			<version>9.0.0</version>
-		</dependency>
-
-		<!-- Retry com backoff para chamadas a servicos externos (Resend, Twilio) sujeitas a falha transitoria -->
+		<!-- Retry com backoff para chamadas a servicos externos (Resend, Meta Graph API) sujeitas a falha transitoria -->
 		<dependency>
 			<groupId>org.springframework.retry</groupId>
 			<artifactId>spring-retry</artifactId>
@@ -175,7 +169,17 @@
 			<scope>compile</scope>
 		</dependency>
 
-
+		<!--
+			Sanitizacao de HTML rico (template de e-mail): allowlist de tags/atributos antes de
+			persistir, defesa em profundidade contra HTML malicioso gravado via chamada direta a
+			API (o frontend ja sanitiza no editor, mas isso e so client-side). jsoup e a lib padrao
+			de mercado pra isso em Java, sem dependencias transitivas pesadas.
+		-->
+		<dependency>
+			<groupId>org.jsoup</groupId>
+			<artifactId>jsoup</artifactId>
+			<version>1.18.1</version>
+		</dependency>
 
 	</dependencies>
 
@@ -187,7 +191,7 @@
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
 		</plugins>
-		<finalName>crm_vincit</finalName>
+		<finalName>crm</finalName>
 	</build>
 
 </project>

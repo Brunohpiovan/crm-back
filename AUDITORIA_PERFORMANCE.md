@@ -1,5 +1,5 @@
 # Auditoria técnica — performance, arquitetura e escalabilidade
-**Projeto:** crm-vincit (Spring Boot 3.4.1 / Java 17 / MySQL / Flyway / Railway)
+**Projeto:** crm-juridiqsystem (Spring Boot 3.4.1 / Java 17 / MySQL / Flyway / Railway)
 **Data:** 2026-08-05
 **Escopo:** 23 controllers, 23 services, 18 repositories, 22 entidades JPA, configuração e integrações externas (Twilio/WhatsApp, S3, SMTP, ffmpeg, WebSocket, scheduler).
 
