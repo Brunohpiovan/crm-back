@@ -7,8 +7,10 @@ import com.juridiqsystem.crm.infra.escavador.dto.EscavadorCallbackPayload;
 import com.juridiqsystem.crm.infra.security.TenantContext;
 import com.juridiqsystem.crm.model.EscavadorCallbackEvento;
 import com.juridiqsystem.crm.model.Processo;
+import com.juridiqsystem.crm.model.ProcessoMonitoramento;
 import com.juridiqsystem.crm.model.dtos.escavador.MovimentacaoInput;
 import com.juridiqsystem.crm.repository.EscavadorCallbackEventoRepository;
+import com.juridiqsystem.crm.repository.ProcessoMonitoramentoRepository;
 import com.juridiqsystem.crm.repository.ProcessoRepository;
 import com.juridiqsystem.crm.service.ProcessoMovimentacaoService;
 import com.juridiqsystem.crm.service.exceptions.AccessDeniedException;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 
 /**
  * Processa os callbacks que a Escavador envia quando há novidade em um processo monitorado.
@@ -53,7 +56,13 @@ public class EscavadorCallbackService {
     private ProcessoRepository processoRepository;
 
     @Autowired
+    private ProcessoMonitoramentoRepository processoMonitoramentoRepository;
+
+    @Autowired
     private ProcessoMovimentacaoService processoMovimentacaoService;
+
+    @Autowired
+    private ProcessoMonitoramentoService processoMonitoramentoService;
 
     public void receber(String rawBody, String authorizationHeader, String tokenQueryParam) {
         if (!tokenValidator.isValid(authorizationHeader, tokenQueryParam, callbackProperties.getToken())) {
@@ -77,28 +86,77 @@ public class EscavadorCallbackService {
     }
 
     private void processar(EscavadorCallbackPayload payload) {
-        if (!payload.isNovaMovimentacao()) {
-            // Os demais eventos (processo_verificado, processo_encontrado, novo_documento...) não
+        if (payload.isNovaMovimentacao()) {
+            registrarMovimentacoes(payload);
+        } else if (payload.isProcessoNaoEncontrado()) {
+            desligarMonitoramentoSemProcessoNoTribunal(payload);
+        } else {
+            // processo_verificado, processo_encontrado, novo_documento, novo_processo... não
             // alteram estado no CRM hoje; ficam registrados no evento bruto para auditoria.
             log.debug("Callback da Escavador ignorado (evento sem efeito no CRM). event={}", payload.event());
-            return;
         }
+    }
 
+    private void registrarMovimentacoes(EscavadorCallbackPayload payload) {
         List<MovimentacaoInput> movimentacoes = callbackMapper.toMovimentacaoInputs(payload);
         if (movimentacoes.isEmpty()) {
             throw new IllegalStateException("Callback de nova movimentação sem conteúdo utilizável.");
         }
-
-        Processo processo = buscarProcesso(payload.numeroCnj());
-        // O webhook é público e roda sem sessão: o tenant vem do próprio processo encontrado.
-        TenantContext.runAs(processo.getEmpresaId(), () ->
+        aplicarNosMonitoradosDoCnj(payload.numeroCnj(), (processo, monitoramento) ->
                 processoMovimentacaoService.registrarMovimentacoes(processo.getId(), movimentacoes));
     }
 
-    private Processo buscarProcesso(String numeroCnj) {
-        return Optional.ofNullable(numeroCnj)
-                .flatMap(processoRepository::findByNumeroCnjIgnoringTenant)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Callback recebido para processo não cadastrado nesta instalação. numeroCnj=" + numeroCnj));
+    /**
+     * A Escavador não achou o processo no sistema do tribunal, então não vai monitorá-lo nem
+     * cobrar por ele. Manter a linha como ativa faria a empresa ver "monitorando" para algo que
+     * ninguém está acompanhando, e ainda ocuparia uma vaga da cota do plano.
+     */
+    private void desligarMonitoramentoSemProcessoNoTribunal(EscavadorCallbackPayload payload) {
+        aplicarNosMonitoradosDoCnj(payload.numeroCnj(), (processo, monitoramento) -> {
+            log.warn("Escavador nao localizou o processo no tribunal; desligando monitoramento. numeroCnj={} monitoramentoId={}",
+                    payload.numeroCnj(), monitoramento.getId());
+            processoMonitoramentoService.desligarPorProcessoNaoEncontrado(monitoramento.getId());
+        });
+    }
+
+    /**
+     * O callback identifica o processo só pelo número CNJ, que é único por empresa e não
+     * globalmente: duas empresas clientes podem, de forma legítima, monitorar o mesmo processo
+     * público. Por isso a ação roda para cada empresa que tenha monitoramento ativo daquele CNJ —
+     * atender só a primeira faria as demais pagarem a cota e nunca receberem nada.
+     *
+     * <p>Empresas que apenas consultaram o processo, sem monitoramento ativo, ficam de fora: elas
+     * não estão pagando por acompanhamento contínuo.</p>
+     */
+    private void aplicarNosMonitoradosDoCnj(String numeroCnj, BiConsumer<Processo, ProcessoMonitoramento> acao) {
+        List<Processo> processos = Optional.ofNullable(numeroCnj)
+                .map(processoRepository::findAllByNumeroCnjIgnoringTenant)
+                .orElseGet(List::of);
+        if (processos.isEmpty()) {
+            throw new ResourceNotFoundException(
+                    "Callback recebido para processo não cadastrado nesta instalação. numeroCnj=" + numeroCnj);
+        }
+
+        int atendidos = 0;
+        for (Processo processo : processos) {
+            // O webhook é público e roda sem sessão: o tenant vem do próprio processo encontrado.
+            Boolean aplicou = TenantContext.runAs(processo.getEmpresaId(), () ->
+                    processoMonitoramentoRepository.findByProcessoId(processo.getId())
+                            .filter(monitoramento -> Boolean.TRUE.equals(monitoramento.getAtivo()))
+                            .map(monitoramento -> {
+                                acao.accept(processo, monitoramento);
+                                return true;
+                            })
+                            .orElse(false));
+            if (Boolean.TRUE.equals(aplicou)) {
+                atendidos++;
+            }
+        }
+
+        if (atendidos == 0) {
+            // Não é erro: pode ser corrida com um monitoramento recém-desligado. Mas se persistir,
+            // é sinal de assinatura órfã na Escavador (custo sem contrapartida) — daí o warn.
+            log.warn("Callback da Escavador sem nenhum monitoramento ativo correspondente. numeroCnj={}", numeroCnj);
+        }
     }
 }

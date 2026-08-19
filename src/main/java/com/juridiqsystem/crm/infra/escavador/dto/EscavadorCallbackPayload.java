@@ -26,9 +26,18 @@ public record EscavadorCallbackPayload(
         String uuid) {
 
     public static final String EVENTO_NOVA_MOVIMENTACAO = "nova_movimentacao";
+    public static final String EVENTO_PROCESSO_NAO_ENCONTRADO = "processo_nao_encontrado";
 
     public boolean isNovaMovimentacao() {
         return EVENTO_NOVA_MOVIMENTACAO.equals(event);
+    }
+
+    /**
+     * A Escavador foi ao tribunal e não localizou o processo: a assinatura não vira monitoramento
+     * e não há cobrança. Estado terminal para aquela assinatura — não é uma falha transitória.
+     */
+    public boolean isProcessoNaoEncontrado() {
+        return EVENTO_PROCESSO_NAO_ENCONTRADO.equals(event);
     }
 
     /** Numeração CNJ do processo monitorado, sempre presente em {@code monitoramento.numero}. */

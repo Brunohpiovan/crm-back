@@ -24,7 +24,7 @@ import java.time.LocalDateTime;
 /**
  * Processo judicial consultado/vinculado via Escavador (v2). numeroCnj é único por empresa e é a
  * chave usada pelo Prompt 2 para casar callbacks de monitoramento recebidos com este registro —
- * ver ProcessoRepository.findByNumeroCnjIgnoringTenant.
+ * ver ProcessoRepository.findAllByNumeroCnjIgnoringTenant.
  */
 @Getter
 @Setter

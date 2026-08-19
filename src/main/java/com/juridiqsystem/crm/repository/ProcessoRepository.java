@@ -37,9 +37,14 @@ public interface ProcessoRepository extends JpaRepository<Processo, Long> {
      * Nativa de propósito, mesmo motivo de WhatsAppIntegrationRepository.findByPhoneNumberIdIgnoringTenant:
      * chamada em contexto sem tenant conhecido (webhook/callback — ver Prompt 2). Uma query JPQL
      * normal seria filtrada pelo TenantIdentifierResolver (sentinela -1) e nunca encontraria nada.
-     * numero_cnj é único por empresa, não globalmente — LIMIT 1 resolve a ambiguidade entre
-     * empresas distintas monitorando o mesmo processo público, priorizando o registro mais antigo.
+     *
+     * <p>Devolve TODOS os processos com aquele CNJ, e não o mais antigo: numero_cnj é único por
+     * empresa, não globalmente, e duas empresas clientes podem legitimamente acompanhar o mesmo
+     * processo público. Retornar só o primeiro faria a segunda empresa em diante nunca receber as
+     * movimentações do callback — pagando a cota de monitoramento sem receber nada. Quem consome
+     * decide o que fazer com cada um (ver EscavadorCallbackService, que só registra nos processos
+     * de empresas com monitoramento ativo).</p>
      */
-    @Query(value = "SELECT * FROM processo WHERE numero_cnj = :numeroCnj ORDER BY id ASC LIMIT 1", nativeQuery = true)
-    Optional<Processo> findByNumeroCnjIgnoringTenant(@Param("numeroCnj") String numeroCnj);
+    @Query(value = "SELECT * FROM processo WHERE numero_cnj = :numeroCnj ORDER BY id ASC", nativeQuery = true)
+    List<Processo> findAllByNumeroCnjIgnoringTenant(@Param("numeroCnj") String numeroCnj);
 }

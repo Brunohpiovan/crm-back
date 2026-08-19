@@ -68,15 +68,20 @@ não pode ficar aberto por esquecimento de configuração.
 
 Sete eventos, todos com a mesma casca (`event`, `monitoramento`, `uuid`):
 
-| `event`                          | Efeito no CRM                                |
-| -------------------------------- | -------------------------------------------- |
+| `event`                          | Efeito no CRM                                    |
+| -------------------------------- | ------------------------------------------------ |
 | `nova_movimentacao`              | Registra a movimentação e notifica em tempo real |
-| `novo_processo`                  | Só auditoria                                 |
-| `atualizacao_processo_concluida` | Só auditoria                                 |
-| `novo_documento`                 | Só auditoria                                 |
-| `processo_verificado`            | Só auditoria                                 |
-| `processo_encontrado`            | Só auditoria                                 |
-| `processo_nao_encontrado`        | Só auditoria                                 |
+| `processo_nao_encontrado`        | Desliga o monitoramento e libera a vaga da cota  |
+| `novo_processo`                  | Só auditoria                                     |
+| `atualizacao_processo_concluida` | Só auditoria                                     |
+| `novo_documento`                 | Só auditoria                                     |
+| `processo_verificado`            | Só auditoria                                     |
+| `processo_encontrado`            | Só auditoria                                     |
+
+`processo_nao_encontrado` é terminal: a Escavador foi ao tribunal, não localizou o processo, não
+vai monitorá-lo e não cobra por ele. Manter a linha ativa mostraria "monitorando" para algo que
+ninguém acompanha e ainda ocuparia uma vaga do plano — por isso o monitoramento é desligado
+localmente, sem chamar a API (a assinatura já não existe do lado de lá).
 
 Exemplo de `nova_movimentacao` (payload real da documentação, também usado em
 `EscavadorCallbackMapperTest`):
@@ -109,8 +114,14 @@ Exemplo de `nova_movimentacao` (payload real da documentação, também usado em
 2. Token inválido → 403, **sem gravar nada** (endpoint público que persiste tudo que chega é
    vetor de enchimento de banco).
 3. Token válido → grava `escavador_callback_evento` com o payload cru, sempre.
-4. Resolve o `Processo` por `findByNumeroCnjIgnoringTenant` (o webhook roda sem sessão, então o
-   tenant vem do processo encontrado) e processa dentro de `TenantContext.runAs`.
+4. Resolve os `Processo` por `findAllByNumeroCnjIgnoringTenant` (o webhook roda sem sessão, então
+   o tenant vem de cada processo encontrado) e processa dentro de `TenantContext.runAs`.
+
+   O callback identifica o processo só pelo número CNJ, que é único **por empresa** e não
+   globalmente: duas empresas clientes podem, de forma legítima, acompanhar o mesmo processo
+   público. A ação roda para **cada** empresa com monitoramento ativo daquele CNJ — atender só a
+   primeira faria as demais pagarem a cota e nunca receberem nada. Empresas que apenas consultaram
+   o processo, sem monitoramento ativo, ficam de fora: não estão pagando por acompanhamento.
 5. Delega a `ProcessoMovimentacaoService.registrarMovimentacoes`, que deduplica e publica
    `NovasMovimentacoesDetectadasEvent`.
 6. `ProcessoNotificacaoService` publica, após o commit, em

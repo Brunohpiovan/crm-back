@@ -5,9 +5,11 @@ import com.juridiqsystem.crm.infra.escavador.EscavadorCallbackProperties;
 import com.juridiqsystem.crm.infra.escavador.EscavadorCallbackTokenValidator;
 import com.juridiqsystem.crm.model.EscavadorCallbackEvento;
 import com.juridiqsystem.crm.model.Processo;
-import com.juridiqsystem.crm.model.enums.FonteMovimentacao;
+import com.juridiqsystem.crm.model.ProcessoMonitoramento;
 import com.juridiqsystem.crm.model.dtos.escavador.MovimentacaoInput;
+import com.juridiqsystem.crm.model.enums.FonteMovimentacao;
 import com.juridiqsystem.crm.repository.EscavadorCallbackEventoRepository;
+import com.juridiqsystem.crm.repository.ProcessoMonitoramentoRepository;
 import com.juridiqsystem.crm.repository.ProcessoRepository;
 import com.juridiqsystem.crm.service.ProcessoMovimentacaoService;
 import com.juridiqsystem.crm.service.exceptions.AccessDeniedException;
@@ -23,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -52,6 +55,7 @@ class EscavadorCallbackServiceTest {
 
     private static final String TOKEN = "s3gr3do";
     private static final Long PROCESSO_ID = 10L;
+    private static final Long OUTRO_PROCESSO_ID = 20L;
     private static final String NUMERO_CNJ = "1002089-72.2023.8.26.0260";
     private static final String PAYLOAD = """
             {
@@ -78,7 +82,13 @@ class EscavadorCallbackServiceTest {
     private ProcessoRepository processoRepository;
 
     @Mock
+    private ProcessoMonitoramentoRepository processoMonitoramentoRepository;
+
+    @Mock
     private ProcessoMovimentacaoService processoMovimentacaoService;
+
+    @Mock
+    private ProcessoMonitoramentoService processoMonitoramentoService;
 
     @Captor
     private ArgumentCaptor<List<MovimentacaoInput>> movimentacoesCaptor;
@@ -86,9 +96,12 @@ class EscavadorCallbackServiceTest {
     @InjectMocks
     private EscavadorCallbackService escavadorCallbackService;
 
+    private final List<Processo> processosDoCnj = new ArrayList<>();
+
     @BeforeEach
     void configurar() {
         callbackProperties.setToken(TOKEN);
+        processosDoCnj.clear();
         when(escavadorCallbackEventoRepository.save(any(EscavadorCallbackEvento.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }
@@ -104,7 +117,7 @@ class EscavadorCallbackServiceTest {
 
     @Test
     void receber_comCallbackValido_registraMovimentacaoEMarcaEventoComoProcessado() {
-        prepararProcesso();
+        prepararProcessoMonitorado(PROCESSO_ID, 7L);
 
         escavadorCallbackService.receber(PAYLOAD, "Bearer " + TOKEN, null);
 
@@ -121,13 +134,41 @@ class EscavadorCallbackServiceTest {
     }
 
     /**
+     * numero_cnj é único por empresa, não globalmente: duas empresas podem, de forma legítima,
+     * acompanhar o mesmo processo público. Atender só a primeira faria a segunda pagar a cota de
+     * monitoramento e nunca receber nada.
+     */
+    @Test
+    void receber_mesmoCnjMonitoradoPorDuasEmpresas_registraNasDuas() {
+        prepararProcessoMonitorado(PROCESSO_ID, 7L);
+        prepararProcessoMonitorado(OUTRO_PROCESSO_ID, 9L);
+
+        escavadorCallbackService.receber(PAYLOAD, TOKEN, null);
+
+        verify(processoMovimentacaoService).registrarMovimentacoes(eq(PROCESSO_ID), any());
+        verify(processoMovimentacaoService).registrarMovimentacoes(eq(OUTRO_PROCESSO_ID), any());
+    }
+
+    /** Quem só consultou o processo, sem monitoramento ativo, não recebe o acompanhamento. */
+    @Test
+    void receber_empresaSemMonitoramentoAtivo_naoRecebeMovimentacao() {
+        prepararProcessoMonitorado(PROCESSO_ID, 7L);
+        prepararProcessoSemMonitoramento(OUTRO_PROCESSO_ID, 9L);
+
+        escavadorCallbackService.receber(PAYLOAD, TOKEN, null);
+
+        verify(processoMovimentacaoService).registrarMovimentacoes(eq(PROCESSO_ID), any());
+        verify(processoMovimentacaoService, never()).registrarMovimentacoes(eq(OUTRO_PROCESSO_ID), any());
+    }
+
+    /**
      * O reenvio automático da Escavador (até 11 tentativas) faz o mesmo payload chegar repetido.
      * A deduplicação é responsabilidade de registrarMovimentacoes; o que se garante aqui é que o
      * service delega sempre a ele e nunca abre um caminho de escrita próprio.
      */
     @Test
     void receber_mesmoCallbackDuasVezes_delegaSempreAoServiceQueDeduplica() {
-        prepararProcesso();
+        prepararProcessoMonitorado(PROCESSO_ID, 7L);
 
         escavadorCallbackService.receber(PAYLOAD, TOKEN, null);
         escavadorCallbackService.receber(PAYLOAD, TOKEN, null);
@@ -135,9 +176,31 @@ class EscavadorCallbackServiceTest {
         verify(processoMovimentacaoService, times(2)).registrarMovimentacoes(eq(PROCESSO_ID), any());
     }
 
+    /**
+     * NAO_ENCONTRADO é terminal: a Escavador não monitora nem cobra. Manter ativo mostraria
+     * "monitorando" para algo que ninguém acompanha e ainda ocuparia uma vaga da cota do plano.
+     */
+    @Test
+    void receber_processoNaoEncontradoNoTribunal_desligaOMonitoramento() {
+        ProcessoMonitoramento monitoramento = prepararProcessoMonitorado(PROCESSO_ID, 7L);
+        String naoEncontrado = """
+                {
+                    "event": "processo_nao_encontrado",
+                    "monitoramento": { "id": 1567024, "numero": "%s", "status": "NAO_ENCONTRADO" },
+                    "uuid": "65b45990e91de83f8f40483102ce97ca"
+                }
+                """.formatted(NUMERO_CNJ);
+
+        escavadorCallbackService.receber(naoEncontrado, TOKEN, null);
+
+        verify(processoMonitoramentoService).desligarPorProcessoNaoEncontrado(monitoramento.getId());
+        verify(processoMovimentacaoService, never()).registrarMovimentacoes(anyLong(), any());
+        assertThat(ultimoEventoGravado().getProcessado()).isTrue();
+    }
+
     @Test
     void receber_processoInexistente_gravaEventoComErroEmVezDeFalharOCallback() {
-        when(processoRepository.findByNumeroCnjIgnoringTenant(anyString())).thenReturn(Optional.empty());
+        when(processoRepository.findAllByNumeroCnjIgnoringTenant(anyString())).thenReturn(List.of());
 
         escavadorCallbackService.receber(PAYLOAD, TOKEN, null);
 
@@ -172,13 +235,30 @@ class EscavadorCallbackServiceTest {
         assertThat(ultimoEventoGravado().getProcessado()).isTrue();
     }
 
-    private void prepararProcesso() {
+    private ProcessoMonitoramento prepararProcessoMonitorado(Long processoId, Long empresaId) {
+        Processo processo = registrarProcesso(processoId, empresaId);
+        ProcessoMonitoramento monitoramento = new ProcessoMonitoramento();
+        monitoramento.setId(processoId * 100);
+        monitoramento.setProcesso(processo);
+        monitoramento.setAtivo(true);
+        when(processoMonitoramentoRepository.findByProcessoId(processoId)).thenReturn(Optional.of(monitoramento));
+        return monitoramento;
+    }
+
+    private void prepararProcessoSemMonitoramento(Long processoId, Long empresaId) {
+        registrarProcesso(processoId, empresaId);
+        when(processoMonitoramentoRepository.findByProcessoId(processoId)).thenReturn(Optional.empty());
+    }
+
+    private Processo registrarProcesso(Long processoId, Long empresaId) {
         Processo processo = new Processo();
-        processo.setId(PROCESSO_ID);
-        processo.setPublicId("processo-1");
-        processo.setEmpresaId(7L);
+        processo.setId(processoId);
+        processo.setPublicId("processo-" + processoId);
+        processo.setEmpresaId(empresaId);
         processo.setNumeroCnj(NUMERO_CNJ);
-        when(processoRepository.findByNumeroCnjIgnoringTenant(NUMERO_CNJ)).thenReturn(Optional.of(processo));
+        processosDoCnj.add(processo);
+        when(processoRepository.findAllByNumeroCnjIgnoringTenant(NUMERO_CNJ)).thenReturn(List.copyOf(processosDoCnj));
+        return processo;
     }
 
     private EscavadorCallbackEvento ultimoEventoGravado() {

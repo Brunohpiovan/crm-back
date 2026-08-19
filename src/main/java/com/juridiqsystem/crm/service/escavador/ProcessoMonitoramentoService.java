@@ -125,6 +125,21 @@ public class ProcessoMonitoramentoService {
         processoMonitoramentoRepository.save(monitoramento);
     }
 
+    /**
+     * Desliga um monitoramento porque a Escavador informou, por callback, que não localizou o
+     * processo no tribunal. Diferente de {@link #desativar(String)}, NÃO chama a Escavador: a
+     * assinatura já não existe do lado de lá (e não houve cobrança). Libera a vaga na cota.
+     */
+    @Transactional
+    public void desligarPorProcessoNaoEncontrado(Long monitoramentoId) {
+        processoMonitoramentoRepository.findById(monitoramentoId)
+                .filter(m -> Boolean.TRUE.equals(m.getAtivo()))
+                .ifPresent(monitoramento -> {
+                    monitoramento.desativar();
+                    processoMonitoramentoRepository.save(monitoramento);
+                });
+    }
+
     private void criarNaEscavador(ProcessoMonitoramento monitoramento, String numeroCnj) {
         try {
             EscavadorMonitoramentoResponse resposta = escavadorMonitoramentoApi.criar(
