@@ -44,6 +44,8 @@ public class OportunidadeDTO {
     private List<TagOportunidadeDTO> tags;
     @Schema(description = "Posição (0-based) da oportunidade dentro da lista de oportunidades da sua etapa atual, usada para ordenação no Kanban")
     private int indice;
+    @Schema(description = "Quantidade de processos judiciais vinculados a esta oportunidade")
+    private long totalProcessos;
 
     public OportunidadeDTO(Oportunidade oportunidade) {
         this.id = oportunidade.getPublicId();

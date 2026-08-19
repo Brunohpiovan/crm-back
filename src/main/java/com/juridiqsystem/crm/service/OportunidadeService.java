@@ -72,6 +72,9 @@ public class OportunidadeService {
     private TagRepository tagRepository;
 
     @Autowired
+    private OportunidadeProcessoRepository oportunidadeProcessoRepository;
+
+    @Autowired
     private OportunidadeHistoricoRepository oportunidadeHistoricoRepository;
 
     // Auto-injeção do proxy do Spring: criarComAnexoResolvido/atualizarComAnexoResolvido só rodam
@@ -382,9 +385,7 @@ public class OportunidadeService {
         }
         oportunidadeRepository.saveAll(oportunidades);
 
-        List<OportunidadeDTO> dtoList = oportunidades.stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
+        List<OportunidadeDTO> dtoList = toDtos(oportunidades);
         afterCommit(() -> messagingTemplate.convertAndSend("/topic/attoportunidades", dtoList));
     }
 
@@ -452,7 +453,26 @@ public class OportunidadeService {
     }
 
     private OportunidadeDTO toDto(Oportunidade oportunidade) {
-        return new OportunidadeDTO(oportunidade);
+        OportunidadeDTO dto = new OportunidadeDTO(oportunidade);
+        dto.setTotalProcessos(oportunidadeProcessoRepository.countByOportunidadeId(oportunidade.getId()));
+        return dto;
+    }
+
+    /** Mesma ideia de toDto, mas em lote (1 query de contagem em vez de N) -- usado no broadcast de reordenacao, que pode envolver varias oportunidades da mesma etapa. */
+    private List<OportunidadeDTO> toDtos(List<Oportunidade> oportunidades) {
+        if (oportunidades.isEmpty()) {
+            return List.of();
+        }
+        List<Long> ids = oportunidades.stream().map(Oportunidade::getId).collect(Collectors.toList());
+        Map<Long, Long> totalProcessosPorOportunidade = new HashMap<>();
+        for (Object[] linha : oportunidadeProcessoRepository.countByOportunidadeIdIn(ids)) {
+            totalProcessosPorOportunidade.put((Long) linha[0], (Long) linha[1]);
+        }
+        return oportunidades.stream().map(oportunidade -> {
+            OportunidadeDTO dto = new OportunidadeDTO(oportunidade);
+            dto.setTotalProcessos(totalProcessosPorOportunidade.getOrDefault(oportunidade.getId(), 0L));
+            return dto;
+        }).collect(Collectors.toList());
     }
 
     /**

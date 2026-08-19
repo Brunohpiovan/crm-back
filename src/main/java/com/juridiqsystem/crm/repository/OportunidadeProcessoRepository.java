@@ -24,4 +24,14 @@ public interface OportunidadeProcessoRepository extends JpaRepository<Oportunida
     Optional<OportunidadeProcesso> findByOportunidadeIdAndProcessoId(Long oportunidadeId, Long processoId);
 
     Optional<OportunidadeProcesso> findByOportunidadeIdAndProcessoPublicId(Long oportunidadeId, String processoPublicId);
+
+    long countByOportunidadeId(Long oportunidadeId);
+
+    /**
+     * Contagem por oportunidade, para exibir "processos vinculados" nos cards do Kanban sem N+1 nem
+     * JOIN FETCH direto em Oportunidade (que causaria produto cartesiano combinado com o fetch de
+     * tags já existente na query de cards). Object[] é {oportunidadeId, total} por linha.
+     */
+    @Query("SELECT op.oportunidade.id, COUNT(op) FROM OportunidadeProcesso op WHERE op.oportunidade.id IN :oportunidadeIds GROUP BY op.oportunidade.id")
+    List<Object[]> countByOportunidadeIdIn(@Param("oportunidadeIds") List<Long> oportunidadeIds);
 }

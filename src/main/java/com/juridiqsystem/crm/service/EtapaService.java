@@ -12,6 +12,7 @@ import com.juridiqsystem.crm.model.dtos.OportunidadeDTO;
 import com.juridiqsystem.crm.model.enums.SituacaoOportunidade;
 import com.juridiqsystem.crm.repository.EtapaRepository;
 import com.juridiqsystem.crm.repository.FunilRepository;
+import com.juridiqsystem.crm.repository.OportunidadeProcessoRepository;
 import com.juridiqsystem.crm.repository.OportunidadeRepository;
 import com.juridiqsystem.crm.service.exceptions.ConflictException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +37,9 @@ public class EtapaService {
 
     @Autowired
     private OportunidadeRepository oportunidadeRepository;
+
+    @Autowired
+    private OportunidadeProcessoRepository oportunidadeProcessoRepository;
 
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
@@ -69,12 +73,7 @@ public class EtapaService {
             return Map.of();
         }
         List<Oportunidade> oportunidades = oportunidadeRepository.findCardsByEtapaIdIn(etapaIds);
-        Map<Long, List<OportunidadeDTO>> resultado = new HashMap<>();
-        for (Oportunidade oportunidade : oportunidades) {
-            OportunidadeDTO dto = new OportunidadeDTO(oportunidade);
-            resultado.computeIfAbsent(oportunidade.getEtapa().getId(), k -> new ArrayList<>()).add(dto);
-        }
-        return resultado;
+        return agruparPorEtapaComTotalProcessos(oportunidades);
     }
 
     Map<Long, List<OportunidadeDTO>> carregarOportunidadesPorEtapa(List<Long> etapaIds,
@@ -86,9 +85,25 @@ public class EtapaService {
         List<Oportunidade> oportunidades = (tagIds != null && !tagIds.isEmpty())
                 ? oportunidadeRepository.findCardsByEtapaIdInAndSituacaoInAndTagIdsIn(etapaIds, situacoes, tagIds)
                 : oportunidadeRepository.findCardsByEtapaIdInAndSituacaoIn(etapaIds, situacoes);
+        return agruparPorEtapaComTotalProcessos(oportunidades);
+    }
+
+    /**
+     * Monta os OportunidadeDTO com totalProcessos já preenchido, numa única consulta de contagem
+     * agrupada (evita N+1 -- mesmo racional do JOIN FETCH de tags já usado nas queries de cards).
+     */
+    private Map<Long, List<OportunidadeDTO>> agruparPorEtapaComTotalProcessos(List<Oportunidade> oportunidades) {
+        Map<Long, Long> totalProcessosPorOportunidade = new HashMap<>();
+        if (!oportunidades.isEmpty()) {
+            List<Long> oportunidadeIds = oportunidades.stream().map(Oportunidade::getId).collect(Collectors.toList());
+            for (Object[] linha : oportunidadeProcessoRepository.countByOportunidadeIdIn(oportunidadeIds)) {
+                totalProcessosPorOportunidade.put((Long) linha[0], (Long) linha[1]);
+            }
+        }
         Map<Long, List<OportunidadeDTO>> resultado = new HashMap<>();
         for (Oportunidade oportunidade : oportunidades) {
             OportunidadeDTO dto = new OportunidadeDTO(oportunidade);
+            dto.setTotalProcessos(totalProcessosPorOportunidade.getOrDefault(oportunidade.getId(), 0L));
             resultado.computeIfAbsent(oportunidade.getEtapa().getId(), k -> new ArrayList<>()).add(dto);
         }
         return resultado;
