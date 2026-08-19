@@ -47,4 +47,12 @@ public interface ProcessoRepository extends JpaRepository<Processo, Long> {
      */
     @Query(value = "SELECT * FROM processo WHERE numero_cnj = :numeroCnj ORDER BY id ASC", nativeQuery = true)
     List<Processo> findAllByNumeroCnjIgnoringTenant(@Param("numeroCnj") String numeroCnj);
+
+    /**
+     * Usado por EscavadorResumoIaScheduler — roda em background, sem tenant conhecido, mesmo
+     * motivo de findAllByNumeroCnjIgnoringTenant. Limite evita transformar uma indisponibilidade
+     * prolongada da Escavador numa rajada de chamadas quando ela voltar.
+     */
+    @Query(value = "SELECT * FROM processo WHERE resumo_ia_pendente = true LIMIT :limite", nativeQuery = true)
+    List<Processo> findComResumoIaPendenteIgnoringTenant(@Param("limite") int limite);
 }

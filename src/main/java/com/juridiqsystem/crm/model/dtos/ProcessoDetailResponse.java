@@ -22,6 +22,9 @@ public record ProcessoDetailResponse(
         String assunto,
         String resumoIa,
         LocalDateTime resumoIaGeradoEm,
+        /** true entre o usuário pedir a geração e a Escavador confirmar concluído — permite o
+         * frontend restaurar o indicador de "gerando..." ao recarregar a tela nesse meio-tempo. */
+        boolean resumoIaPendente,
         LocalDateTime ultimaConsultaEm,
         List<ProcessoEnvolvidoResponse> envolvidos,
         List<ProcessoMovimentacaoResponse> movimentacoes
@@ -40,6 +43,7 @@ public record ProcessoDetailResponse(
                 processo.getAssunto(),
                 processo.getResumoIa(),
                 processo.getResumoIaGeradoEm(),
+                Boolean.TRUE.equals(processo.getResumoIaPendente()),
                 processo.getUltimaConsultaEm(),
                 envolvidos.stream().map(ProcessoEnvolvidoResponse::new).toList(),
                 movimentacoes.stream().map(ProcessoMovimentacaoResponse::new).toList()

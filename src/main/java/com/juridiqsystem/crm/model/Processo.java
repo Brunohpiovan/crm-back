@@ -77,6 +77,10 @@ public class Processo {
     @Column(name = "resumo_ia_gerado_em")
     private LocalDateTime resumoIaGeradoEm;
 
+    /** true entre "solicitar-atualizacao" e a Escavador confirmar FINALIZADO — ver EscavadorResumoIaScheduler. */
+    @Column(name = "resumo_ia_pendente", nullable = false)
+    private Boolean resumoIaPendente = false;
+
     @Column(name = "ultima_consulta_em")
     private LocalDateTime ultimaConsultaEm;
 

@@ -25,8 +25,10 @@ import com.juridiqsystem.crm.model.enums.TipoEnvolvido;
 import com.juridiqsystem.crm.repository.ProcessoEnvolvidoRepository;
 import com.juridiqsystem.crm.repository.ProcessoMovimentacaoRepository;
 import com.juridiqsystem.crm.repository.ProcessoRepository;
+import com.juridiqsystem.crm.service.escavador.ResumoIaConcluidoEvent;
 import com.juridiqsystem.crm.service.exceptions.EscavadorApiException;
 import com.juridiqsystem.crm.service.exceptions.ResourceNotFoundException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,6 +51,7 @@ public class ProcessoService {
     private final ProcessoEnvolvidoRepository processoEnvolvidoRepository;
     private final ProcessoMovimentacaoRepository processoMovimentacaoRepository;
     private final ProcessoMovimentacaoService processoMovimentacaoService;
+    private final ApplicationEventPublisher eventPublisher;
     /** Proxy autoinjetado (@Lazy quebra o ciclo de criação do bean) — chamadas internas passam por
      * "self" em vez de "this" para que @Transactional funcione (invocação direta dentro da mesma
      * classe não passa pelo proxy AOP do Spring e a anotação seria silenciosamente ignorada). */
@@ -59,12 +62,14 @@ public class ProcessoService {
                             ProcessoEnvolvidoRepository processoEnvolvidoRepository,
                             ProcessoMovimentacaoRepository processoMovimentacaoRepository,
                             ProcessoMovimentacaoService processoMovimentacaoService,
+                            ApplicationEventPublisher eventPublisher,
                             @org.springframework.context.annotation.Lazy ProcessoService self) {
         this.escavadorProcessoApi = escavadorProcessoApi;
         this.processoRepository = processoRepository;
         this.processoEnvolvidoRepository = processoEnvolvidoRepository;
         this.processoMovimentacaoRepository = processoMovimentacaoRepository;
         this.processoMovimentacaoService = processoMovimentacaoService;
+        this.eventPublisher = eventPublisher;
         this.self = self;
     }
 
@@ -147,8 +152,10 @@ public class ProcessoService {
     /**
      * Dispara/verifica a geração do resumo IA (fluxo assíncrono de 3 passos — §8.11) sem manter
      * uma requisição HTTP bloqueada em polling: primeiro tenta obter um status já concluído; se não
-     * houver nenhuma solicitação em andamento, apenas dispara uma nova e devolve PENDENTE — o
-     * frontend chama este mesmo endpoint de novo (ex.: reabrindo a tela) para checar se concluiu.
+     * houver nenhuma solicitação em andamento, dispara uma nova e marca resumoIaPendente=true.
+     * Dali em diante, EscavadorResumoIaScheduler assume a checagem em background e notifica via
+     * WebSocket quando concluir — o usuário não precisa manter esta chamada síncrona nem adivinhar
+     * quando voltar e tentar de novo.
      */
     public ProcessoResumoIaResponse gerarOuObterResumoIa(String publicId) {
         Processo processo = buscarPorPublicIdOuFalhar(publicId);
@@ -160,10 +167,28 @@ public class ProcessoService {
             return self.persistirResumo(processo, resumo);
         }
         if (status != null && "PENDENTE".equalsIgnoreCase(status.status())) {
+            self.marcarResumoPendente(processo.getId());
             return new ProcessoResumoIaResponse("PENDENTE", null, null);
         }
         escavadorProcessoApi.solicitarResumoIa(numeroCnj);
+        self.marcarResumoPendente(processo.getId());
         return new ProcessoResumoIaResponse("PENDENTE", null, null);
+    }
+
+    /**
+     * Chamado pelo EscavadorResumoIaScheduler (background, já dentro do tenant correto via
+     * TenantContext.runAs) para cada Processo com resumoIaPendente=true. Silencioso quando ainda
+     * não concluiu — o próximo tick tenta de novo; erros ficam só logados pelo scheduler, sem
+     * derrubar a checagem dos demais processos pendentes.
+     */
+    public void verificarResumoIaPendente(String publicId) {
+        Processo processo = buscarPorPublicIdOuFalhar(publicId);
+        EscavadorResumoIaSolicitacao status = tentarObterStatusResumoIa(processo.getNumeroCnj());
+        if (status == null || !"FINALIZADO".equalsIgnoreCase(status.status())) {
+            return;
+        }
+        EscavadorResumoIa resumo = escavadorProcessoApi.obterResumoIa(processo.getNumeroCnj());
+        self.persistirResumo(processo, resumo);
     }
 
     Processo buscarPorPublicIdOuFalhar(String publicId) {
@@ -192,8 +217,22 @@ public class ProcessoService {
     public ProcessoResumoIaResponse persistirResumo(Processo processo, EscavadorResumoIa resumo) {
         processo.setResumoIa(resumo.conteudo());
         processo.setResumoIaGeradoEm(LocalDateTime.now());
-        processoRepository.save(processo);
+        processo.setResumoIaPendente(false);
+        Processo salvo = processoRepository.save(processo);
+        eventPublisher.publishEvent(new ResumoIaConcluidoEvent(
+                salvo.getId(), salvo.getPublicId(), salvo.getEmpresaId(), salvo.getNumeroCnj()));
         return new ProcessoResumoIaResponse("CONCLUIDO", resumo.conteudo(), processo.getResumoIaGeradoEm());
+    }
+
+    @Transactional
+    public void marcarResumoPendente(Long processoId) {
+        // idempotente/best-effort: se já estava true, este save é um no-op funcional.
+        processoRepository.findById(processoId).ifPresent(processo -> {
+            if (!Boolean.TRUE.equals(processo.getResumoIaPendente())) {
+                processo.setResumoIaPendente(true);
+                processoRepository.save(processo);
+            }
+        });
     }
 
     private void registrarMovimentacoesRemotas(Processo processo, FonteMovimentacao fonte) {
