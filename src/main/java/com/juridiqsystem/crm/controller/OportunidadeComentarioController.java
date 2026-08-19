@@ -40,18 +40,20 @@ public class OportunidadeComentarioController {
     }
 
     @Operation(summary = "Criar um comentário na oportunidade",
-            description = "Requer JWT. Requisição multipart/form-data: `conteudo` é o texto do comentário e `file`, opcional, é uma imagem (PNG, JPG, JPEG, WEBP ou GIF, até 100 MB) anexada ao comentário. O autor é sempre o usuário autenticado.")
+            description = """
+                    Requer JWT. Requisição multipart/form-data: `conteudo` é o texto do comentário                     e `file`, opcional, é o anexo. São aceitos documentos (PDF, DOCX, DOC, XLSX,                     XLS, ODT, ODS, TXT) e imagens (PNG, JPG, WEBP, GIF), com limite de tamanho por                     arquivo (ver app.anexo-comentario.max-size-mb). O tipo é confirmado pela                     assinatura real do arquivo, não pelo content-type declarado. O autor é sempre                     o usuário autenticado.
+                    """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Comentário criado com sucesso",
                     content = @Content(schema = @Schema(implementation = OportunidadeComentarioDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Oportunidade não encontrada, ou arquivo de anexo inválido (tamanho acima de 100 MB ou tipo de imagem não permitido)",
+            @ApiResponse(responseCode = "400", description = "Oportunidade não encontrada, ou anexo inválido (acima do limite de tamanho, tipo fora da lista permitida, ou conteúdo que não corresponde ao tipo declarado)",
                     content = @Content(mediaType = "text/plain", schema = @Schema(type = "string", example = "Oportunidade com id 1 nao encontrada")))
     })
     @PostMapping(consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     public ResponseEntity<OportunidadeComentarioDTO> criar(
             @Parameter(description = "Id da oportunidade", required = true) @PathVariable String oportunidadeId,
             @Parameter(description = "Texto do comentário", required = true) @RequestParam("conteudo") String conteudo,
-            @Parameter(description = "Arquivo de imagem opcional a ser anexado ao comentário") @RequestPart(value = "file", required = false) MultipartFile file) {
+            @Parameter(description = "Arquivo opcional a ser anexado ao comentário (documento ou imagem)") @RequestPart(value = "file", required = false) MultipartFile file) {
         return ResponseEntity.ok(oportunidadeComentarioService.criar(oportunidadeId, conteudo, file));
     }
 

@@ -13,6 +13,12 @@ public record OportunidadeComentarioDTO(
         String autorAvatarUrl,
         String conteudo,
         String urlAnexo,
+        @Schema(description = "Nome original do arquivo anexado, para exibição e download.")
+        String nomeAnexo,
+        @Schema(description = "Content-type validado do anexo. O frontend usa para decidir entre miniatura (imagem) e item de download (documento).")
+        String tipoAnexo,
+        @Schema(description = "Tamanho do anexo em bytes.")
+        Long tamanhoAnexo,
         LocalDateTime criadoEm,
         boolean podeExcluir
 ) {
@@ -24,6 +30,9 @@ public record OportunidadeComentarioDTO(
                 comentario.getAutor().getUrlPicture(),
                 comentario.getConteudo(),
                 comentario.getUrlAnexo(),
+                comentario.getNomeAnexo(),
+                comentario.getTipoAnexo(),
+                comentario.getTamanhoAnexo(),
                 comentario.getCriadoEm(),
                 podeExcluir
         );
