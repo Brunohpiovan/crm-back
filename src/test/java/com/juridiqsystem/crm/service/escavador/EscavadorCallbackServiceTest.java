@@ -5,7 +5,7 @@ import com.juridiqsystem.crm.infra.escavador.EscavadorCallbackProperties;
 import com.juridiqsystem.crm.infra.escavador.EscavadorCallbackTokenValidator;
 import com.juridiqsystem.crm.model.EscavadorCallbackEvento;
 import com.juridiqsystem.crm.model.Processo;
-import com.juridiqsystem.crm.model.dtos.escavador.FonteMovimentacao;
+import com.juridiqsystem.crm.model.enums.FonteMovimentacao;
 import com.juridiqsystem.crm.model.dtos.escavador.MovimentacaoInput;
 import com.juridiqsystem.crm.repository.EscavadorCallbackEventoRepository;
 import com.juridiqsystem.crm.repository.ProcessoRepository;

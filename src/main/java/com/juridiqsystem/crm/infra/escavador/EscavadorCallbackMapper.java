@@ -4,8 +4,9 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.juridiqsystem.crm.infra.escavador.dto.EscavadorCallbackMovimentacao;
 import com.juridiqsystem.crm.infra.escavador.dto.EscavadorCallbackPayload;
-import com.juridiqsystem.crm.model.dtos.escavador.FonteMovimentacao;
 import com.juridiqsystem.crm.model.dtos.escavador.MovimentacaoInput;
+import com.juridiqsystem.crm.model.enums.FonteMovimentacao;
+import com.juridiqsystem.crm.service.exceptions.EscavadorApiException;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;

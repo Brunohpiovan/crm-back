@@ -3,7 +3,6 @@ package com.juridiqsystem.crm.infra.escavador;
 import com.juridiqsystem.crm.infra.escavador.dto.EscavadorMonitoramentoCreateRequest;
 import com.juridiqsystem.crm.infra.escavador.dto.EscavadorMonitoramentoResponse;
 import com.juridiqsystem.crm.model.enums.FrequenciaMonitoramento;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -27,10 +26,17 @@ import org.springframework.stereotype.Component;
 @Component
 public class EscavadorMonitoramentoApi {
 
-    private static final String PATH_MONITORAMENTO_PROCESSOS = "/api/v2/monitoramentos/processos";
+    /**
+     * Relativo à base URL do EscavadorClient, que já inclui "/api/v2" — mesmo padrão de
+     * EscavadorProcessoApi. Repetir o prefixo aqui produziria ".../api/v2/api/v2/...".
+     */
+    private static final String PATH_MONITORAMENTO_PROCESSOS = "/monitoramentos/processos";
 
-    @Autowired
-    private EscavadorClient escavadorClient;
+    private final EscavadorClient client;
+
+    public EscavadorMonitoramentoApi(EscavadorClient client) {
+        this.client = client;
+    }
 
     /**
      * Cria a assinatura de monitoramento do processo. A assinatura nasce com status PENDENTE e
@@ -44,13 +50,13 @@ public class EscavadorMonitoramentoApi {
     public EscavadorMonitoramentoResponse criar(String numeroCnj, FrequenciaMonitoramento frequencia, boolean comDocumentos) {
         EscavadorMonitoramentoCreateRequest corpo = new EscavadorMonitoramentoCreateRequest(
                 numeroCnj, null, frequencia.name(), comDocumentos);
-        return escavadorClient
+        return client
                 .post(EscavadorApiVersion.V2, PATH_MONITORAMENTO_PROCESSOS, corpo, EscavadorMonitoramentoResponse.class)
                 .corpo();
     }
 
     public EscavadorMonitoramentoResponse buscar(String escavadorMonitoramentoId) {
-        return escavadorClient
+        return client
                 .get(EscavadorApiVersion.V2, PATH_MONITORAMENTO_PROCESSOS + "/" + escavadorMonitoramentoId, null,
                         EscavadorMonitoramentoResponse.class)
                 .corpo();
@@ -58,6 +64,6 @@ public class EscavadorMonitoramentoApi {
 
     /** Remove a assinatura na Escavador. Responde 204 sem corpo. */
     public void remover(String escavadorMonitoramentoId) {
-        escavadorClient.delete(EscavadorApiVersion.V2, PATH_MONITORAMENTO_PROCESSOS + "/" + escavadorMonitoramentoId, Void.class);
+        client.delete(EscavadorApiVersion.V2, PATH_MONITORAMENTO_PROCESSOS + "/" + escavadorMonitoramentoId, Void.class);
     }
 }

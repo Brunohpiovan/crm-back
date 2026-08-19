@@ -1,6 +1,5 @@
 package com.juridiqsystem.crm.service.escavador;
 
-import com.juridiqsystem.crm.infra.escavador.EscavadorApiException;
 import com.juridiqsystem.crm.infra.escavador.EscavadorMonitoramentoApi;
 import com.juridiqsystem.crm.infra.escavador.dto.EscavadorMonitoramentoResponse;
 import com.juridiqsystem.crm.model.Empresa;
@@ -14,6 +13,7 @@ import com.juridiqsystem.crm.repository.EmpresaRepository;
 import com.juridiqsystem.crm.repository.ProcessoMonitoramentoRepository;
 import com.juridiqsystem.crm.repository.ProcessoRepository;
 import com.juridiqsystem.crm.service.exceptions.ConflictException;
+import com.juridiqsystem.crm.service.exceptions.EscavadorApiException;
 import com.juridiqsystem.crm.service.exceptions.IntegrationException;
 import com.juridiqsystem.crm.service.exceptions.ResourceNotFoundException;
 import lombok.extern.slf4j.Slf4j;

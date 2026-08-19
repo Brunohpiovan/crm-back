@@ -1,8 +1,9 @@
 package com.juridiqsystem.crm.infra.escavador;
 
 import com.juridiqsystem.crm.infra.escavador.dto.EscavadorCallbackPayload;
-import com.juridiqsystem.crm.model.dtos.escavador.FonteMovimentacao;
+import com.juridiqsystem.crm.model.enums.FonteMovimentacao;
 import com.juridiqsystem.crm.model.dtos.escavador.MovimentacaoInput;
+import com.juridiqsystem.crm.service.exceptions.EscavadorApiException;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
