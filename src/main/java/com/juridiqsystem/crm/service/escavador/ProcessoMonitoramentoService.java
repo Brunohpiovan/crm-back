@@ -178,9 +178,12 @@ public class ProcessoMonitoramentoService {
     }
 
     private Integer limiteDaEmpresa(Long empresaId) {
-        return empresaRepository.findById(empresaId)
-                .map(Empresa::getProcessosMonitoradosLimite)
+        // Não usar .map(Empresa::getProcessosMonitoradosLimite).orElseThrow(...): quando o limite é
+        // null (plano sem cota configurada = ilimitado), Optional.map colapsa para Optional.empty()
+        // e o orElseThrow dispararia "Empresa não encontrada" para uma empresa que existe.
+        Empresa empresa = empresaRepository.findById(empresaId)
                 .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada."));
+        return empresa.getProcessosMonitoradosLimite();
     }
 
     private Processo buscarProcesso(String processoPublicId) {

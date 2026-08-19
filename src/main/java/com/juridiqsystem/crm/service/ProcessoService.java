@@ -70,7 +70,7 @@ public class ProcessoService {
 
     /** Consulta capa+envolvidos+movimentações na Escavador e faz upsert local. Não vincula a nenhuma Oportunidade. */
     public Processo consultarEUpsertPorCnj(String numeroCnj) {
-        EscavadorProcesso remoto = escavadorProcessoApi.consultarPorCnj(numeroCnj);
+        EscavadorProcesso remoto = consultarPorCnjOuFalhar(numeroCnj);
         Processo processo = self.upsert(remoto);
         registrarMovimentacoesRemotas(processo, FonteMovimentacao.CONSULTA_INICIAL);
         return processo;
@@ -80,10 +80,27 @@ public class ProcessoService {
     public Processo atualizarNoTribunal(String publicId) {
         Processo processo = buscarPorPublicIdOuFalhar(publicId);
         escavadorProcessoApi.atualizarNoTribunal(processo.getNumeroCnj());
-        EscavadorProcesso remoto = escavadorProcessoApi.consultarPorCnj(processo.getNumeroCnj());
+        EscavadorProcesso remoto = consultarPorCnjOuFalhar(processo.getNumeroCnj());
         Processo atualizado = self.upsert(remoto);
         registrarMovimentacoesRemotas(atualizado, FonteMovimentacao.ATUALIZACAO_MANUAL);
         return atualizado;
+    }
+
+    /**
+     * 404 da Escavador aqui é um resultado de negócio legítimo ("nenhum processo com esse CNJ"),
+     * não uma falha de integração — por isso vira ResourceNotFoundException (404 com mensagem
+     * clara), nunca a EscavadorApiException genérica (que o handler global sempre traduz para
+     * "falha em serviço externo", 502 — enganoso para o caso comum de CNJ inexistente/digitado errado).
+     */
+    private EscavadorProcesso consultarPorCnjOuFalhar(String numeroCnj) {
+        try {
+            return escavadorProcessoApi.consultarPorCnj(numeroCnj);
+        } catch (EscavadorApiException e) {
+            if (e.getStatusHttp() == 404) {
+                throw new ResourceNotFoundException("Nenhum processo encontrado para o número CNJ informado.");
+            }
+            throw e;
+        }
     }
 
     public List<ProcessoBuscaResultResponse> buscarPorEnvolvido(String documento, String nome) {
@@ -91,16 +108,27 @@ public class ProcessoService {
         if (termo == null || termo.isBlank()) {
             return List.of();
         }
-        EscavadorProcessoPaginado resultado = escavadorProcessoApi.buscarPorEnvolvido(termo);
-        return mapBusca(resultado);
+        return mapBusca(buscarIgnorandoNaoEncontrado(() -> escavadorProcessoApi.buscarPorEnvolvido(termo)));
     }
 
     public List<ProcessoBuscaResultResponse> buscarPorOab(String oab) {
         if (oab == null || oab.isBlank()) {
             return List.of();
         }
-        EscavadorProcessoPaginado resultado = escavadorProcessoApi.buscarPorOab(oab.trim());
-        return mapBusca(resultado);
+        String oabNormalizado = oab.trim();
+        return mapBusca(buscarIgnorandoNaoEncontrado(() -> escavadorProcessoApi.buscarPorOab(oabNormalizado)));
+    }
+
+    /** 404 num endpoint de busca/listagem é "nenhum resultado", não erro — devolve lista vazia em vez de propagar. */
+    private EscavadorProcessoPaginado buscarIgnorandoNaoEncontrado(java.util.function.Supplier<EscavadorProcessoPaginado> busca) {
+        try {
+            return busca.get();
+        } catch (EscavadorApiException e) {
+            if (e.getStatusHttp() == 404) {
+                return null;
+            }
+            throw e;
+        }
     }
 
     public ProcessoDetailResponse buscarDetalheLocalPorPublicId(String publicId) {
