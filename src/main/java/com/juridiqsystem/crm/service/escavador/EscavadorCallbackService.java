@@ -12,6 +12,7 @@ import com.juridiqsystem.crm.model.dtos.escavador.MovimentacaoInput;
 import com.juridiqsystem.crm.repository.EscavadorCallbackEventoRepository;
 import com.juridiqsystem.crm.repository.ProcessoMonitoramentoRepository;
 import com.juridiqsystem.crm.repository.ProcessoRepository;
+import com.juridiqsystem.crm.service.ProcessoDocumentoService;
 import com.juridiqsystem.crm.service.ProcessoMovimentacaoService;
 import com.juridiqsystem.crm.service.exceptions.AccessDeniedException;
 import com.juridiqsystem.crm.service.exceptions.ResourceNotFoundException;
@@ -62,6 +63,9 @@ public class EscavadorCallbackService {
     private ProcessoMovimentacaoService processoMovimentacaoService;
 
     @Autowired
+    private ProcessoDocumentoService processoDocumentoService;
+
+    @Autowired
     private ProcessoMonitoramentoService processoMonitoramentoService;
 
     public void receber(String rawBody, String authorizationHeader, String tokenQueryParam) {
@@ -88,11 +92,13 @@ public class EscavadorCallbackService {
     private void processar(EscavadorCallbackPayload payload) {
         if (payload.isNovaMovimentacao()) {
             registrarMovimentacoes(payload);
+        } else if (payload.isNovoDocumento()) {
+            registrarDocumento(payload);
         } else if (payload.isProcessoNaoEncontrado()) {
             desligarMonitoramentoSemProcessoNoTribunal(payload);
         } else {
-            // processo_verificado, processo_encontrado, novo_documento, novo_processo... não
-            // alteram estado no CRM hoje; ficam registrados no evento bruto para auditoria.
+            // processo_verificado, processo_encontrado, novo_processo... não alteram estado no
+            // CRM hoje; ficam registrados no evento bruto para auditoria.
             log.debug("Callback da Escavador ignorado (evento sem efeito no CRM). event={}", payload.event());
         }
     }
@@ -104,6 +110,15 @@ public class EscavadorCallbackService {
         }
         aplicarNosMonitoradosDoCnj(payload.numeroCnj(), (processo, monitoramento) ->
                 processoMovimentacaoService.registrarMovimentacoes(processo.getId(), movimentacoes));
+    }
+
+    /** Só chega quando o monitoramento foi ligado com "Incluir documentos públicos". */
+    private void registrarDocumento(EscavadorCallbackPayload payload) {
+        if (payload.documento() == null) {
+            throw new IllegalStateException("Callback de novo documento sem objeto documento.");
+        }
+        aplicarNosMonitoradosDoCnj(payload.numeroCnj(), (processo, monitoramento) ->
+                processoDocumentoService.registrarDoCallback(processo.getId(), payload.documento()));
     }
 
     /**

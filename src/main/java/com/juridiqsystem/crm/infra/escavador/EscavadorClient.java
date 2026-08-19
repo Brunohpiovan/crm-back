@@ -70,13 +70,31 @@ public class EscavadorClient {
         return execute(versao, HttpMethod.DELETE, path, null, null, tipoResposta);
     }
 
+    /**
+     * Download binário (ex.: PDF de documento) — único método que não passa por
+     * {@code .retrieve().toEntity(tipoResposta)} com o Accept JSON padrão de {@link #authHeaders},
+     * já que o corpo da resposta nunca é JSON aqui. Mesmos aspectos dos demais métodos (auth
+     * Bearer, retry em 429, publicação de EscavadorRequisicaoRealizadaEvent).
+     */
+    @Retryable(retryFor = HttpClientErrorException.TooManyRequests.class, maxAttempts = 4,
+            backoff = @Backoff(delay = 500, multiplier = 2, random = true))
+    public EscavadorResponse<byte[]> getBinario(EscavadorApiVersion versao, String path) {
+        return execute(versao, HttpMethod.GET, path, null, null, byte[].class, this::authHeadersBinario);
+    }
+
     private <T> EscavadorResponse<T> execute(EscavadorApiVersion versao, HttpMethod metodo, String path,
                                               Map<String, String> query, Object corpo, Class<T> tipoResposta) {
+        return execute(versao, metodo, path, query, corpo, tipoResposta, this::authHeaders);
+    }
+
+    private <T> EscavadorResponse<T> execute(EscavadorApiVersion versao, HttpMethod metodo, String path,
+                                              Map<String, String> query, Object corpo, Class<T> tipoResposta,
+                                              java.util.function.Consumer<HttpHeaders> headersCustomizer) {
         RestClient client = versao == EscavadorApiVersion.V1 ? clientV1 : clientV2;
         try {
             RestClient.RequestBodySpec spec = client.method(metodo)
                     .uri(uriBuilder -> buildUri(uriBuilder, path, query))
-                    .headers(this::authHeaders);
+                    .headers(headersCustomizer::accept);
             if (corpo != null) {
                 spec.body(corpo);
             }
@@ -89,7 +107,7 @@ public class EscavadorClient {
         } catch (RestClientResponseException e) {
             int custo = extrairCredito(e.getResponseHeaders());
             publicarEvento(path, custo, false);
-            throw mapError(e);
+            throw mapError(e, path);
         } catch (ResourceAccessException e) {
             publicarEvento(path, 0, false);
             throw new EscavadorApiException("A API da Escavador está indisponível no momento.", e);
@@ -107,6 +125,11 @@ public class EscavadorClient {
     private void authHeaders(HttpHeaders headers) {
         headers.setBearerAuth(properties.getToken());
         headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
+    }
+
+    private void authHeadersBinario(HttpHeaders headers) {
+        headers.setBearerAuth(properties.getToken());
+        headers.setAccept(java.util.List.of(MediaType.APPLICATION_PDF, MediaType.ALL));
     }
 
     private int extrairCredito(HttpHeaders headers) {
@@ -133,9 +156,9 @@ public class EscavadorClient {
      * Traduz o erro cru da Escavador numa EscavadorApiException com mensagem de negócio — o corpo
      * cru da resposta nunca chega ao controller/frontend. 402 é "sem saldo" (ver docs §Balance).
      */
-    private EscavadorApiException mapError(RestClientResponseException e) {
+    private EscavadorApiException mapError(RestClientResponseException e, String path) {
         HttpStatusCode status = e.getStatusCode();
-        log.warn("Erro retornado pela Escavador API: status={} corpo={}", status.value(), e.getResponseBodyAsString());
+        log.warn("Erro retornado pela Escavador API: path={} status={} corpo={}", path, status.value(), e.getResponseBodyAsString());
 
         if (status.value() == 401) {
             return new EscavadorApiException("Autenticação com a Escavador falhou. Verifique o token configurado.", status.value());

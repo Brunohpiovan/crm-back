@@ -2,6 +2,9 @@ package com.juridiqsystem.crm.infra.escavador;
 
 import com.juridiqsystem.crm.infra.escavador.dto.EscavadorAssunto;
 import com.juridiqsystem.crm.infra.escavador.dto.EscavadorAtualizacaoSolicitacao;
+import com.juridiqsystem.crm.infra.escavador.dto.EscavadorDocumento;
+import com.juridiqsystem.crm.infra.escavador.dto.EscavadorDocumentoLinks;
+import com.juridiqsystem.crm.infra.escavador.dto.EscavadorDocumentoPaginado;
 import com.juridiqsystem.crm.infra.escavador.dto.EscavadorEnvolvido;
 import com.juridiqsystem.crm.infra.escavador.dto.EscavadorEstado;
 import com.juridiqsystem.crm.infra.escavador.dto.EscavadorLinks;
@@ -34,6 +37,8 @@ import java.util.Map;
 public class EscavadorProcessoApi {
 
     private static final String NUMERO_CNJ_MOCK_PADRAO = "0000001-23.2025.8.26.0100";
+    /** Placeholder de PDF em modo mock — evita gastar o download (também pago) testando a UI. Não é um PDF válido de verdade. */
+    private static final byte[] PDF_FICTICIO = "%PDF-1.4 documento ficticio (modo mock, sem custo)".getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
     private final EscavadorClient client;
     private final EscavadorApiProperties properties;
@@ -103,6 +108,23 @@ public class EscavadorProcessoApi {
         return client.get(EscavadorApiVersion.V2, "/processos/numero_cnj/" + numeroCnj + "/ia/resumo", null, EscavadorResumoIa.class).corpo();
     }
 
+    /** Chamada paga separada (§8.4) — não vem junto de consultarPorCnj. Só documentos públicos, nunca autos restritos. */
+    public EscavadorDocumentoPaginado listarDocumentos(String numeroCnj) {
+        if (properties.isMockMode()) {
+            return documentosFicticios();
+        }
+        return client.get(EscavadorApiVersion.V2, "/processos/numero_cnj/" + numeroCnj + "/documentos", null, EscavadorDocumentoPaginado.class).corpo();
+    }
+
+    /** {@code documentoId} é o {@code key} do documento (ver EscavadorDocumento/EscavadorCallbackDocumento). Billed per download. */
+    public byte[] baixarDocumentoPdf(String numeroCnj, String documentoId) {
+        if (properties.isMockMode()) {
+            return PDF_FICTICIO;
+        }
+        return client.getBinario(EscavadorApiVersion.V2,
+                "/processos/numero_cnj/" + numeroCnj + "/documentos/" + documentoId + "/pdf").corpo();
+    }
+
     // --- Dados fictícios de modo mock (escavador.api.mock-mode=true) ---
 
     private EscavadorResumoIaSolicitacao resumoSolicitacaoFicticia(String numeroCnj) {
@@ -133,6 +155,16 @@ public class EscavadorProcessoApi {
                 new EscavadorMovimentacao(4L, "2025-06-20", "PUBLICAÇÃO", "Sentença publicada: pedido julgado parcialmente procedente (mock).", fonte)
         );
         return new EscavadorMovimentacaoPaginado(items, new EscavadorLinks(null, null, null, null), new EscavadorPaginator(1, 20, items.size(), 1));
+    }
+
+    private EscavadorDocumentoPaginado documentosFicticios() {
+        List<EscavadorDocumento> items = List.of(
+                new EscavadorDocumento(1L, "Petição Inicial", "Petição Inicial", "2025-03-10", "PUBLICO", "pdf", 5,
+                        "mock-doc-key-1", new EscavadorDocumentoLinks(null), "2099-01-01T00:00:00-03:00"),
+                new EscavadorDocumento(2L, "Sentença", "Sentença", "2025-06-20", "PUBLICO", "pdf", 12,
+                        "mock-doc-key-2", new EscavadorDocumentoLinks(null), "2099-01-01T00:00:00-03:00")
+        );
+        return new EscavadorDocumentoPaginado(items, new EscavadorLinks(null, null, null, null), new EscavadorPaginator(1, 20, items.size(), 1));
     }
 
     private EscavadorProcesso processoFicticio(String numeroCnj) {

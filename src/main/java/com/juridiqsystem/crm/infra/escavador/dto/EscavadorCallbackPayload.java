@@ -6,7 +6,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * Corpo dos callbacks da Escavador (POST na URL cadastrada no painel da API, content-type
  * application/json). Os sete eventos publicados compartilham a mesma casca
  * ({@code event}, {@code monitoramento}, {@code uuid}) e variam só no objeto específico —
- * mapeamos aqui apenas o de {@code nova_movimentacao}, o único que altera estado no CRM.
+ * mapeamos aqui os de {@code nova_movimentacao} e {@code novo_documento}, os únicos que alteram
+ * estado no CRM.
  *
  * <p>Eventos e seus nomes exatos (https://api.escavador.com/v2/docs/callbacks):
  * {@code novo_processo}, {@code atualizacao_processo_concluida}, {@code nova_movimentacao},
@@ -23,13 +24,19 @@ public record EscavadorCallbackPayload(
         String event,
         EscavadorMonitoramentoResponse monitoramento,
         EscavadorCallbackMovimentacao movimentacao,
+        EscavadorCallbackDocumento documento,
         String uuid) {
 
     public static final String EVENTO_NOVA_MOVIMENTACAO = "nova_movimentacao";
+    public static final String EVENTO_NOVO_DOCUMENTO = "novo_documento";
     public static final String EVENTO_PROCESSO_NAO_ENCONTRADO = "processo_nao_encontrado";
 
     public boolean isNovaMovimentacao() {
         return EVENTO_NOVA_MOVIMENTACAO.equals(event);
+    }
+
+    public boolean isNovoDocumento() {
+        return EVENTO_NOVO_DOCUMENTO.equals(event);
     }
 
     /**
