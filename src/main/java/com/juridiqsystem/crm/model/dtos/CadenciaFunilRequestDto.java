@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -36,9 +36,9 @@ public class CadenciaFunilRequestDto {
     @Schema(description = "Id da etapa para onde as oportunidades serão movidas")
     @NotBlank(message = "Informe a etapa de destino")
     private String etapaDestino;
-    @Schema(description = "Quantidade de dias que uma oportunidade precisa permanecer na etapa de origem para se tornar elegível para a movimentação automática")
+    @Schema(description = "Quantidade de dias que uma oportunidade precisa permanecer na etapa de origem para se tornar elegível para a movimentação automática. Use 0 para tornar elegíveis todas as oportunidades da etapa de origem no horário configurado.")
     @NotNull(message = "Informe a quantidade de dias na etapa")
-    @Positive(message = "A quantidade de dias na etapa deve ser maior que zero")
+    @PositiveOrZero(message = "A quantidade de dias na etapa não pode ser negativa")
     @Max(value = 3650, message = "A quantidade de dias na etapa deve ser no máximo 3650")
     private Integer diasNaEtapa;
     @Schema(description = "Horário do dia em que o scheduler deve executar a movimentação das oportunidades elegíveis")
