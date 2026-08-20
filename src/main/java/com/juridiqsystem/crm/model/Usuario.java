@@ -162,6 +162,15 @@ public class Usuario implements UserDetails {
     @Column(name = "bloqueado",nullable = false)
     private Boolean bloqueado;
 
+    @Schema(description = "Número da OAB do advogado, se aplicável. Opcional — usado para pré-preencher o vínculo advogado/OAB ao cadastrar uma OAB monitorada em IntimacaoMonitoramento.")
+    @Column(name = "oab_numero", length = 20)
+    private String oabNumero;
+
+    @Schema(description = "UF da OAB do advogado, se aplicável.")
+    @Column(name = "oab_uf", length = 2)
+    @Enumerated(EnumType.STRING)
+    private Uf oabUf;
+
     public Usuario(UsuarioCreateDTO usuarioDTO){
         this.urlPicture = usuarioDTO.getUrlPicture();
         this.nome = usuarioDTO.getNome();

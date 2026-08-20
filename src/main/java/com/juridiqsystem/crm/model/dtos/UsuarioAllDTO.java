@@ -34,6 +34,10 @@ public class UsuarioAllDTO {
     private Boolean bloqueado;
     @Schema(description = "URL da foto/avatar do usuário")
     private String avatar;
+    @Schema(description = "Número da OAB do advogado, se aplicável. Usado para pré-preencher o formulário de OAB monitorada (IntimacaoMonitoramento) ao selecionar este usuário como advogado dono.")
+    private String oabNumero;
+    @Schema(description = "UF da OAB do advogado, se aplicável.")
+    private Uf oabUf;
 
 
     public UsuarioAllDTO(Usuario usuario){
@@ -44,6 +48,8 @@ public class UsuarioAllDTO {
         this.cargo = usuario.getCargo();
         this.bloqueado = usuario.getBloqueado();
         this.avatar = usuario.getUrlPicture();
+        this.oabNumero = usuario.getOabNumero();
+        this.oabUf = usuario.getOabUf();
     }
 
 }

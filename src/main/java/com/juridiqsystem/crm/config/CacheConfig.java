@@ -26,6 +26,7 @@ public class CacheConfig {
     public static final String TAGS_CACHE = "tags";
     public static final String TEMPLATES_CACHE = "templates";
     public static final String EQUIPES_CACHE = "equipes";
+    public static final String ESCAVADOR_ORIGENS_CACHE = "escavadorOrigens";
 
     @Bean
     public CacheManager cacheManager() {
@@ -33,13 +34,18 @@ public class CacheConfig {
         // o MetaWhatsAppClient é stateless e compartilhado entre todos os tenants — o accessToken
         // vai como parâmetro em cada chamada, então não há client por empresa para cachear.
         CaffeineCacheManager cacheManager = new CaffeineCacheManager(
-                DASHBOARD_CACHE, TAGS_CACHE, TEMPLATES_CACHE, EQUIPES_CACHE);
+                DASHBOARD_CACHE, TAGS_CACHE, TEMPLATES_CACHE, EQUIPES_CACHE, ESCAVADOR_ORIGENS_CACHE);
 
         cacheManager.registerCustomCache(DASHBOARD_CACHE,
                 Caffeine.newBuilder().expireAfterWrite(30, TimeUnit.SECONDS).maximumSize(1000).build());
         cacheManager.registerCustomCache(TAGS_CACHE, dadosDeReferencia());
         cacheManager.registerCustomCache(TEMPLATES_CACHE, dadosDeReferencia());
         cacheManager.registerCustomCache(EQUIPES_CACHE, dadosDeReferencia());
+        // TTL bem mais longo que os demais: a lista de diários da Escavador (GET /api/v1/origens)
+        // praticamente não muda e é usada a cada ativação de OAB monitorada — ver
+        // EscavadorMonitoramentoDiarioApi.listarOrigens.
+        cacheManager.registerCustomCache(ESCAVADOR_ORIGENS_CACHE,
+                Caffeine.newBuilder().expireAfterWrite(12, TimeUnit.HOURS).maximumSize(1).build());
 
         return cacheManager;
     }

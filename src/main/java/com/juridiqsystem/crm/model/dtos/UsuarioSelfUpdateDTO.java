@@ -94,4 +94,13 @@ public class UsuarioSelfUpdateDTO implements UsuarioDadosPessoaisDTO {
     private String cep;
 
     private String observacoes;
+
+    @Schema(description = "Número da OAB do advogado, se aplicável. Opcional.")
+    @Nullable
+    @Size(max = 20, message = "O número da OAB deve ter no máximo 20 caracteres")
+    private String oabNumero;
+
+    @Schema(description = "UF da OAB do advogado, se aplicável. Opcional.")
+    @Nullable
+    private Uf oabUf;
 }

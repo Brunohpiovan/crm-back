@@ -30,4 +30,6 @@ public interface UsuarioDadosPessoaisDTO {
     String getCidade();
     String getCep();
     String getObservacoes();
+    String getOabNumero();
+    Uf getOabUf();
 }

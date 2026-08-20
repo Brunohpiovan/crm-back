@@ -1,11 +1,14 @@
 package com.juridiqsystem.crm.infra.escavador;
 
+import com.juridiqsystem.crm.infra.escavador.dto.EscavadorCallbackDiarioPayload;
 import com.juridiqsystem.crm.infra.escavador.dto.EscavadorCallbackPayload;
+import com.juridiqsystem.crm.model.dtos.escavador.IntimacaoInput;
 import com.juridiqsystem.crm.model.enums.FonteMovimentacao;
 import com.juridiqsystem.crm.model.dtos.escavador.MovimentacaoInput;
 import com.juridiqsystem.crm.service.exceptions.EscavadorApiException;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -73,7 +76,109 @@ class EscavadorCallbackMapperTest {
             }
             """;
 
+    /**
+     * "monitoramento" como OBJETO ÚNICO (não array) — o formato-base descrito na documentação
+     * para os eventos de processo; para os dois eventos de diário abaixo, a documentação local
+     * marca o campo como podendo vir tanto como objeto único quanto como array (§9.13), por isso
+     * os dois formatos são cobertos aqui.
+     */
+    private static final String DIARIO_MOVIMENTACAO_NOVA_OBJETO_UNICO_JSON = """
+            {
+                "event": "diario_movimentacao_nova",
+                "monitoramento": { "id": 555, "termo": "123456", "tipo": "TERMO", "qtd_aparicoes": 3, "numero_diarios_monitorados": 12, "data_ultima_aparicao": "10/08/2026" },
+                "movimentacao": { "data": "2026-08-15", "tipo": "PUBLICACAO", "conteudo": "Intimação de sentença." },
+                "processo": { "numero_cnj": "1002089-72.2023.8.26.0260" },
+                "envolvidos": [ { "nome": "Fulano de Tal" } ],
+                "uuid": "abc123"
+            }
+            """;
+
+    /** "monitoramento" como ARRAY — cobre o caso de a mesma publicação citar mais de uma OAB nossa. */
+    private static final String DIARIO_CITACAO_NOVA_ARRAY_JSON = """
+            {
+                "event": "diario_citacao_nova",
+                "monitoramento": [
+                    { "id": 555, "termo": "123456", "tipo": "TERMO" },
+                    { "id": 777, "termo": "654321", "tipo": "TERMO" }
+                ],
+                "diario": { "id": 42, "nome": "Diário de Justiça de SP", "sigla": "DJSP", "data_publicacao": "2026-08-16", "link": "https://example.com/diario/42" },
+                "pagina_diario": { "pagina": 7, "conteudo": "<p>Publicação sem processo identificado.</p>", "link": "https://example.com/diario/42/pagina/7" },
+                "uuid": "def456"
+            }
+            """;
+
     private final EscavadorCallbackMapper mapper = new EscavadorCallbackMapper();
+
+    @Test
+    void lerEvento_identificaEventosDeDiarioParaDecidirQualPayloadDesserializar() {
+        assertThat(mapper.lerEvento(DIARIO_MOVIMENTACAO_NOVA_OBJETO_UNICO_JSON)).isEqualTo("diario_movimentacao_nova");
+        assertThat(mapper.lerEvento(DIARIO_CITACAO_NOVA_ARRAY_JSON)).isEqualTo("diario_citacao_nova");
+        assertThat(mapper.lerEvento(NOVA_MOVIMENTACAO_JSON)).isEqualTo("nova_movimentacao");
+
+        assertThat(EscavadorCallbackDiarioPayload.isEventoDiario("diario_movimentacao_nova")).isTrue();
+        assertThat(EscavadorCallbackDiarioPayload.isEventoDiario("diario_citacao_nova")).isTrue();
+        assertThat(EscavadorCallbackDiarioPayload.isEventoDiario("nova_movimentacao")).isFalse();
+    }
+
+    @Test
+    void parseDiario_monitoramentoComoObjetoUnico_toleraViaAcceptSingleValueAsArray() {
+        EscavadorCallbackDiarioPayload payload = mapper.parseDiario(DIARIO_MOVIMENTACAO_NOVA_OBJETO_UNICO_JSON);
+
+        assertThat(payload.monitoramento()).hasSize(1);
+        assertThat(payload.monitoramento().get(0).id()).isEqualTo(555L);
+        assertThat(payload.isCitacao()).isFalse();
+        assertThat(payload.numeroCnjIdentificado()).isEqualTo("1002089-72.2023.8.26.0260");
+        assertThat(payload.uuid()).isEqualTo("abc123");
+    }
+
+    @Test
+    void parseDiario_monitoramentoComoArray_parseiaTodasAsReferencias() {
+        EscavadorCallbackDiarioPayload payload = mapper.parseDiario(DIARIO_CITACAO_NOVA_ARRAY_JSON);
+
+        assertThat(payload.monitoramento()).hasSize(2);
+        assertThat(payload.monitoramento()).extracting(m -> m.id()).containsExactly(555L, 777L);
+        assertThat(payload.isCitacao()).isTrue();
+        // diario_citacao_nova nunca traz "processo": a Escavador não identificou o processo.
+        assertThat(payload.numeroCnjIdentificado()).isNull();
+    }
+
+    @Test
+    void toIntimacaoInput_diarioMovimentacaoNova_extraiConteudoDaMovimentacaoENumeroCnjIdentificado() {
+        IntimacaoInput input = mapper.toIntimacaoInput(mapper.parseDiario(DIARIO_MOVIMENTACAO_NOVA_OBJETO_UNICO_JSON));
+
+        assertThat(input.numeroCnjIdentificado()).isEqualTo("1002089-72.2023.8.26.0260");
+        assertThat(input.conteudo()).isEqualTo("Intimação de sentença.");
+        assertThat(input.uuidCallback()).isEqualTo("abc123");
+        // Sem objeto "diario" neste payload (só chega em diario_citacao_nova, ver outro teste).
+        assertThat(input.diarioId()).isNull();
+        assertThat(input.pagina()).isNull();
+    }
+
+    /**
+     * diario_citacao_nova é o caso mais importante de não ser descartado (Escavador não achou o
+     * processo) — o input resultante precisa carregar diarioId/página para a chave de dedupe
+     * (monitoramento_id+diario_id+página, ver IntimacaoService), mesmo sem processo identificado.
+     */
+    @Test
+    void toIntimacaoInput_diarioCitacaoNova_extraiDiarioEPaginaSemNumeroCnj() {
+        IntimacaoInput input = mapper.toIntimacaoInput(mapper.parseDiario(DIARIO_CITACAO_NOVA_ARRAY_JSON));
+
+        assertThat(input.numeroCnjIdentificado()).isNull();
+        assertThat(input.diarioNome()).isEqualTo("Diário de Justiça de SP");
+        assertThat(input.diarioSigla()).isEqualTo("DJSP");
+        assertThat(input.diarioData()).isEqualTo(LocalDate.of(2026, 8, 16));
+        assertThat(input.diarioId()).isEqualTo("42");
+        assertThat(input.pagina()).isEqualTo(7);
+        assertThat(input.conteudo()).isEqualTo("<p>Publicação sem processo identificado.</p>");
+        assertThat(input.link()).isEqualTo("https://example.com/diario/42");
+        assertThat(input.uuidCallback()).isEqualTo("def456");
+    }
+
+    @Test
+    void parseDiario_corpoInvalido_lancaEscavadorApiException() {
+        assertThatThrownBy(() -> mapper.parseDiario("isso não é json"))
+                .isInstanceOf(EscavadorApiException.class);
+    }
 
     @Test
     void parse_callbackDeNovaMovimentacao_extraiEventoNumeroCnjEMovimentacao() {

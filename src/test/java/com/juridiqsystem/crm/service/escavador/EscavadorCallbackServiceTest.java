@@ -4,13 +4,17 @@ import com.juridiqsystem.crm.infra.escavador.EscavadorCallbackMapper;
 import com.juridiqsystem.crm.infra.escavador.EscavadorCallbackProperties;
 import com.juridiqsystem.crm.infra.escavador.EscavadorCallbackTokenValidator;
 import com.juridiqsystem.crm.model.EscavadorCallbackEvento;
+import com.juridiqsystem.crm.model.IntimacaoMonitoramento;
 import com.juridiqsystem.crm.model.Processo;
 import com.juridiqsystem.crm.model.ProcessoMonitoramento;
+import com.juridiqsystem.crm.model.dtos.escavador.IntimacaoInput;
 import com.juridiqsystem.crm.model.dtos.escavador.MovimentacaoInput;
 import com.juridiqsystem.crm.model.enums.FonteMovimentacao;
 import com.juridiqsystem.crm.repository.EscavadorCallbackEventoRepository;
+import com.juridiqsystem.crm.repository.IntimacaoMonitoramentoRepository;
 import com.juridiqsystem.crm.repository.ProcessoMonitoramentoRepository;
 import com.juridiqsystem.crm.repository.ProcessoRepository;
+import com.juridiqsystem.crm.service.IntimacaoService;
 import com.juridiqsystem.crm.service.ProcessoMovimentacaoService;
 import com.juridiqsystem.crm.service.exceptions.AccessDeniedException;
 import org.junit.jupiter.api.BeforeEach;
@@ -90,8 +94,17 @@ class EscavadorCallbackServiceTest {
     @Mock
     private ProcessoMonitoramentoService processoMonitoramentoService;
 
+    @Mock
+    private IntimacaoMonitoramentoRepository intimacaoMonitoramentoRepository;
+
+    @Mock
+    private IntimacaoService intimacaoService;
+
     @Captor
     private ArgumentCaptor<List<MovimentacaoInput>> movimentacoesCaptor;
+
+    @Captor
+    private ArgumentCaptor<IntimacaoInput> intimacaoInputCaptor;
 
     @InjectMocks
     private EscavadorCallbackService escavadorCallbackService;
@@ -233,6 +246,97 @@ class EscavadorCallbackServiceTest {
 
         verify(processoMovimentacaoService, never()).registrarMovimentacoes(anyLong(), any());
         assertThat(ultimoEventoGravado().getProcessado()).isTrue();
+    }
+
+    // --- diario_movimentacao_nova / diario_citacao_nova (monitoramento de OAB) ---
+
+    private static final String DIARIO_MOVIMENTACAO_NOVA_PAYLOAD = """
+            {
+                "event": "diario_movimentacao_nova",
+                "monitoramento": { "id": 555, "termo": "123456", "tipo": "TERMO" },
+                "movimentacao": { "data": "2026-08-15", "tipo": "PUBLICACAO", "conteudo": "Intimação de sentença." },
+                "processo": { "numero_cnj": "1002089-72.2023.8.26.0260" },
+                "uuid": "abc123"
+            }
+            """;
+
+    private static final String DIARIO_CITACAO_NOVA_PAYLOAD = """
+            {
+                "event": "diario_citacao_nova",
+                "monitoramento": [
+                    { "id": 555, "termo": "123456", "tipo": "TERMO" },
+                    { "id": 777, "termo": "654321", "tipo": "TERMO" }
+                ],
+                "diario": { "id": 42, "nome": "Diário de Justiça de SP", "sigla": "DJSP", "data_publicacao": "2026-08-16", "link": "https://example.com/diario/42" },
+                "pagina_diario": { "pagina": 7, "conteudo": "<p>Publicação sem processo identificado.</p>" },
+                "uuid": "def456"
+            }
+            """;
+
+    @Test
+    void receber_diarioMovimentacaoNova_resolveTenantPeloIdDaAssinaturaERegistraNoIntimacaoService() {
+        IntimacaoMonitoramento monitoramento = prepararIntimacaoMonitorada("555", 7L);
+
+        escavadorCallbackService.receber(DIARIO_MOVIMENTACAO_NOVA_PAYLOAD, "Bearer " + TOKEN, null);
+
+        verify(intimacaoService).registrarDoCallback(eq(monitoramento), intimacaoInputCaptor.capture());
+        assertThat(intimacaoInputCaptor.getValue().numeroCnjIdentificado()).isEqualTo("1002089-72.2023.8.26.0260");
+        assertThat(intimacaoInputCaptor.getValue().conteudo()).isEqualTo("Intimação de sentença.");
+
+        EscavadorCallbackEvento evento = ultimoEventoGravado();
+        assertThat(evento.getProcessado()).isTrue();
+        assertThat(evento.getErro()).isNull();
+    }
+
+    /**
+     * O caso mais importante de não ser descartado: a Escavador não identificou o processo, mas a
+     * publicação ainda precisa aparecer na lista de intimações para atenção humana. Também cobre
+     * "monitoramento" como array citando duas OABs nossas na mesma publicação — as duas devem ser
+     * atendidas.
+     */
+    @Test
+    void receber_diarioCitacaoNova_semProcessoIdentificado_naoDescartaERegistraParaCadaOabCitada() {
+        IntimacaoMonitoramento monitoramentoUm = prepararIntimacaoMonitorada("555", 7L);
+        IntimacaoMonitoramento monitoramentoDois = prepararIntimacaoMonitorada("777", 9L);
+
+        escavadorCallbackService.receber(DIARIO_CITACAO_NOVA_PAYLOAD, TOKEN, null);
+
+        verify(intimacaoService).registrarDoCallback(eq(monitoramentoUm), any());
+        verify(intimacaoService).registrarDoCallback(eq(monitoramentoDois), any());
+        assertThat(ultimoEventoGravado().getProcessado()).isTrue();
+    }
+
+    @Test
+    void receber_diarioSemAssinaturaCorrespondente_naoChamaIntimacaoServiceMasMarcaProcessado() {
+        when(intimacaoMonitoramentoRepository.findByEscavadorMonitoramentoIdIgnoringTenant(anyString()))
+                .thenReturn(Optional.empty());
+
+        escavadorCallbackService.receber(DIARIO_MOVIMENTACAO_NOVA_PAYLOAD, TOKEN, null);
+
+        verify(intimacaoService, never()).registrarDoCallback(any(), any());
+        assertThat(ultimoEventoGravado().getProcessado()).isTrue();
+    }
+
+    /** Reentrega do mesmo callback (até 11x): o service delega sempre, dedupe é responsabilidade do IntimacaoService. */
+    @Test
+    void receber_mesmoCallbackDeDiarioDuasVezes_delegaSempreAoServiceQueDeduplica() {
+        prepararIntimacaoMonitorada("555", 7L);
+
+        escavadorCallbackService.receber(DIARIO_MOVIMENTACAO_NOVA_PAYLOAD, TOKEN, null);
+        escavadorCallbackService.receber(DIARIO_MOVIMENTACAO_NOVA_PAYLOAD, TOKEN, null);
+
+        verify(intimacaoService, times(2)).registrarDoCallback(any(), any());
+    }
+
+    private IntimacaoMonitoramento prepararIntimacaoMonitorada(String escavadorMonitoramentoId, Long empresaId) {
+        IntimacaoMonitoramento monitoramento = new IntimacaoMonitoramento();
+        monitoramento.setId(Long.valueOf(escavadorMonitoramentoId));
+        monitoramento.setEmpresaId(empresaId);
+        monitoramento.setEscavadorMonitoramentoId(escavadorMonitoramentoId);
+        monitoramento.setAtivo(true);
+        when(intimacaoMonitoramentoRepository.findByEscavadorMonitoramentoIdIgnoringTenant(escavadorMonitoramentoId))
+                .thenReturn(Optional.of(monitoramento));
+        return monitoramento;
     }
 
     private ProcessoMonitoramento prepararProcessoMonitorado(Long processoId, Long empresaId) {

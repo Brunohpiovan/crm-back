@@ -481,6 +481,8 @@ public class UsuarioService {
         usuario.setCidade(dto.getCidade());
         usuario.setObservacoes(dto.getObservacoes());
         usuario.setCep(dto.getCep());
+        usuario.setOabNumero(dto.getOabNumero());
+        usuario.setOabUf(dto.getOabUf());
         return usuario;
     }
 

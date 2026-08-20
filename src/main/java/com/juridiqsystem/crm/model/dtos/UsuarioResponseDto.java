@@ -60,6 +60,10 @@ public class UsuarioResponseDto {
     private String cargo;
     @Schema(description = "Se true, o usuário está inativado/bloqueado (não consegue efetuar login)")
     private Boolean bloqueado;
+    @Schema(description = "Número da OAB do advogado, se aplicável.")
+    private String oabNumero;
+    @Schema(description = "UF da OAB do advogado, se aplicável.")
+    private Uf oabUf;
 
     public UsuarioResponseDto(Usuario usuario){
         this.id = usuario.getPublicId();
@@ -80,5 +84,7 @@ public class UsuarioResponseDto {
         this.cargo = usuario.getCargo().toString();
         this.cep = usuario.getCep().toString();
         this.bloqueado = usuario.getBloqueado();
+        this.oabNumero = usuario.getOabNumero();
+        this.oabUf = usuario.getOabUf();
     }
 }

@@ -60,6 +60,10 @@ public class Empresa {
     @Column(name = "processos_monitorados_limite")
     private Integer processosMonitoradosLimite;
 
+    @Schema(description = "Quantas OABs esta empresa pode manter monitoradas simultaneamente nos Diários Oficiais (Escavador), conforme o plano contratado. Null = ilimitado.")
+    @Column(name = "intimacoes_monitoradas_limite")
+    private Integer intimacoesMonitoradasLimite;
+
     @Column(name = "notificacao_visual_habilitada", nullable = false)
     private Boolean notificacaoVisualHabilitada;
 
