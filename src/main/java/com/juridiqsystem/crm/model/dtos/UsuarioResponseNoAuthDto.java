@@ -2,7 +2,6 @@ package com.juridiqsystem.crm.model.dtos;
 
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.enums.Uf;
-import com.juridiqsystem.crm.model.enums.UserRole;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.EnumType;
@@ -17,7 +16,7 @@ import lombok.Setter;
 
 import java.time.LocalDate;
 
-@Schema(description = "Dados completos do usuário, retornados por GET /usuario/{id}/edicao (para preencher formulário de edição). Diferente de UsuarioResponseDto, expõe 'cargo' como enum tipado.")
+@Schema(description = "Dados completos do usuário, retornados por GET /usuario/{id}/edicao (para preencher formulário de edição). Diferente de UsuarioResponseDto, expõe o id do cargo (para o seletor) além do nome.")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -56,8 +55,12 @@ public class UsuarioResponseNoAuthDto {
     @NotNull(message = "O campo CEP é requerido.")
     private String cep;
     private String observacoes;
-    @Schema(description = "Cargo do usuário: ADMINISTRADOR concede as autoridades ROLE_ADMIN e ROLE_VENDEDOR; VENDEDOR concede apenas ROLE_VENDEDOR")
-    private UserRole cargo;
+    @Schema(description = "Id público do cargo do usuário, usado para pré-selecionar o cargo no formulário")
+    private String cargoId;
+    @Schema(description = "Nome do cargo do usuário, para exibição")
+    private String cargoNome;
+    @Schema(description = "Se true, o usuário é super-admin da plataforma (/master/**), independente do cargo")
+    private Boolean master;
     @Schema(description = "Se true, o usuário está inativado/bloqueado (não consegue efetuar login)")
     private Boolean bloqueado;
     @Schema(description = "Número da OAB do advogado, se aplicável.")
@@ -81,7 +84,9 @@ public class UsuarioResponseNoAuthDto {
         this.uf = usuario.getUf();
         this.cidade = usuario.getCidade();
         this.observacoes = usuario.getObservacoes();
-        this.cargo = usuario.getCargo();
+        this.cargoId = usuario.getCargo() != null ? usuario.getCargo().getPublicId() : null;
+        this.cargoNome = usuario.getCargo() != null ? usuario.getCargo().getNome() : null;
+        this.master = Boolean.TRUE.equals(usuario.getMaster());
         this.cep = usuario.getCep();
         this.bloqueado = usuario.getBloqueado();
         this.oabNumero = usuario.getOabNumero();

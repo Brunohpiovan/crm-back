@@ -56,8 +56,8 @@ public class UsuarioResponseDto {
     @NotNull(message = "O campo CEP é requerido.")
     private String cep;
     private String observacoes;
-    @Schema(description = "Cargo do usuário, como texto (ex.: \"ADMINISTRADOR\", \"VENDEDOR\")")
-    private String cargo;
+    @Schema(description = "Nome do cargo do usuário, como texto livre definido pela empresa (ex.: \"Advogado\")")
+    private String cargoNome;
     @Schema(description = "Se true, o usuário está inativado/bloqueado (não consegue efetuar login)")
     private Boolean bloqueado;
     @Schema(description = "Número da OAB do advogado, se aplicável.")
@@ -81,7 +81,7 @@ public class UsuarioResponseDto {
         this.uf = usuario.getUf();
         this.cidade = usuario.getCidade();
         this.observacoes = usuario.getObservacoes();
-        this.cargo = usuario.getCargo().toString();
+        this.cargoNome = usuario.getCargo() != null ? usuario.getCargo().getNome() : null;
         this.cep = usuario.getCep().toString();
         this.bloqueado = usuario.getBloqueado();
         this.oabNumero = usuario.getOabNumero();

@@ -6,7 +6,6 @@ import com.juridiqsystem.crm.model.Tag;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.*;
 import com.juridiqsystem.crm.model.enums.SituacaoOportunidade;
-import com.juridiqsystem.crm.model.enums.UserRole;
 import com.juridiqsystem.crm.repository.EtapaRepository;
 import com.juridiqsystem.crm.repository.FunilRepository;
 import com.juridiqsystem.crm.repository.OportunidadeRepository;
@@ -49,7 +48,7 @@ public class FunilService {
         Usuario usuario = getUsuarioAutenticado();
 
         List<Funil> funis;
-        if (usuario.getCargo() == UserRole.ADMINISTRADOR) {
+        if (usuario.getCargo() != null && usuario.getCargo().isAdministrador()) {
             funis = funilRepository.findAll();
         }else {
             funis = funilRepository.findByFuncionariosContains(usuario);
@@ -68,7 +67,7 @@ public class FunilService {
                 .orElseThrow(() -> new RuntimeException("Funil não encontrado"));
 
         List<UsuarioContatoDto> usuariosNaoNoFunil =
-                usuarioRepository.findDisponiveisParaFunil(funil.getId(), UserRole.ADMINISTRADOR);
+                usuarioRepository.findDisponiveisParaFunil(funil.getId());
 
         return usuariosNaoNoFunil;
     }

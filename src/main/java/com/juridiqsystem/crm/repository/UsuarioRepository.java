@@ -6,7 +6,6 @@ import com.juridiqsystem.crm.model.dtos.EmpresaUsuarioCountProjection;
 import com.juridiqsystem.crm.model.dtos.UsuarioAllContactsDTO;
 import com.juridiqsystem.crm.model.dtos.UsuarioAllDTO;
 import com.juridiqsystem.crm.model.dtos.UsuarioContatoDto;
-import com.juridiqsystem.crm.model.enums.UserRole;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -31,6 +30,9 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     boolean existsByCpf(String cpf);
     boolean existsByCpfAndIdNot(String cpf, Long id);
 
+    /** Usado por CargoService.excluir: um cargo com usuários vinculados não pode ser removido. */
+    boolean existsByCargoId(Long cargoId);
+
     /**
      * Nativa de propósito: login/cpf são únicos por Empresa agora, e esta é a query usada
      * ANTES de qualquer autenticação (AuthorizationService.loadUserByUsername) — o
@@ -53,15 +55,21 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     @Query(value = "SELECT * FROM usuario WHERE id = :id", nativeQuery = true)
     Optional<Usuario> findByIdIgnorandoTenant(@Param("id") Long id);
 
+    /**
+     * "Disponíveis para o funil" exclui quem já está nele e quem ocupa o cargo de administrador
+     * da empresa (administrador enxerga todos os funis por definição, não precisa ser vinculado
+     * a um). Antes o cargo a excluir vinha como parâmetro (UserRole.ADMINISTRADOR); agora a
+     * condição é o flag do Cargo, já que o nome do cargo é livre por empresa.
+     */
     @Query("""
     SELECT new com.juridiqsystem.crm.model.dtos.UsuarioContatoDto(u.publicId, u.nome, u.urlPicture)
     FROM Usuario u
-    WHERE u.cargo <> :cargo
+    WHERE u.cargo.administrador = false
     AND u.id NOT IN (
         SELECT f.id FROM Funil fn JOIN fn.funcionarios f WHERE fn.id = :funilId
     )
     """)
-    List<UsuarioContatoDto> findDisponiveisParaFunil(@Param("funilId") Long funilId, @Param("cargo") UserRole cargo);
+    List<UsuarioContatoDto> findDisponiveisParaFunil(@Param("funilId") Long funilId);
 
     @Query("""
     SELECT new com.juridiqsystem.crm.model.dtos.UsuarioContatoDto(u.publicId, u.nome, u.urlPicture)
@@ -73,18 +81,22 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     List<UsuarioContatoDto> findFuncionariosDoFunil(@Param("funilId") Long funilId);
 
     @Query("""
-    SELECT new com.juridiqsystem.crm.model.dtos.UsuarioAllDTO(u.publicId, u.nome, u.login, u.celular, u.cargo, u.bloqueado, u.urlPicture, u.oabNumero, u.oabUf)
+    SELECT new com.juridiqsystem.crm.model.dtos.UsuarioAllDTO(u.publicId, u.nome, u.login, u.celular, u.cargo.publicId, u.cargo.nome, u.cargo.administrador, u.master, u.bloqueado, u.urlPicture, u.oabNumero, u.oabUf)
     FROM Usuario u
     WHERE (:search IS NULL OR LOWER(u.nome) LIKE :search OR LOWER(u.login) LIKE :search)
     """)
     Page<UsuarioAllDTO> findAllPaginado(@Param("search") String search, Pageable pageable);
 
+    /**
+     * Substitui findResumoByCargo(UserRole.ADMINISTRADOR): com cargo customizável, "administrador"
+     * deixou de ser um nome de enum e passou a ser o flag do Cargo da empresa.
+     */
     @Query("""
-    SELECT new com.juridiqsystem.crm.model.dtos.UsuarioAllDTO(u.publicId, u.nome, u.login, u.celular, u.cargo, u.bloqueado, u.urlPicture, u.oabNumero, u.oabUf)
+    SELECT new com.juridiqsystem.crm.model.dtos.UsuarioAllDTO(u.publicId, u.nome, u.login, u.celular, u.cargo.publicId, u.cargo.nome, u.cargo.administrador, u.master, u.bloqueado, u.urlPicture, u.oabNumero, u.oabUf)
     FROM Usuario u
-    WHERE u.cargo = :cargo
+    WHERE u.cargo.administrador = true
     """)
-    List<UsuarioAllDTO> findResumoByCargo(@Param("cargo") UserRole cargo);
+    List<UsuarioAllDTO> findResumoByCargoAdministradorTrue();
 
     @Query("""
     SELECT new com.juridiqsystem.crm.model.dtos.CriadorDto(u.publicId, u.nome, u.login, u.celular, u.urlPicture)
@@ -125,12 +137,13 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
      * bloqueados (bloqueado = true é inativação lógica, não deve entrar na contagem "atual").
      */
     @Query(value = """
-    SELECT empresa_id AS empresaId,
+    SELECT u.empresa_id AS empresaId,
            COUNT(*) AS totalUsuarios,
-           SUM(CASE WHEN cargo = 'ADMINISTRADOR' THEN 1 ELSE 0 END) AS totalAdmins
-    FROM usuario
-    WHERE empresa_id IN (:empresaIds) AND bloqueado = false
-    GROUP BY empresa_id
+           SUM(CASE WHEN c.administrador = TRUE THEN 1 ELSE 0 END) AS totalAdmins
+    FROM usuario u
+    JOIN cargo c ON c.id = u.cargo_id
+    WHERE u.empresa_id IN (:empresaIds) AND u.bloqueado = false
+    GROUP BY u.empresa_id
     """, nativeQuery = true)
     List<EmpresaUsuarioCountProjection> countUsuariosPorEmpresa(@Param("empresaIds") List<Long> empresaIds);
 }

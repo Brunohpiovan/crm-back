@@ -118,18 +118,21 @@ public class SecurityConfiguration {
                         // ADMIN, mesmo padrão de PUT /empresa — nenhum vendedor gerencia essa integração.
                         .requestMatchers(HttpMethod.GET, "/empresa/whatsapp-integration/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.POST, "/empresa/whatsapp-integration/**").hasAuthority("ROLE_ADMIN")
-                        // Só ADMINISTRADOR cria/atualiza/exclui funil e etapa (afeta o pipeline
-                        // de vendas de todos os vendedores). Match exato em "/funil" (POST) não
-                        // pega POST /funil/filtro (consulta) nem POST /funil/add-funcionario/**.
-                        .requestMatchers(HttpMethod.POST, "/funil").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/funil/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/funil/**").hasAuthority("ROLE_ADMIN")
+                        // Criar/atualizar/excluir funil e etapa afeta o pipeline de todos, mas é
+                        // configuração de negócio delegável: quem tem o cargo administrador recebe
+                        // todos os PERM_* automaticamente (ver Usuario.getAuthorities()), e um cargo
+                        // customizado só passa a poder se receber GERENCIAR_FUNIL. Match exato em
+                        // "/funil" (POST) não pega POST /funil/filtro (consulta) nem
+                        // POST /funil/add-funcionario/**.
+                        .requestMatchers(HttpMethod.POST, "/funil").hasAuthority("PERM_GERENCIAR_FUNIL")
+                        .requestMatchers(HttpMethod.PUT, "/funil/**").hasAuthority("PERM_GERENCIAR_FUNIL")
+                        .requestMatchers(HttpMethod.DELETE, "/funil/**").hasAuthority("PERM_GERENCIAR_FUNIL")
                         // Adicionar vendedor a um funil é gestão de equipe, não uso básico do
                         // funil — só ADMIN. Não bate no matcher exato "/funil" (POST) acima.
                         .requestMatchers(HttpMethod.POST, "/funil/add-funcionario/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/etapa").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/etapa/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/etapa/**").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/etapa").hasAuthority("PERM_GERENCIAR_FUNIL")
+                        .requestMatchers(HttpMethod.PUT, "/etapa/**").hasAuthority("PERM_GERENCIAR_FUNIL")
+                        .requestMatchers(HttpMethod.DELETE, "/etapa/**").hasAuthority("PERM_GERENCIAR_FUNIL")
                         // Oportunidade continua liberada de propósito: é o card individual de
                         // trabalho do vendedor (criar, editar, mover entre etapas, excluir) — só
                         // a estrutura do funil/etapa em si (acima) é restrita a ADMIN.
@@ -140,23 +143,28 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.DELETE, "/participante/**").hasAuthority("ROLE_ADMIN")
                         // Cadência, template de e-mail e tag são configuração compartilhada da
                         // empresa inteira (diferente de Oportunidade, que é liberada de propósito
-                        // — ver comentário acima). Mesmo padrão já usado em Funil/Etapa: só ADMIN
-                        // cria/edita/exclui.
-                        .requestMatchers(HttpMethod.POST, "/cadencia").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/cadencia/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/cadencia/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/template/create").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/template/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/template/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/tag").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/tag/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/tag/**").hasAuthority("ROLE_ADMIN")
+                        // — ver comentário acima). Mesmo padrão de Funil/Etapa: delegável por
+                        // permissão de cargo, com o cargo administrador já cobrindo todas elas.
+                        .requestMatchers(HttpMethod.POST, "/cadencia").hasAuthority("PERM_GERENCIAR_CADENCIA")
+                        .requestMatchers(HttpMethod.PUT, "/cadencia/**").hasAuthority("PERM_GERENCIAR_CADENCIA")
+                        .requestMatchers(HttpMethod.DELETE, "/cadencia/**").hasAuthority("PERM_GERENCIAR_CADENCIA")
+                        .requestMatchers(HttpMethod.POST, "/template/create").hasAuthority("PERM_GERENCIAR_TEMPLATE_EMAIL")
+                        .requestMatchers(HttpMethod.PUT, "/template/**").hasAuthority("PERM_GERENCIAR_TEMPLATE_EMAIL")
+                        .requestMatchers(HttpMethod.DELETE, "/template/**").hasAuthority("PERM_GERENCIAR_TEMPLATE_EMAIL")
+                        .requestMatchers(HttpMethod.POST, "/tag").hasAuthority("PERM_GERENCIAR_TAG")
+                        .requestMatchers(HttpMethod.PUT, "/tag/**").hasAuthority("PERM_GERENCIAR_TAG")
+                        .requestMatchers(HttpMethod.DELETE, "/tag/**").hasAuthority("PERM_GERENCIAR_TAG")
                         // Editar grupo de chat (renomear, trocar foto, adicionar/remover membros)
                         // não tinha nenhuma checagem — qualquer autenticado podia mexer em
                         // qualquer grupo, mesmo sem ser membro. ChatGrupo não tem campo de
                         // "criador" (só a lista de membros), então restringir a ADMIN é o corte
                         // mais simples sem exigir migration. Criar grupo continua liberado.
                         .requestMatchers(HttpMethod.PUT, "/grupos/**").hasAuthority("ROLE_ADMIN")
+                        // Cargos e permissões da empresa: gerenciar quem pode o que é a raiz da
+                        // autorização, então continua exclusivo de ROLE_ADMIN e deliberadamente
+                        // NÃO tem Permissao correspondente — delegar isso seria delegar a própria
+                        // capacidade de escalar privilégio.
+                        .requestMatchers("/cargos/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/log/finalizar/**").permitAll()
                         // Histórico de acesso (IP/geolocalização/dispositivo) de usuários da

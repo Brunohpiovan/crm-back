@@ -2,7 +2,6 @@ package com.juridiqsystem.crm.model;
 
 import com.juridiqsystem.crm.model.enums.TipoParticipante;
 import com.juridiqsystem.crm.model.enums.Uf;
-import com.juridiqsystem.crm.model.enums.UserRole;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;

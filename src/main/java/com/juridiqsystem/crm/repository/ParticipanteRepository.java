@@ -3,7 +3,6 @@ package com.juridiqsystem.crm.repository;
 import com.juridiqsystem.crm.model.Participante;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.enums.StatusProtocolo;
-import com.juridiqsystem.crm.model.enums.UserRole;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

@@ -22,7 +22,6 @@ import com.juridiqsystem.crm.model.dtos.PageResponse;
 import com.juridiqsystem.crm.model.enums.Origem;
 import com.juridiqsystem.crm.model.enums.Situacao;
 import com.juridiqsystem.crm.model.enums.SituacaoOportunidade;
-import com.juridiqsystem.crm.model.enums.UserRole;
 import com.juridiqsystem.crm.repository.CadenciaFunilRepository;
 import com.juridiqsystem.crm.repository.EmpresaRepository;
 import com.juridiqsystem.crm.repository.EquipeRepository;
@@ -188,14 +187,14 @@ public class DashboardService {
 
     /**
      * Resolve userId + teamId para uma única lista de ids elegível para os filtros do dashboard.
-     * Lista vazia = sem restrição (só é possível para ADMINISTRADOR sem nenhum dos dois filtros).
-     * teamId só amplia a visão de ADMINISTRADOR (vê o time inteiro); para quem não é
-     * ADMINISTRADOR, o resultado continua restrito ao próprio id mesmo informando uma equipe da
+     * Lista vazia = sem restrição (só é possível para quem ocupa o cargo administrador, sem nenhum dos dois filtros).
+     * teamId só amplia a visão do administrador (vê o time inteiro); para quem não é
+     * administrador, o resultado continua restrito ao próprio id mesmo informando uma equipe da
      * qual é membro — só serve para não dar erro, não para ver dados de colegas (a entidade
      * Equipe não tem noção de líder/permissão elevada).
      */
     private List<Long> resolverUserIdsComAutorizacao(Usuario usuario, Long userIdFiltro, Long teamId) {
-        boolean administrador = usuario.getCargo() == UserRole.ADMINISTRADOR;
+        boolean administrador = usuario.getCargo() != null && usuario.getCargo().isAdministrador();
         List<Long> membrosDaEquipe = null;
 
         if (teamId != null) {
@@ -251,7 +250,7 @@ public class DashboardService {
     }
 
     private List<Long> resolverFunilIdsPermitidos(Usuario usuario, Long pipelineId) {
-        List<Long> permitidos = usuario.getCargo() == UserRole.ADMINISTRADOR
+        List<Long> permitidos = usuario.getCargo() != null && usuario.getCargo().isAdministrador()
                 ? funilRepository.findAll().stream().map(Funil::getId).toList()
                 : funilRepository.findByFuncionariosContains(usuario).stream().map(Funil::getId).toList();
 

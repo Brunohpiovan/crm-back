@@ -1,7 +1,6 @@
 package com.juridiqsystem.crm.model.dtos;
 
 import com.juridiqsystem.crm.model.enums.Uf;
-import com.juridiqsystem.crm.model.enums.UserRole;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.annotation.Nullable;
@@ -98,9 +97,12 @@ public class UsuarioCreateDTO {
     @Size(max = 10, message = "O cep deve ter no maximo 10 caracteres")
     private String cep;
 
-    @Schema(description = "Cargo do usuário: ADMINISTRADOR concede as autoridades ROLE_ADMIN e ROLE_VENDEDOR; VENDEDOR concede apenas ROLE_VENDEDOR")
+    @Schema(description = "Id público do Cargo da empresa a ser atribuído ao usuário (ver GET /cargos). O cargo precisa pertencer à mesma empresa.")
     @NotNull(message = "O campo CARGO é requerido.")
-    private UserRole cargo;
+    private String cargoId;
+
+    @Schema(description = "Se true, cria um super-admin da plataforma (/master/**). Só um usuário master pode enviar true; qualquer outro requisitante recebe 403.")
+    private Boolean master;
 
     private String observacoes;
 }

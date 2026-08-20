@@ -7,7 +7,6 @@ import com.juridiqsystem.crm.model.Acesso;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.AuthenticationDTO;
 import com.juridiqsystem.crm.model.dtos.LoginResponseDTO;
-import com.juridiqsystem.crm.model.enums.UserRole;
 import com.juridiqsystem.crm.infra.security.logging.SecurityEventType;
 import com.juridiqsystem.crm.infra.security.logging.SecurityLogger;
 import com.juridiqsystem.crm.service.AcessoService;
@@ -88,7 +87,7 @@ public class AuthenticationService {
             // Só a allowlist de IP é checada aqui; o segredo de rota é regra de /master/** (ver
             // AdminAccessPolicy). A checagem vem DEPOIS da validação de senha, para não virar um
             // oráculo de "esta conta é master" para quem não tem a credencial.
-            if (usuario.getCargo() == UserRole.MASTER && !adminAccessPolicy.isIpAllowed(request)) {
+            if (Boolean.TRUE.equals(usuario.getMaster()) && !adminAccessPolicy.isIpAllowed(request)) {
                 securityLogger.log(SecurityEventType.ADMIN_ROUTE_DENIED,
                         "Login de MASTER recusado: IP fora da allowlist administrativa",
                         username, clientIp, "/auth/login");

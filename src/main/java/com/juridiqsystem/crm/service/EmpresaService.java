@@ -49,6 +49,9 @@ public class EmpresaService {
     @Autowired
     private SecurityLogger securityLogger;
 
+    @Autowired
+    private CargoService cargoService;
+
     public Page<EmpresaResponseDTO> findAll(String search, Pageable pageable) {
         String termoBusca = (search == null || search.isBlank())
                 ? null
@@ -88,6 +91,10 @@ public class EmpresaService {
         empresa.setAtualizadoEm(LocalDateTime.now());
 
         Empresa salva = empresaRepository.save(empresa);
+        // Toda empresa precisa nascer com o cargo administrador (Usuario.cargo_id é NOT NULL, e
+        // sem ele não haveria como criar o primeiro usuário administrador da empresa nova).
+        cargoService.criarCargosPadrao(salva.getId());
+
         securityLogger.log(SecurityEventType.ADMIN_ACTION, "Empresa criada: codigo=" + salva.getCodigo(),
                 currentActorLogin(), null, "/master/empresas");
         return new EmpresaResponseDTO(salva);

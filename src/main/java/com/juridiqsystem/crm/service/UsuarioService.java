@@ -4,16 +4,18 @@ import com.juridiqsystem.crm.infra.security.TenantContext;
 import com.juridiqsystem.crm.infra.security.TokenService;
 import com.juridiqsystem.crm.infra.security.logging.SecurityEventType;
 import com.juridiqsystem.crm.infra.security.logging.SecurityLogger;
+import com.juridiqsystem.crm.model.Cargo;
 import com.juridiqsystem.crm.model.MensagemInterna;
 import com.juridiqsystem.crm.model.Participante;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.*;
 import com.juridiqsystem.crm.model.enums.TipoParticipante;
-import com.juridiqsystem.crm.model.enums.UserRole;
+import com.juridiqsystem.crm.repository.CargoRepository;
 import com.juridiqsystem.crm.repository.ChatGrupoRepository;
 import com.juridiqsystem.crm.repository.MensagemInternaRepository;
 import com.juridiqsystem.crm.repository.UsuarioRepository;
 import com.juridiqsystem.crm.service.exceptions.DataIntegrityViolationException;
+import com.juridiqsystem.crm.service.exceptions.ResourceNotFoundException;
 import com.juridiqsystem.crm.service.exceptions.UserNotFoundException;
 import com.juridiqsystem.crm.service.exceptions.AccessDeniedException;
 
@@ -68,6 +70,9 @@ public class UsuarioService {
 
     @Autowired
     private MensagemInternaRepository mensagemInternaRepository;
+
+    @Autowired
+    private CargoRepository cargoRepository;
 
     public UsuarioResponseNoAuthDto findByIdParaEdicao(String publicId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -145,7 +150,7 @@ public class UsuarioService {
     }
 
     public List<UsuarioAllDTO> findByAdmin() {
-        return usuarioRepository.findResumoByCargo(UserRole.ADMINISTRADOR);
+        return usuarioRepository.findResumoByCargoAdministradorTrue();
     }
 
     public UsuarioResponseDto findById(String publicId) {
@@ -169,8 +174,11 @@ public class UsuarioService {
 
     public UsuarioAllDTO save(UsuarioCreateDTO dto, MultipartFile foto) {
         validarDuplicidadeCriacao(dto.getLogin(), dto.getCpf());
+        validarPodeDefinirMaster(dto.getMaster());
 
         Usuario usuario = new Usuario(dto);
+        usuario.setCargo(resolverCargoDaEmpresa(dto.getCargoId()));
+        usuario.setMaster(Boolean.TRUE.equals(dto.getMaster()));
         if (!imageUrlValidator.isPermitida(usuario.getUrlPicture())) {
             throw new IllegalArgumentException("URL de foto não permitida.");
         }
@@ -194,7 +202,8 @@ public class UsuarioService {
         usuario = usuarioRepository.save(usuario);
 
         securityLogger.log(SecurityEventType.ADMIN_ACTION,
-                "Usuário criado: login=" + usuario.getLogin() + "; cargo=" + usuario.getCargo(),
+                "Usuário criado: login=" + usuario.getLogin() + "; cargo=" + usuario.getCargo().getNome()
+                        + "; master=" + usuario.getMaster(),
                 currentActorLogin(), null, "/usuario");
 
         return new UsuarioAllDTO(usuario);
@@ -293,20 +302,26 @@ public class UsuarioService {
 
     public UsuarioAllDTO updateAll(String publicId, UsuarioAdminUpdateDTO dto, MultipartFile foto) {
         Usuario usuarioDoBanco = buscarUsuarioPorPublicId(publicId);
-        Usuario requisitante = validarPodeGerenciar(usuarioDoBanco, "/usuario/all/" + publicId);
+        validarPodeGerenciar(usuarioDoBanco, "/usuario/all/" + publicId);
+        validarPodeDefinirMaster(dto.getMaster());
 
-        if (dto.getCargo() == UserRole.MASTER && requisitante.getCargo() != UserRole.MASTER) {
-            throw new AccessDeniedException("Você não tem permissão para definir o cargo MASTER.");
-        }
+        Cargo cargo = resolverCargoDaEmpresa(dto.getCargoId());
 
         aplicarAtualizacao(usuarioDoBanco, dto, foto);
-        usuarioDoBanco.setCargo(dto.getCargo());
+        usuarioDoBanco.setCargo(cargo);
+        // master só muda quando o payload traz o campo: os formulários que não exibem o switch
+        // (visível apenas para quem já é master) o omitem, e omitir não pode rebaixar
+        // silenciosamente um usuário master.
+        if (dto.getMaster() != null) {
+            usuarioDoBanco.setMaster(dto.getMaster());
+        }
         usuarioDoBanco.setBloqueado(dto.getBloqueado());
         usuarioRepository.save(usuarioDoBanco);
 
         securityLogger.log(SecurityEventType.ADMIN_ACTION,
                 "Atualização administrativa de usuário-alvo=" + usuarioDoBanco.getLogin()
-                        + "; cargo=" + dto.getCargo() + "; bloqueado=" + dto.getBloqueado(),
+                        + "; cargo=" + cargo.getNome() + "; master=" + usuarioDoBanco.getMaster()
+                        + "; bloqueado=" + dto.getBloqueado(),
                 currentActorLogin(), null, "/usuario/all/" + publicId);
 
         return new UsuarioAllDTO(usuarioDoBanco);
@@ -317,7 +332,8 @@ public class UsuarioService {
      * que além de cargo/bloqueado também podem alterar login e senha de outra conta
      * (UsuarioAdminUpdateDTO tem ambos os campos). Duas regras: (1) ninguém pode se auto-alterar
      * por essa via — existe /usuario/{id} (self-service) pra isso, que não expõe cargo/bloqueado;
-     * (2) um ADMINISTRADOR não pode alterar outro ADMINISTRADOR nem um MASTER, só um MASTER pode.
+     * (2) quem ocupa o cargo administrador não pode alterar outro administrador nem um usuário
+     * master — só um master pode.
      * Funciona também no fluxo master gerenciando uma empresa-cliente (TenantContext.runAs): esse
      * runAs só troca o tenant de dados, a autenticação continua sendo a do MASTER que fez a
      * requisição, então authentication.getPrincipal() aqui é sempre o ator real, nunca afetado
@@ -334,8 +350,9 @@ public class UsuarioService {
             throw new AccessDeniedException("Você não pode alterar sua própria conta por aqui. Use a tela \"Minha conta\".");
         }
 
-        boolean alvoPrivilegiado = usuarioAlvo.getCargo() == UserRole.ADMINISTRADOR || usuarioAlvo.getCargo() == UserRole.MASTER;
-        if (alvoPrivilegiado && requisitante.getCargo() != UserRole.MASTER) {
+        boolean alvoPrivilegiado = (usuarioAlvo.getCargo() != null && usuarioAlvo.getCargo().isAdministrador())
+                || Boolean.TRUE.equals(usuarioAlvo.getMaster());
+        if (alvoPrivilegiado && !Boolean.TRUE.equals(requisitante.getMaster())) {
             securityLogger.log(SecurityEventType.RESOURCE_ACCESS_DENIED,
                     "Tentativa de administrador alterar outro administrador: alvo=" + usuarioAlvo.getLogin(),
                     requisitante.getLogin(), null, path);
@@ -343,6 +360,40 @@ public class UsuarioService {
         }
 
         return requisitante;
+    }
+
+    /**
+     * Resolve o Cargo pelo id público DENTRO da empresa da requisição (TenantContext, que no fluxo
+     * do master já aponta para a empresa-alvo via runAs). Sem esse recorte por empresa, um
+     * administrador poderia atribuir a um usuário seu um cargo de outra empresa — por engano ou
+     * de propósito.
+     */
+    private Cargo resolverCargoDaEmpresa(String cargoPublicId) {
+        if (cargoPublicId == null || cargoPublicId.isBlank()) {
+            throw new DataIntegrityViolationException("Informe o cargo do usuário.");
+        }
+        return cargoRepository.findByEmpresaIdAndPublicId(TenantContext.get(), cargoPublicId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cargo não encontrado nesta empresa."));
+    }
+
+    /**
+     * Só um usuário master cria ou promove outro master. Antes essa checagem existia apenas na
+     * atualização; na criação, o cargo MASTER podia ser enviado por qualquer ROLE_ADMIN, o que
+     * permitia escalar privilégio criando um usuário master novo.
+     */
+    private void validarPodeDefinirMaster(Boolean masterSolicitado) {
+        if (!Boolean.TRUE.equals(masterSolicitado)) {
+            return;
+        }
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean requisitanteEhMaster = authentication != null
+                && authentication.getPrincipal() instanceof Usuario requisitante
+                && Boolean.TRUE.equals(requisitante.getMaster());
+        if (!requisitanteEhMaster) {
+            securityLogger.log(SecurityEventType.RESOURCE_ACCESS_DENIED,
+                    "Tentativa de definir usuário master sem ser master", currentActorLogin(), null, "/usuario");
+            throw new AccessDeniedException("Você não tem permissão para definir um usuário master.");
+        }
     }
 
     private Usuario buscarUsuarioPorPublicId(String publicId) {

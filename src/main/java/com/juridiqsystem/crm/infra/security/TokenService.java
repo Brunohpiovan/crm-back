@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 
 @Service
 public class TokenService {
@@ -27,6 +28,12 @@ public class TokenService {
      * TenantContext ANTES de buscar o Usuario no banco (Usuario é @TenantId, então sem o
      * tenant já resolvido a busca não encontraria nada) — fica como id numérico interno mesmo,
      * Empresa ainda não tem nenhum endpoint que a exponha (ver DASHBOARD.md/plano de multi-tenant).
+     *
+     * <p>Os claims de autorização são explícitos (`admin`, `master`, `cargoNome`, `permissoes`)
+     * desde que cargo virou entidade por empresa: o antigo claim único `roles` carregava o nome
+     * do enum UserRole, que não existe mais. Eles servem só para a UI decidir o que exibir — o
+     * enforcement real continua sendo authority + SecurityConfiguration, recalculado a cada
+     * requisição a partir do banco (ver Usuario.getAuthorities()), nunca a partir do token.</p>
      */
     public String generateToken(Usuario user){
         try {
@@ -37,7 +44,10 @@ public class TokenService {
                     .withClaim("id", user.getPublicId())
                     .withClaim("empresaId", user.getEmpresaId())
                     .withClaim("nome",user.getNome())
-                    .withClaim("roles", String.valueOf(user.getCargo()))
+                    .withClaim("admin", isAdministrador(user))
+                    .withClaim("master", Boolean.TRUE.equals(user.getMaster()))
+                    .withClaim("cargoNome", cargoNome(user))
+                    .withClaim("permissoes", permissoesConcedidas(user))
                     .withClaim("sessionVersion", user.getSessaoVersao())
                     .withExpiresAt(generateExpirationDate())
                     .sign(algorithm);
@@ -45,6 +55,27 @@ public class TokenService {
         }catch (JWTCreationException exception){
             throw new RuntimeException("Error while generating token",exception);
         }
+    }
+
+    private boolean isAdministrador(Usuario user) {
+        return user.getCargo() != null && user.getCargo().isAdministrador();
+    }
+
+    /** String vazia em vez de null: o master não tem cargo relevante, e o claim é só rótulo de UI. */
+    private String cargoNome(Usuario user) {
+        return user.getCargo() != null ? user.getCargo().getNome() : "";
+    }
+
+    /**
+     * Lista vazia para administrador de propósito: quem é admin tem acesso total (ver
+     * Usuario.getAuthorities()) e o frontend trata `admin = true` como "tem tudo" — enumerar
+     * todas as permissões no token só engordaria o JWT sem mudar decisão nenhuma.
+     */
+    private List<String> permissoesConcedidas(Usuario user) {
+        if (user.getCargo() == null || user.getCargo().isAdministrador()) {
+            return List.of();
+        }
+        return user.getCargo().getPermissoes().stream().map(Enum::name).toList();
     }
 
     /**

@@ -1,9 +1,9 @@
 package com.juridiqsystem.crm.model;
 
 import com.juridiqsystem.crm.model.dtos.UsuarioCreateDTO;
+import com.juridiqsystem.crm.model.enums.Permissao;
 import com.juridiqsystem.crm.model.enums.Uf;
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.juridiqsystem.crm.model.enums.UserRole;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
@@ -38,6 +38,9 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Usuario implements UserDetails {
+
+    /** Prefixo das authorities derivadas de Permissao, consumidas por SecurityConfiguration. */
+    public static final String AUTHORITY_PERMISSAO_PREFIX = "PERM_";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -109,9 +112,24 @@ public class Usuario implements UserDetails {
     @Size(max = 15, message = "O telefone deve ter no maximo 15 caracteres")
     private String celular;
 
-    @Column(name = "cargo",nullable = false)
-    @Enumerated(EnumType.STRING)
-    private UserRole cargo;   //Exemplo: admin, user, maneger
+    /**
+     * Cargo da empresa a que este usuário pertence ("Advogado", "Secretário"...). EAGER
+     * (padrão de @ManyToOne, explícito aqui por ser crítico): getAuthorities() depende dele e
+     * roda fora de sessão JPA aberta (open-in-view=false) — inclusive entre frames STOMP, onde
+     * o Usuario fica guardado nos sessionAttributes do WebSocket.
+     */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "cargo_id", nullable = false, foreignKey = @ForeignKey(name = "fk_usuario_cargo"))
+    private Cargo cargo;
+
+    /**
+     * Super-admin da plataforma (dono/operador do juriq-crm), não é um cargo de
+     * empresa-cliente: é ortogonal a `cargo`, autenticado numa empresa interna reservada e
+     * restrito a /master/**. Substitui o antigo valor de enum UserRole.MASTER.
+     */
+    @Schema(description = "Se true, o usuário é super-admin da plataforma (acesso exclusivo a /master/**), independente do cargo.")
+    @Column(name = "master", nullable = false)
+    private Boolean master = false;
 
     @NotBlank(message = "Informe um endereco")
     @Column(name = "endereco",nullable = false)
@@ -187,29 +205,42 @@ public class Usuario implements UserDetails {
         this.uf = usuarioDTO.getUf();
         this.cidade = usuarioDTO.getCidade();
         this.observacoes = usuarioDTO.getObservacoes();
-        this.cargo = usuarioDTO.getCargo();
         this.cep = usuarioDTO.getCep();
-    }
-
-    public Usuario(String login,String senha,UserRole cargo){
-        this.login = login;
-        this.senha = senha;
-        this.cargo = cargo;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         List<SimpleGrantedAuthority> authorities = new ArrayList<>();
 
-        if (this.cargo == UserRole.MASTER) {
+        if (Boolean.TRUE.equals(this.master)) {
             // Master administra empresas/usuários via /master/**, sem acesso às telas normais
-            // do CRM (chat, funil, etc.) — por isso não recebe ROLE_ADMIN nem ROLE_VENDEDOR.
+            // do CRM (chat, funil, etc.) — por isso não recebe ROLE_ADMIN nem ROLE_VENDEDOR,
+            // e é rejeitado automaticamente por todas as regras de rota de empresa.
             authorities.add(new SimpleGrantedAuthority("ROLE_MASTER"));
-        } else if (this.cargo == UserRole.ADMINISTRADOR) {
+            return authorities;
+        }
+
+        // Baseline de todo usuário de empresa: o uso do dia a dia (oportunidades, chat) não
+        // depende de cargo nenhum.
+        authorities.add(new SimpleGrantedAuthority("ROLE_VENDEDOR"));
+
+        if (this.cargo == null) {
+            // Defensivo: cargo_id é NOT NULL no banco, mas um NPE aqui derrubaria toda
+            // requisição autenticada — melhor degradar para o acesso mínimo.
+            return authorities;
+        }
+
+        if (this.cargo.isAdministrador()) {
             authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
-            authorities.add(new SimpleGrantedAuthority("ROLE_VENDEDOR"));
+            // Acesso total vem do flag, não de linhas em cargo_permissao: um admin nunca fica
+            // "capado" por uma permissão faltando/corrompida na tabela.
+            for (Permissao permissao : Permissao.values()) {
+                authorities.add(new SimpleGrantedAuthority(AUTHORITY_PERMISSAO_PREFIX + permissao.name()));
+            }
         } else {
-            authorities.add(new SimpleGrantedAuthority("ROLE_VENDEDOR"));
+            for (Permissao permissao : this.cargo.getPermissoes()) {
+                authorities.add(new SimpleGrantedAuthority(AUTHORITY_PERMISSAO_PREFIX + permissao.name()));
+            }
         }
 
         return authorities;

@@ -1,7 +1,6 @@
 package com.juridiqsystem.crm.model.dtos;
 
 import com.juridiqsystem.crm.model.enums.Uf;
-import com.juridiqsystem.crm.model.enums.UserRole;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.annotation.Nullable;
@@ -21,7 +20,7 @@ import java.time.LocalDate;
  * Payload de atualização administrativa (PUT /usuario/all/{id}, restrito a ROLE_ADMIN).
  * É o único payload de atualização que pode alterar cargo e bloqueado.
  */
-@Schema(description = "Payload multipart (parte 'usuario') para atualização administrativa de um usuário (PUT /usuario/all/{id}, restrito a ROLE_ADMIN). Único payload que pode alterar cargo e bloqueado.")
+@Schema(description = "Payload multipart (parte 'usuario') para atualização administrativa de um usuário (PUT /usuario/all/{id}, restrito a ROLE_ADMIN). Único payload que pode alterar cargo, master e bloqueado.")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -93,9 +92,12 @@ public class UsuarioAdminUpdateDTO implements UsuarioDadosPessoaisDTO {
     @Size(max = 10, message = "O cep deve ter no maximo 10 caracteres")
     private String cep;
 
-    @Schema(description = "Cargo do usuário: ADMINISTRADOR concede as autoridades ROLE_ADMIN e ROLE_VENDEDOR; VENDEDOR concede apenas ROLE_VENDEDOR")
+    @Schema(description = "Id público do Cargo da empresa a ser atribuído ao usuário (ver GET /cargos). O cargo precisa pertencer à mesma empresa.")
     @NotNull(message = "O campo CARGO é requerido.")
-    private UserRole cargo;
+    private String cargoId;
+
+    @Schema(description = "Se true, marca o usuário como super-admin da plataforma (/master/**). Ortogonal ao cargo: só um usuário master pode enviar true.")
+    private Boolean master;
 
     @Schema(description = "Se true, inativa/bloqueia o usuário (impede login); se false, reativa o usuário")
     @NotNull(message = "O campo BLOQUEADO é requerido.")

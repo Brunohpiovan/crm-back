@@ -7,7 +7,6 @@ import com.juridiqsystem.crm.model.Protocolo;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.*;
 import com.juridiqsystem.crm.model.enums.StatusProtocolo;
-import com.juridiqsystem.crm.model.enums.UserRole;
 import com.juridiqsystem.crm.repository.MensagemRepository;
 import com.juridiqsystem.crm.repository.ParticipanteRepository;
 import com.juridiqsystem.crm.repository.ProtocoloRepository;
