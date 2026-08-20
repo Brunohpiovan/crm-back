@@ -5,7 +5,7 @@ import com.juridiqsystem.crm.model.Protocolo;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.ProtocoloMoveDTO;
 import com.juridiqsystem.crm.model.enums.StatusProtocolo;
-import com.juridiqsystem.crm.model.enums.UserRole;
+import com.juridiqsystem.crm.testsupport.TestCargoFactory;
 import com.juridiqsystem.crm.service.ProtocoloService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,7 +59,7 @@ class ProtocoloControllerTest {
         admin.setNome("Admin Teste");
         admin.setLogin("admin@teste.com");
         admin.setSenha("$2a$10$hashDeSenhaSuperSecreta");
-        admin.setCargo(UserRole.ADMINISTRADOR);
+        admin.setCargo(TestCargoFactory.administrador());
 
         Participante participante = new Participante();
         participante.setId(2L);

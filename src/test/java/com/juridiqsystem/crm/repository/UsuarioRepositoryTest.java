@@ -1,10 +1,11 @@
 package com.juridiqsystem.crm.repository;
 
+import com.juridiqsystem.crm.model.Cargo;
 import com.juridiqsystem.crm.model.Funil;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.UsuarioContatoDto;
 import com.juridiqsystem.crm.model.enums.Uf;
-import com.juridiqsystem.crm.model.enums.UserRole;
+import com.juridiqsystem.crm.testsupport.TestCargoFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
@@ -22,6 +23,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * TODOS os usuários (entidade completa, com senha) e filtrava em memória em FunilService quem já
  * estava no funil. Este teste garante que a exclusão feita agora via SQL (NOT IN) produz o mesmo
  * resultado que a filtragem em memória anterior.
+ *
+ * <p>"Administrador" deixou de ser um valor de enum e passou a ser o flag do Cargo da empresa
+ * (cargos são customizáveis por escritório), então a exclusão dos administradores é testada com
+ * dois cargos reais persistidos, não mais com UserRole.</p>
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -41,11 +46,16 @@ class UsuarioRepositoryTest {
     @Autowired
     private FunilRepository funilRepository;
 
+    @Autowired
+    private CargoRepository cargoRepository;
+
     @Test
     void findDisponiveisParaFunilExcluiFuncionariosDoFunilEAdministradores() {
-        Usuario jaNoFunil = usuarioRepository.save(criaUsuario("Ana", "ana@juridiqsystem.com.br", UserRole.VENDEDOR));
-        Usuario disponivel = usuarioRepository.save(criaUsuario("Bruno", "bruno@juridiqsystem.com.br", UserRole.VENDEDOR));
-        usuarioRepository.save(criaUsuario("Carla", "carla@juridiqsystem.com.br", UserRole.ADMINISTRADOR));
+        Cargo comum = cargoRepository.save(TestCargoFactory.comum());
+        Cargo administrador = cargoRepository.save(TestCargoFactory.administrador());
+        Usuario jaNoFunil = usuarioRepository.save(criaUsuario("Ana", "ana@juridiqsystem.com.br", comum));
+        Usuario disponivel = usuarioRepository.save(criaUsuario("Bruno", "bruno@juridiqsystem.com.br", comum));
+        usuarioRepository.save(criaUsuario("Carla", "carla@juridiqsystem.com.br", administrador));
 
         Funil funil = new Funil();
         funil.setNome("Funil Vendas");
@@ -55,7 +65,7 @@ class UsuarioRepositoryTest {
         Long funilId = funilRepository.save(funil).getId();
 
         List<UsuarioContatoDto> disponiveis =
-                usuarioRepository.findDisponiveisParaFunil(funilId, UserRole.ADMINISTRADOR);
+                usuarioRepository.findDisponiveisParaFunil(funilId);
 
         assertThat(disponiveis)
                 .extracting(UsuarioContatoDto::getId)
@@ -64,9 +74,11 @@ class UsuarioRepositoryTest {
 
     @Test
     void findDisponiveisParaFunilRetornaTodosNaoAdministradoresQuandoFunilVazio() {
-        Usuario vendedor1 = usuarioRepository.save(criaUsuario("Diego", "diego@juridiqsystem.com.br", UserRole.VENDEDOR));
-        Usuario vendedor2 = usuarioRepository.save(criaUsuario("Elis", "elis@juridiqsystem.com.br", UserRole.VENDEDOR));
-        usuarioRepository.save(criaUsuario("Fabio", "fabio@juridiqsystem.com.br", UserRole.ADMINISTRADOR));
+        Cargo comum = cargoRepository.save(TestCargoFactory.comum());
+        Cargo administrador = cargoRepository.save(TestCargoFactory.administrador());
+        Usuario vendedor1 = usuarioRepository.save(criaUsuario("Diego", "diego@juridiqsystem.com.br", comum));
+        Usuario vendedor2 = usuarioRepository.save(criaUsuario("Elis", "elis@juridiqsystem.com.br", comum));
+        usuarioRepository.save(criaUsuario("Fabio", "fabio@juridiqsystem.com.br", administrador));
 
         Funil funil = new Funil();
         funil.setNome("Funil Vazio");
@@ -74,14 +86,14 @@ class UsuarioRepositoryTest {
         Long funilId = funilRepository.save(funil).getId();
 
         List<UsuarioContatoDto> disponiveis =
-                usuarioRepository.findDisponiveisParaFunil(funilId, UserRole.ADMINISTRADOR);
+                usuarioRepository.findDisponiveisParaFunil(funilId);
 
         assertThat(disponiveis)
                 .extracting(UsuarioContatoDto::getId)
                 .containsExactlyInAnyOrder(vendedor1.getPublicId(), vendedor2.getPublicId());
     }
 
-    private Usuario criaUsuario(String nome, String login, UserRole cargo) {
+    private Usuario criaUsuario(String nome, String login, Cargo cargo) {
         Usuario usuario = new Usuario();
         usuario.setNome(nome);
         usuario.setLogin(login);

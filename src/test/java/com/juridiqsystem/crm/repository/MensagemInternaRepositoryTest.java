@@ -1,10 +1,11 @@
 package com.juridiqsystem.crm.repository;
 
+import com.juridiqsystem.crm.model.Cargo;
 import com.juridiqsystem.crm.model.ChatGrupo;
 import com.juridiqsystem.crm.model.MensagemInterna;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.enums.Uf;
-import com.juridiqsystem.crm.model.enums.UserRole;
+import com.juridiqsystem.crm.testsupport.TestCargoFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
@@ -47,6 +48,11 @@ class MensagemInternaRepositoryTest {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private CargoRepository cargoRepository;
+
+    private Cargo cargoComum;
 
     @Test
     void findByChatGrupoRetornaApenasMensagensDoGrupoComSenderCarregado() {
@@ -97,7 +103,7 @@ class MensagemInternaRepositoryTest {
         usuario.setCpf(String.valueOf(Math.abs(login.hashCode())));
         usuario.setDataNascimento(LocalDate.of(1990, 5, 10));
         usuario.setCelular("11988888888");
-        usuario.setCargo(UserRole.VENDEDOR);
+        usuario.setCargo(cargoComum());
         usuario.setEndereco("Rua Exemplo");
         usuario.setNumeroResidencial("50");
         usuario.setBairro("Bairro");
@@ -106,5 +112,16 @@ class MensagemInternaRepositoryTest {
         usuario.setCep("02000-000");
         usuario.setBloqueado(false);
         return usuario;
+    }
+
+    /**
+     * Cargo persistido uma vez por teste: usuario.cargo_id é FK NOT NULL desde que o cargo
+     * passou a ser entidade por empresa (antes era o enum UserRole gravado na própria linha).
+     */
+    private Cargo cargoComum() {
+        if (cargoComum == null) {
+            cargoComum = cargoRepository.save(TestCargoFactory.comum());
+        }
+        return cargoComum;
     }
 }

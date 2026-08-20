@@ -1,9 +1,10 @@
 package com.juridiqsystem.crm.repository;
 
+import com.juridiqsystem.crm.model.Cargo;
 import com.juridiqsystem.crm.model.Equipe;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.enums.Uf;
-import com.juridiqsystem.crm.model.enums.UserRole;
+import com.juridiqsystem.crm.testsupport.TestCargoFactory;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +44,11 @@ class EquipeRepositoryTest {
     @Autowired
     private EntityManager entityManager;
 
+    @Autowired
+    private CargoRepository cargoRepository;
+
+    private Cargo cargoComum;
+
     @Test
     void findAllTrazMembrosJaCarregadosSemLazyLoadingAdicional() {
         Usuario membro = usuarioRepository.save(criaUsuario("Ana", "ana@juridiqsystem.com.br"));
@@ -75,7 +81,7 @@ class EquipeRepositoryTest {
         usuario.setCpf(String.valueOf(Math.abs(login.hashCode())));
         usuario.setDataNascimento(LocalDate.of(1995, 1, 1));
         usuario.setCelular("11999999999");
-        usuario.setCargo(UserRole.VENDEDOR);
+        usuario.setCargo(cargoComum());
         usuario.setEndereco("Rua Teste");
         usuario.setNumeroResidencial("100");
         usuario.setBairro("Centro");
@@ -84,5 +90,16 @@ class EquipeRepositoryTest {
         usuario.setCep("01000-000");
         usuario.setBloqueado(false);
         return usuario;
+    }
+
+    /**
+     * Cargo persistido uma vez por teste: usuario.cargo_id é FK NOT NULL desde que o cargo
+     * passou a ser entidade por empresa (antes era o enum UserRole gravado na própria linha).
+     */
+    private Cargo cargoComum() {
+        if (cargoComum == null) {
+            cargoComum = cargoRepository.save(TestCargoFactory.comum());
+        }
+        return cargoComum;
     }
 }

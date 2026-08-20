@@ -2,7 +2,7 @@ package com.juridiqsystem.crm.infra.security;
 
 import com.juridiqsystem.crm.infra.security.logging.SecurityLogger;
 import com.juridiqsystem.crm.model.Usuario;
-import com.juridiqsystem.crm.model.enums.UserRole;
+import com.juridiqsystem.crm.testsupport.TestCargoFactory;
 import com.juridiqsystem.crm.repository.UsuarioRepository;
 import com.juridiqsystem.crm.service.auth.ClientInfoService;
 import jakarta.servlet.FilterChain;
@@ -86,7 +86,7 @@ class SecurityFilterTest {
         usuario.setEmpresaId(9L);
         usuario.setLogin("usuario@teste.com");
         usuario.setNome("Usuário Teste");
-        usuario.setCargo(UserRole.VENDEDOR);
+        usuario.setCargo(TestCargoFactory.comum());
         usuario.setBloqueado(bloqueado);
         usuario.setSessaoVersao(sessaoVersao);
         return usuario;

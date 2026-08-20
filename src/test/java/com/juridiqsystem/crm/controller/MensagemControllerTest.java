@@ -6,7 +6,7 @@ import com.juridiqsystem.crm.model.Protocolo;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.MensagemResponseDTO;
 import com.juridiqsystem.crm.model.enums.StatusProtocolo;
-import com.juridiqsystem.crm.model.enums.UserRole;
+import com.juridiqsystem.crm.testsupport.TestCargoFactory;
 import com.juridiqsystem.crm.service.MensagemService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,7 +60,7 @@ class MensagemControllerTest {
         admin.setNome("Admin Teste");
         admin.setLogin("admin@teste.com");
         admin.setSenha("$2a$10$hashDeSenhaSuperSecreta");
-        admin.setCargo(UserRole.ADMINISTRADOR);
+        admin.setCargo(TestCargoFactory.administrador());
 
         Participante participanteAdmin = new Participante();
         participanteAdmin.setId(1L);

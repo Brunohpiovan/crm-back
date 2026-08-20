@@ -5,7 +5,8 @@ import com.juridiqsystem.crm.model.Participante;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.UsuarioSelfUpdateDTO;
 import com.juridiqsystem.crm.model.enums.Uf;
-import com.juridiqsystem.crm.model.enums.UserRole;
+import com.juridiqsystem.crm.model.Cargo;
+import com.juridiqsystem.crm.testsupport.TestCargoFactory;
 import com.juridiqsystem.crm.repository.UsuarioRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,6 +71,8 @@ class UsuarioServiceUpdateTest {
         lenient().when(imageUrlValidator.isPermitida(any())).thenReturn(true);
     }
 
+    private static final Cargo CARGO_COMUM = TestCargoFactory.comum();
+
     private Usuario usuarioExistente() {
         Usuario usuario = new Usuario();
         usuario.setId(42L);
@@ -77,7 +80,7 @@ class UsuarioServiceUpdateTest {
         usuario.setLogin("alvo@teste.com");
         usuario.setNome("Usuário Alvo");
         usuario.setUrlPicture("assets/img/avatar/padrao.jpeg");
-        usuario.setCargo(UserRole.VENDEDOR);
+        usuario.setCargo(CARGO_COMUM);
         usuario.setBloqueado(false);
         usuario.setRg("123456");
         usuario.setCpf("11122233344");
@@ -128,7 +131,7 @@ class UsuarioServiceUpdateTest {
         ArgumentCaptor<Usuario> captor = ArgumentCaptor.forClass(Usuario.class);
         verify(usuarioRepository).save(captor.capture());
 
-        assertThat(captor.getValue().getCargo()).isEqualTo(UserRole.VENDEDOR);
+        assertThat(captor.getValue().getCargo()).isSameAs(CARGO_COMUM);
         assertThat(captor.getValue().getBloqueado()).isFalse();
         assertThat(captor.getValue().getNome()).isEqualTo("Usuário Alvo Editado");
     }

@@ -5,7 +5,7 @@ import com.juridiqsystem.crm.model.Protocolo;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.ProtocoloDto;
 import com.juridiqsystem.crm.model.enums.StatusProtocolo;
-import com.juridiqsystem.crm.model.enums.UserRole;
+import com.juridiqsystem.crm.testsupport.TestCargoFactory;
 import com.juridiqsystem.crm.repository.MensagemRepository;
 import com.juridiqsystem.crm.repository.ParticipanteRepository;
 import com.juridiqsystem.crm.repository.ProtocoloRepository;
@@ -61,7 +61,7 @@ class ProtocoloServiceTest {
         Usuario admin = new Usuario();
         admin.setId(1L);
         admin.setLogin("admin@teste.com");
-        admin.setCargo(UserRole.ADMINISTRADOR);
+        admin.setCargo(TestCargoFactory.administrador());
 
         lenient().when(usuarioRepository.findByLogin("admin@teste.com"))
                 .thenReturn(Optional.of((UserDetails) admin));

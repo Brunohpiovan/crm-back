@@ -3,7 +3,7 @@ package com.juridiqsystem.crm.service;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.UsuarioResponseDto;
 import com.juridiqsystem.crm.model.dtos.UsuarioResponseNoAuthDto;
-import com.juridiqsystem.crm.model.enums.UserRole;
+import com.juridiqsystem.crm.testsupport.TestCargoFactory;
 import com.juridiqsystem.crm.repository.UsuarioRepository;
 import com.juridiqsystem.crm.service.exceptions.AccessDeniedException;
 import org.junit.jupiter.api.AfterEach;
@@ -51,7 +51,7 @@ class UsuarioServiceAuthorizationTest {
         usuario.setLogin("alvo@teste.com");
         usuario.setNome("Usuário Alvo");
         usuario.setUrlPicture("assets/img/avatar/padrao.jpeg");
-        usuario.setCargo(UserRole.VENDEDOR);
+        usuario.setCargo(TestCargoFactory.comum());
         usuario.setCep("01000-000");
         return usuario;
     }

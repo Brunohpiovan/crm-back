@@ -1,7 +1,7 @@
 package com.juridiqsystem.crm.infra.security;
 
 import com.juridiqsystem.crm.model.Usuario;
-import com.juridiqsystem.crm.model.enums.UserRole;
+import com.juridiqsystem.crm.testsupport.TestCargoFactory;
 import com.juridiqsystem.crm.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,7 +60,7 @@ class StompAuthChannelInterceptorSubscribeTest {
         usuario.setEmpresaId(empresaId);
         usuario.setLogin("user@empresa" + empresaId + ".com");
         usuario.setNome("Usuário Teste");
-        usuario.setCargo(UserRole.VENDEDOR);
+        usuario.setCargo(TestCargoFactory.comum());
         return usuario;
     }
 

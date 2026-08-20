@@ -1,7 +1,9 @@
 package com.juridiqsystem.crm.infra.security;
 
 import com.juridiqsystem.crm.model.Usuario;
-import com.juridiqsystem.crm.model.enums.UserRole;
+import com.juridiqsystem.crm.model.Cargo;
+import com.juridiqsystem.crm.model.enums.Permissao;
+import com.juridiqsystem.crm.testsupport.TestCargoFactory;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
@@ -12,15 +14,17 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Cobre o shape real do claim "roles" do JWT gerado pelo backend (usado pelo AuthService.isAdmin()
- * do frontend), o subject como publicId (UUID) do usuário — não o id numérico interno, que um JWT
- * decodificado no navegador exporia — e o claim "empresaId" (multi-tenant — ver
- * SecurityFilter/TenantContext) e confirma que um token opaco de recuperação de senha (não-JWT)
- * não é aceito como autenticação normal pelo SecurityFilter.
+ * Cobre o shape real dos claims de autorização do JWT gerado pelo backend ("admin", "master",
+ * "cargoNome" e "permissoes", usados por lib/auth.ts no frontend e que substituíram o antigo claim
+ * único "roles", que carregava o nome do enum UserRole), o subject como publicId (UUID) do usuário
+ * — não o id numérico interno, que um JWT decodificado no navegador exporia — e o claim "empresaId"
+ * (multi-tenant — ver SecurityFilter/TenantContext); e confirma que um token opaco de recuperação
+ * de senha (não-JWT) não é aceito como autenticação normal pelo SecurityFilter.
  */
 class TokenServiceTest {
 
@@ -35,7 +39,7 @@ class TokenServiceTest {
         ReflectionTestUtils.setField(tokenService, "secret", SEGREDO_DE_TESTE);
     }
 
-    private Usuario usuarioComCargo(UserRole cargo) {
+    private Usuario usuarioComCargo(Cargo cargo) {
         Usuario usuario = new Usuario();
         usuario.setId(1L);
         usuario.setPublicId(PUBLIC_ID_DE_TESTE);
@@ -43,32 +47,51 @@ class TokenServiceTest {
         usuario.setLogin("usuario@teste.com");
         usuario.setNome("Usuário Teste");
         usuario.setCargo(cargo);
+        usuario.setMaster(false);
         return usuario;
     }
 
     @Test
-    void generateToken_claimRolesEhAStringDoNomeDoEnumParaAdministrador() {
-        String token = tokenService.generateToken(usuarioComCargo(UserRole.ADMINISTRADOR));
+    void generateToken_cargoAdministrador_marcaAdminSemEnumerarPermissoes() {
+        String token = tokenService.generateToken(usuarioComCargo(TestCargoFactory.administrador()));
 
         DecodedJWT decoded = JWT.decode(token);
 
-        assertThat(decoded.getClaim("roles").asString()).isEqualTo("ADMINISTRADOR");
+        assertThat(decoded.getClaim("admin").asBoolean()).isTrue();
+        assertThat(decoded.getClaim("master").asBoolean()).isFalse();
+        assertThat(decoded.getClaim("cargoNome").asString()).isEqualTo("Administrador");
+        // Administrador tem acesso total pelo flag: enumerar as permissões no token só engordaria
+        // o JWT — o frontend trata admin = true como "tem tudo" (ver hasPermissao em lib/auth.ts).
+        assertThat(decoded.getClaim("permissoes").asList(String.class)).isEmpty();
         assertThat(decoded.getSubject()).isEqualTo(PUBLIC_ID_DE_TESTE);
         assertThat(decoded.getClaim("empresaId").asLong()).isEqualTo(9L);
     }
 
     @Test
-    void generateToken_claimRolesEhAStringDoNomeDoEnumParaVendedor() {
-        String token = tokenService.generateToken(usuarioComCargo(UserRole.VENDEDOR));
+    void generateToken_cargoCustomizado_listaSomenteAsPermissoesDelegadas() {
+        Usuario usuario = usuarioComCargo(TestCargoFactory.comum("Advogado", Permissao.GERENCIAR_TEMPLATE_EMAIL));
 
-        DecodedJWT decoded = JWT.decode(token);
+        DecodedJWT decoded = JWT.decode(tokenService.generateToken(usuario));
 
-        assertThat(decoded.getClaim("roles").asString()).isEqualTo("VENDEDOR");
+        assertThat(decoded.getClaim("admin").asBoolean()).isFalse();
+        assertThat(decoded.getClaim("cargoNome").asString()).isEqualTo("Advogado");
+        assertThat(decoded.getClaim("permissoes").asList(String.class))
+                .isEqualTo(List.of(Permissao.GERENCIAR_TEMPLATE_EMAIL.name()));
+    }
+
+    @Test
+    void generateToken_usuarioMaster_marcaMasterEnaoAdmin() {
+        Usuario usuario = usuarioComCargo(TestCargoFactory.administrador());
+        usuario.setMaster(true);
+
+        DecodedJWT decoded = JWT.decode(tokenService.generateToken(usuario));
+
+        assertThat(decoded.getClaim("master").asBoolean()).isTrue();
     }
 
     @Test
     void validateToken_tokenValido_retornaOPublicIdDoSubjectEEmpresaIdComoClaim() {
-        String token = tokenService.generateToken(usuarioComCargo(UserRole.VENDEDOR));
+        String token = tokenService.generateToken(usuarioComCargo(TestCargoFactory.comum()));
 
         DecodedJWT decoded = tokenService.validateToken(token);
 

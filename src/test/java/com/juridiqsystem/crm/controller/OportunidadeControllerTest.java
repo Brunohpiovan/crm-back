@@ -6,7 +6,7 @@ import com.juridiqsystem.crm.model.Participante;
 import com.juridiqsystem.crm.model.Usuario;
 import com.juridiqsystem.crm.model.dtos.OportunidadeDTO;
 import com.juridiqsystem.crm.model.enums.SituacaoOportunidade;
-import com.juridiqsystem.crm.model.enums.UserRole;
+import com.juridiqsystem.crm.testsupport.TestCargoFactory;
 import com.juridiqsystem.crm.service.OportunidadeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,7 +58,7 @@ class OportunidadeControllerTest {
         criador.setNome("Vendedor Teste");
         criador.setLogin("vendedor@teste.com");
         criador.setSenha("$2a$10$hashDeSenhaSuperSecreta");
-        criador.setCargo(UserRole.VENDEDOR);
+        criador.setCargo(TestCargoFactory.comum());
 
         Participante cliente = new Participante();
         cliente.setId(2L);
